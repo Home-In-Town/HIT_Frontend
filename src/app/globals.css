@@ -1,0 +1,37 @@
+@import "tailwindcss";
+
+
+:root {
+  /* Option 3: Warm Local Builder Theme */
+  --background: #FAF7F2; /* Cream / Off-white */
+  --foreground: #2A2A2A; /* Dark brown-gray */
+  
+  --primary: #B45309;    /* Terracotta / Brick */
+  --primary-hover: #92400E;
+  
+  --secondary: #3F6212;  /* Olive Green */
+  --accent: #E7E5E4;     /* Soft warm gray for borders */
+  
+  --card-bg: #FFFFFF;
+  --muted: #78716C;      /* Stone gray */
+  
+  /* Theme colors for Tailwind */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-serif: 'Playfair Display', serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif, var(--font-sans));
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
