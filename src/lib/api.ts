@@ -2,7 +2,7 @@
 
 import { Project, ProjectFormData } from '@/types/project';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class ApiError extends Error {
     status: number;
@@ -216,11 +216,11 @@ export interface ProjectAnalytics {
         timestamp: string;
     }[];
     recentVisits: {
-    _id: string;
-    timestamp: string;
-    duration: number;
-    leadId?: string;
-  }[];
+        _id: string;
+        timestamp: string;
+        duration: number;
+        leadId?: string;
+    }[];
 }
 
 export interface ProjectAnalyticsOverview {
@@ -255,30 +255,30 @@ export const analyticsApi = {
 -----------------------------------*/
 
 export interface NewCallPayload {
-  to: string;              // user phone
-  from: string;            // AI/system identifier
-  projectId: string;
+    to: string;              // user phone
+    from: string;            // AI/system identifier
+    projectId: string;
 
-  agentId?: string;
-  clientId?: string;
-  metadata?: Record<string, any>;
+    agentId?: string;
+    clientId?: string;
+    metadata?: Record<string, any>;
 }
 
 export interface CallStatusResponse {
-  callId: string;
-  status: 'queued' | 'ringing' | 'in-progress' | 'completed' | 'failed';
-  duration?: number;
-  error?: string;
+    callId: string;
+    status: 'queued' | 'ringing' | 'in-progress' | 'completed' | 'failed';
+    duration?: number;
+    error?: string;
 }
 
 export interface CallLog {
-  callId: string;
-  projectId?: string;
-  userNumber?: string;
-  aiNumber?: string;
-  status: string;
-  duration?: number;
-  createdAt?: string;
+    callId: string;
+    projectId?: string;
+    userNumber?: string;
+    aiNumber?: string;
+    status: string;
+    duration?: number;
+    createdAt?: string;
 }
 
 
@@ -287,32 +287,32 @@ export interface CallLog {
 -----------------------------------*/
 
 export const callApi = {
-  initiateCall(payload: NewCallPayload): Promise<CallStatusResponse> {
-    return fetch(`${API_URL}/calls/new`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    }).then((res) => handleResponse<CallStatusResponse>(res));
-  },
+    initiateCall(payload: NewCallPayload): Promise<CallStatusResponse> {
+        return fetch(`${API_URL}/calls/new`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        }).then((res) => handleResponse<CallStatusResponse>(res));
+    },
 
-  getCallStatus(callId: string): Promise<CallStatusResponse> {
-    return fetch(`${API_URL}/calls/status/${callId}`)
-      .then((res) => handleResponse<CallStatusResponse>(res));
-  },
+    getCallStatus(callId: string): Promise<CallStatusResponse> {
+        return fetch(`${API_URL}/calls/status/${callId}`)
+            .then((res) => handleResponse<CallStatusResponse>(res));
+    },
 
-  getAllLogs(): Promise<CallLog[]> {
-    return fetch(`${API_URL}/calls/logs`)
-      .then((res) => handleResponse<CallLog[]>(res));
-  },
+    getAllLogs(): Promise<CallLog[]> {
+        return fetch(`${API_URL}/calls/logs`)
+            .then((res) => handleResponse<CallLog[]>(res));
+    },
 
-  getLogsByProject(projectId: string): Promise<CallLog[]> {
-    return fetch(`${API_URL}/calls/logs/project/${projectId}`)
-      .then((res) => handleResponse<CallLog[]>(res));
-  },
+    getLogsByProject(projectId: string): Promise<CallLog[]> {
+        return fetch(`${API_URL}/calls/logs/project/${projectId}`)
+            .then((res) => handleResponse<CallLog[]>(res));
+    },
 
-  getLogsByNumber(phoneNumber: string): Promise<CallLog[]> {
-    return fetch(`${API_URL}/calls/logs/number/${phoneNumber}`)
-      .then((res) => handleResponse<CallLog[]>(res));
-  },
+    getLogsByNumber(phoneNumber: string): Promise<CallLog[]> {
+        return fetch(`${API_URL}/calls/logs/number/${phoneNumber}`)
+            .then((res) => handleResponse<CallLog[]>(res));
+    },
 };
 
