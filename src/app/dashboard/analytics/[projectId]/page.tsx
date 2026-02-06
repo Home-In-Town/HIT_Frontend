@@ -3,10 +3,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { analyticsApi, projectsApi, callApi } from '@/lib/api';
+import { analyticsApi, projectsApi } from '@/lib/api';
 import ProjectAnalytics, {
   VisitLog,
-  CallLog,
 } from '@/components/analytics/ProjectAnalytics';
 
 export default function ProjectAnalyticsPage() {
@@ -23,7 +22,6 @@ export default function ProjectAnalyticsPage() {
     whatsappClicks: number;
     formClicks: number;
     visitLogs: VisitLog[];
-    callLogs: CallLog[];
   } | null>(null);
 
   useEffect(() => {
@@ -46,31 +44,15 @@ export default function ProjectAnalyticsPage() {
           // form tracking future-ready
         }));
 
-        // ---- Call logs by project ----
-    const rawCallLogs = await callApi.getLogsByProject(projectId);
-
-    const callLogs: CallLog[] = rawCallLogs.map((call: any) => ({
-      id: call.callId || call._id,
-      startedAt: call.startTime || call.createdAt,
-      endedAt: call.endTime || undefined,
-      durationSeconds: call.duration || 0,
-      status: call.status === 'completed'
-        ? 'completed'
-        : call.status === 'missed'
-        ? 'missed'
-        : 'failed',
-    }));
-
         setAnalyticsData({
           projectId,
-          projectName:project.name,
+          projectName: project.name,
           totalVisits: data.totalVisits,
           totalLeads: data.uniqueLeads,
           totalCalls,
           whatsappClicks,
           formClicks,
           visitLogs,
-          callLogs,
         });
       } catch (err) {
         setError('Failed to load project analytics');
