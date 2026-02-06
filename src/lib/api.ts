@@ -1,8 +1,27 @@
 // API Service for Dynamic Sales Website
 
+export type { Project, ProjectFormData };
 import { Project, ProjectFormData } from '@/types/project';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_URL = '/api';
+
+// Get mock user ID from localStorage (for RBAC)
+function getMockUserId(): string | null {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('mock_user_id');
+}
+
+// Get headers with auth
+function getAuthHeaders(): HeadersInit {
+    const userId = getMockUserId();
+    const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+    };
+    if (userId) {
+        headers['x-mock-user-id'] = userId;
+    }
+    return headers;
+}
 
 class ApiError extends Error {
     status: number;
@@ -130,9 +149,11 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
 
 // Projects API
 export const projectsApi = {
-    // Get all projects
+    // Get all projects (filtered by role on backend)
     async getAll(): Promise<Project[]> {
-        const response = await fetch(`${API_URL}/projects`);
+        const response = await fetch(`${API_URL}/projects`, {
+            headers: getAuthHeaders(),
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = await handleResponse<any[]>(response);
         return data.map(transformBackendToFrontend);
@@ -140,7 +161,9 @@ export const projectsApi = {
 
     // Get single project by ID
     async getById(id: string): Promise<Project> {
-        const response = await fetch(`${API_URL}/projects/${id}`);
+        const response = await fetch(`${API_URL}/projects/${id}`, {
+            headers: getAuthHeaders(),
+        });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = await handleResponse<any>(response);
         return transformBackendToFrontend(data);
@@ -158,7 +181,7 @@ export const projectsApi = {
     async create(data: ProjectFormData): Promise<Project> {
         const response = await fetch(`${API_URL}/projects`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(transformFrontendToBackend(data)),
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -170,7 +193,7 @@ export const projectsApi = {
     async update(id: string, data: Partial<ProjectFormData>): Promise<Project> {
         const response = await fetch(`${API_URL}/projects/${id}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: getAuthHeaders(),
             body: JSON.stringify(transformFrontendToBackend(data)),
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -182,6 +205,7 @@ export const projectsApi = {
     async delete(id: string): Promise<void> {
         const response = await fetch(`${API_URL}/projects/${id}`, {
             method: 'DELETE',
+            headers: getAuthHeaders(),
         });
         if (!response.ok) {
             throw new ApiError('Failed to delete project', response.status);
@@ -192,6 +216,7 @@ export const projectsApi = {
     async publish(id: string): Promise<{ trackableLink: string }> {
         const response = await fetch(`${API_URL}/projects/${id}/publish`, {
             method: 'POST',
+            headers: getAuthHeaders(),
         });
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const result = await handleResponse<any>(response);
@@ -250,69 +275,121 @@ export const analyticsApi = {
 };
 
 
-/* ----------------------------------
-   Types
------------------------------------*/
 
-export interface NewCallPayload {
-    to: string;              // user phone
-    from: string;            // AI/system identifier
-    projectId: string;
-
-    agentId?: string;
-    clientId?: string;
-    metadata?: Record<string, any>;
-}
-
-export interface CallStatusResponse {
-    callId: string;
-    status: 'queued' | 'ringing' | 'in-progress' | 'completed' | 'failed';
-    duration?: number;
-    error?: string;
-}
-
-export interface CallLog {
-    callId: string;
-    projectId?: string;
-    userNumber?: string;
-    aiNumber?: string;
-    status: string;
-    duration?: number;
-    createdAt?: string;
-}
 
 
 /* ----------------------------------
-   Call APIs
+   User Types & API
 -----------------------------------*/
 
-export const callApi = {
-    initiateCall(payload: NewCallPayload): Promise<CallStatusResponse> {
-        return fetch(`${API_URL}/calls/new`, {
+export interface MockUser {
+    id: string;
+    name: string;
+    email: string;
+    role: 'admin' | 'builder' | 'agent';
+    companyName?: string;
+    phone?: string;
+}
+
+export const usersApi = {
+    // Get current user based on mock header
+    async getMe(): Promise<MockUser | null> {
+        try {
+            const response = await fetch(`${API_URL}/users/me`, {
+                headers: getAuthHeaders(),
+            });
+            if (!response.ok) return null;
+            return handleResponse<MockUser>(response);
+        } catch {
+            return null;
+        }
+    },
+
+    // Get available mock accounts for role switcher
+    async getMockAccounts(): Promise<MockUser[]> {
+        const response = await fetch(`${API_URL}/users/mock-accounts`);
+        return handleResponse<MockUser[]>(response);
+    },
+
+    // Get all users (admin only)
+    async getAll(role?: string): Promise<MockUser[]> {
+        const url = role
+            ? `${API_URL}/users?role=${role}`
+            : `${API_URL}/users`;
+        const response = await fetch(url, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<MockUser[]>(response);
+    },
+
+    // Login by name and role (for mock login flow)
+    async loginByName(name: string, role: string): Promise<MockUser> {
+        const response = await fetch(`${API_URL}/users/login-by-name`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-        }).then((res) => handleResponse<CallStatusResponse>(res));
+            body: JSON.stringify({ name, role }),
+        });
+        return handleResponse<MockUser>(response);
     },
 
-    getCallStatus(callId: string): Promise<CallStatusResponse> {
-        return fetch(`${API_URL}/calls/status/${callId}`)
-            .then((res) => handleResponse<CallStatusResponse>(res));
-    },
-
-    getAllLogs(): Promise<CallLog[]> {
-        return fetch(`${API_URL}/calls/logs`)
-            .then((res) => handleResponse<CallLog[]>(res));
-    },
-
-    getLogsByProject(projectId: string): Promise<CallLog[]> {
-        return fetch(`${API_URL}/calls/logs/project/${projectId}`)
-            .then((res) => handleResponse<CallLog[]>(res));
-    },
-
-    getLogsByNumber(phoneNumber: string): Promise<CallLog[]> {
-        return fetch(`${API_URL}/calls/logs/number/${phoneNumber}`)
-            .then((res) => handleResponse<CallLog[]>(res));
+    // Get users by role (for login dropdown)
+    async getByRole(role: string): Promise<{ id: string; name: string; email: string }[]> {
+        const response = await fetch(`${API_URL}/users/by-role/${role}`);
+        return handleResponse<{ id: string; name: string; email: string }[]>(response);
     },
 };
 
+
+/* ----------------------------------
+   Organization Types & API
+-----------------------------------*/
+
+export interface Organization {
+    id: string;
+    name: string;
+    description?: string;
+    agents: { id: string; name: string; email: string }[];
+    projects: { id: string; projectName: string; status: string }[];
+    createdAt?: string;
+}
+
+export const organizationsApi = {
+    // Get organizations (filtered by role on backend)
+    async getAll(): Promise<Organization[]> {
+        const response = await fetch(`${API_URL}/organizations`, {
+            headers: getAuthHeaders(),
+        });
+        return handleResponse<Organization[]>(response);
+    },
+
+    // Create organization (admin only)
+    async create(data: { name: string; description?: string; agents?: string[]; projects?: string[] }): Promise<Organization> {
+        const response = await fetch(`${API_URL}/organizations`, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse<Organization>(response);
+    },
+
+    // Update organization (admin only)
+    async update(id: string, data: Partial<{ name: string; description: string; agents: string[]; projects: string[] }>): Promise<Organization> {
+        const response = await fetch(`${API_URL}/organizations/${id}`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            body: JSON.stringify(data),
+        });
+        return handleResponse<Organization>(response);
+    },
+
+    // Delete organization (admin only)
+    async delete(id: string): Promise<void> {
+        const response = await fetch(`${API_URL}/organizations/${id}`, {
+            method: 'DELETE',
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) {
+            throw new ApiError('Failed to delete organization', response.status);
+        }
+    },
+};
