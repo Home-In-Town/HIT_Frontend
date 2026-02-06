@@ -250,7 +250,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       }
     }
 
-    router.push('/dashboard');
+    router.push('/dashboard/projects');
   } catch (err: any) {
     console.error('API error:', err);
     // Friendly fallback for duplicate key error

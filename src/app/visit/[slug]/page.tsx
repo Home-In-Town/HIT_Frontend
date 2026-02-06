@@ -10,7 +10,6 @@ import ProjectMap from '@/components/public/ProjectMap';
 import { Project } from '@/types/project';
 import { projectsApi } from '@/lib/api'; // adjust path if needed
 import { useTracking } from '@/hooks/useTracking';
-import { callApi } from '@/lib/api';
 import { MapPin, Map, Eye } from 'lucide-react';
 import {
   Dumbbell,
@@ -62,8 +61,6 @@ export default function VisitProjectPage() {
   });
   const [formSubmitted, setFormSubmitted] = useState(false);
 
-  const [isCalling, setIsCalling] = useState(false);
-  const [callId, setCallId] = useState<string | null>(null);
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
   const mapRef = useRef<any>(null); // Ref to ProjectMap
   // 🔥 Fetch project by slug
@@ -151,58 +148,24 @@ const handleWhatsApp = () => {
   }
 };
 
-const handleCall = async () => {
-  if (isCalling) return;
+const handleCall = () => {
   handleCallClick?.();
 
-  try {
-    if (!project.callNumber && !project.whatsappNumber) {
-      alert('Call not available');
-      return;
-    }
-
-    const toNumber = (project.callNumber || project.whatsappNumber || '')
-      .replace(/\D/g, '');
-
-    if (!toNumber) {
-      alert('Invalid phone number');
-      return;
-    }
-
-    setIsCalling(true);
-
-    const response = await callApi.initiateCall({
-      to: toNumber,
-      from: 'AI_AGENT',
-      projectId: project.id,
-      metadata: {
-        projectName: project.name,
-        source: 'cta_call_button',
-      },
-    });
-
-    setCallId(response.callId);
-    pollCallStatus(response.callId);
-  } catch (err: any) {
-    setIsCalling(false);
-    alert(err.message || 'Failed to initiate call');
-    console.error(err);
+  if (!project.callNumber && !project.whatsappNumber) {
+    alert('Call not available');
+    return;
   }
-};
 
-const pollCallStatus = (callId: string) => {
-  const interval = setInterval(async () => {
-    try {
-      const status = await callApi.getCallStatus(callId);
+  const toNumber = (project.callNumber || project.whatsappNumber || '')
+    .replace(/\D/g, '');
 
-      if (['completed', 'failed'].includes(status.status)) {
-        clearInterval(interval);
-        setIsCalling(false);
-      }
-    } catch {
-      clearInterval(interval);
-    }
-  }, 3000);
+  if (!toNumber) {
+    alert('Invalid phone number');
+    return;
+  }
+
+  // Use native phone dialer
+  window.location.href = `tel:+91${toNumber}`;
 };
 
 const handleFormOpen = () => setShowFormModal(true);
@@ -573,13 +536,11 @@ const handleFormSubmitAction = (e: React.FormEvent<HTMLFormElement>) => {
     {/* CALL */}
     <button
       onClick={handleCall}
-      disabled={isCalling}
       className="rounded-md bg-blue-600 py-1.5
                  text-[11px] font-semibold text-white
-                 hover:bg-blue-700 transition
-                 disabled:opacity-60"
+                 hover:bg-blue-700 transition"
     >
-      {isCalling ? 'Calling…' : 'Call'}
+      Call
     </button>
 
     {/* WHATSAPP */}
