@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { trackPageView, trackTimeSpent, trackCTAClick } from '@/lib/tracking';
+import { trackPageView, trackTimeSpent, trackCTAClick, trackFormSubmit } from '@/lib/tracking';
 
 interface UseTrackingOptions {
     projectId: string;
@@ -87,9 +87,9 @@ export function useTracking({ projectId, trackTimeInterval = 30 }: UseTrackingOp
         }
     }, [projectId, trackingParams]);
 
-    const handleFormSubmit = useCallback(() => {
+    const handleFormSubmit = useCallback((formData?: Record<string, unknown>) => {
         if (projectId) {
-            trackCTAClick(trackingParams, 'form');
+            trackFormSubmit(trackingParams, formData || {});
         }
     }, [projectId, trackingParams]);
 
