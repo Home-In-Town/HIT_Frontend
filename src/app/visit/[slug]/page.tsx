@@ -192,7 +192,11 @@ const handleFormSubmitAction = (e: React.FormEvent<HTMLFormElement>) => {
     return;
   }
 
-  handleFormSubmit?.();
+  handleFormSubmit?.({
+    ...formData,
+    projectId: project.id,
+    projectName: project.name,
+  });
   setFormSubmitted(true);
 
   console.log('Form submitted:', {

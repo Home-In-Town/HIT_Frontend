@@ -149,6 +149,14 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
 
 // Projects API
 export const projectsApi = {
+    // Get all public projects (for projects list page)
+    async getAllPublic(): Promise<Project[]> {
+        const response = await fetch(`${API_URL}/public/projects`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await handleResponse<any[]>(response);
+        return data.map(transformBackendToFrontend);
+    },
+
     // Get all projects (filtered by role on backend)
     async getAll(): Promise<Project[]> {
         const response = await fetch(`${API_URL}/projects`, {
@@ -175,6 +183,17 @@ export const projectsApi = {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = await handleResponse<any>(response);
         return transformBackendToFrontend(data);
+    },
+
+    // Get projects by builder ID (Public Portfolio)
+    async getProjectsByBuilderId(builderId: string): Promise<{ builder: any, projects: Project[] }> {
+        const response = await fetch(`${API_URL}/public/builders/${builderId}/projects`);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const data = await handleResponse<any>(response);
+        return {
+            builder: data.builder,
+            projects: data.projects.map(transformBackendToFrontend)
+        };
     },
 
     // Create new project
@@ -323,11 +342,11 @@ export const usersApi = {
     },
 
     // Login by name and role (for mock login flow)
-    async loginByName(name: string, role: string): Promise<MockUser> {
+    async loginByName(name: string, role: string, phone: string): Promise<MockUser> {
         const response = await fetch(`${API_URL}/users/login-by-name`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, role }),
+            body: JSON.stringify({ name, role, phone }),
         });
         return handleResponse<MockUser>(response);
     },

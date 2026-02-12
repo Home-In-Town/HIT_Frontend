@@ -22,6 +22,7 @@ export default function LoginPage() {
   const [step, setStep] = useState<Step>('select-role');
   const [selectedRole, setSelectedRole] = useState<Role | null>(null);
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [users, setUsers] = useState<UserOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -66,13 +67,13 @@ export default function LoginPage() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedRole || !name.trim()) return;
+    if (!selectedRole || !name.trim() || !phone.trim()) return;
 
     setLoading(true);
     setError('');
 
     try {
-      const user = await usersApi.loginByName(name.trim(), selectedRole);
+      const user = await usersApi.loginByName(name.trim(), selectedRole, phone.trim());
       await login(user.id);
       redirectToDashboard(user.role);
     } catch (err: unknown) {
@@ -87,6 +88,7 @@ export default function LoginPage() {
     setStep('select-role');
     setSelectedRole(null);
     setName('');
+    setPhone('');
     setError('');
     setUsers([]);
   }
@@ -260,6 +262,20 @@ export default function LoginPage() {
                 />
               </div>
 
+              <div className="mb-6">
+                <label htmlFor="phone" className="block text-sm font-medium text-[#2A2A2A] mb-2">
+                  Phone Number
+                </label>
+                <input
+                  type="tel"
+                  id="phone"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="e.g. 1234567890"
+                  className="w-full px-4 py-3 border border-[#E7E5E4] rounded-lg focus:ring-2 focus:ring-[#B45309] focus:border-transparent outline-none transition-all text-[#2A2A2A] placeholder-[#A8A29E]"
+                />
+              </div>
+
               {/* Available Users Hint */}
               {users.length > 0 && (
                 <div className="mb-6 p-4 bg-[#FAF7F2] rounded-lg">
@@ -291,7 +307,7 @@ export default function LoginPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading || !name.trim()}
+                disabled={loading || !name.trim() || !phone.trim()}
                 className={`
                   w-full py-3 rounded-lg font-semibold text-white transition-all
                   bg-gradient-to-r ${roleConfig[selectedRole].color}
