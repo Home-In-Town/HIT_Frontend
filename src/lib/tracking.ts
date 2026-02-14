@@ -1,6 +1,6 @@
 // Tracking Service for Dynamic Sales Website
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
 interface TrackingParams {
     projectId: string;
