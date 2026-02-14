@@ -17,7 +17,10 @@ export default function DashboardLayout({
   // Fix: Strictly match /dashboard to prevent it from being active on /dashboard/analytics
   const isActive = (path: string) => {
     if (path === '/dashboard') {
-      return pathname === '/dashboard';
+      return pathname === '/dashboard' || 
+             pathname === '/dashboard/builder' || 
+             pathname === '/dashboard/agent' || 
+             pathname === '/dashboard/admin';
     }
     return pathname.startsWith(path);
   };
