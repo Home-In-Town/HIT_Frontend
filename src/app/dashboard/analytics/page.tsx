@@ -2,6 +2,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+<<<<<<< HEAD
 import { analyticsApi, callApi, ProjectAnalyticsOverview } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 
@@ -14,6 +15,12 @@ const formatDateTime = (iso?: string) => {
   return new Date(iso).toLocaleString();
 };
 
+=======
+import { analyticsApi, ProjectAnalyticsOverview } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+
+// ---------------- Helpers ----------------
+>>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
 const formatDuration = (seconds?: number) => {
   if (!seconds || seconds <= 0) return '-';
   if (seconds < 60) return `${seconds}s`;
@@ -40,12 +47,15 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+<<<<<<< HEAD
   // Logs state
   const [logMode, setLogMode] = useState<LogMode>('none');
   const [logs, setLogs] = useState<any[]>([]);
   const [phoneFilter, setPhoneFilter] = useState('');
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+=======
+>>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
   // ---------------- Initial fetch ----------------
   useEffect(() => {
     async function fetchData() {
@@ -61,6 +71,7 @@ export default function AnalyticsPage() {
     fetchData();
   }, []);
 
+<<<<<<< HEAD
   // ---------------- Log fetchers ----------------
   async function fetchAllLogs() {
     setLoadingLogs(true);
@@ -85,6 +96,8 @@ export default function AnalyticsPage() {
     }
   }
 
+=======
+>>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
   // ---------------- Loading / Error ----------------
   if (loading) {
     return (
@@ -132,6 +145,7 @@ export default function AnalyticsPage() {
         <MiniStat label="Forms" value={totalForms} />
       </div>
 
+<<<<<<< HEAD
       {/* Filters */}
       <section className="bg-white border rounded-xl p-4 space-y-3">
         <div className="flex flex-wrap gap-2 items-center">
@@ -246,6 +260,43 @@ export default function AnalyticsPage() {
           </div>
         </div>
       )}
+=======
+      {/* Project Overview Table */}
+      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visits</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Time</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Call</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">WA</th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Form</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y">
+              {data.map(row => (
+                <tr
+                  key={row.id}
+                  onClick={() => router.push(`/dashboard/analytics/${row.id}`)}
+                  className="hover:bg-gray-50 cursor-pointer"
+                >
+                  <td className="px-6 py-4 font-medium">{row.name}</td>
+                  <td className="px-6 py-4 text-right">{row.totalVisits}</td>
+                  <td className="px-6 py-4 text-right text-emerald-700">{row.uniqueLeads}</td>
+                  <td className="px-6 py-4 text-right">{formatDuration(row.totalTimeSpent)}</td>
+                  <td className="px-6 py-4 text-center">{row.calls || '-'}</td>
+                  <td className="px-6 py-4 text-center">{row.whatsapp || '-'}</td>
+                  <td className="px-6 py-4 text-center">{row.forms || '-'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+>>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // Tracking Service for Dynamic Sales Website
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 
 interface TrackingParams {
     projectId: string;
@@ -76,5 +76,29 @@ export async function trackCTAClick(
         });
     } catch (error) {
         console.error('Failed to track CTA click:', error);
+    }
+}
+
+// Track form submissions
+export async function trackFormSubmit(
+    params: TrackingParams,
+    formData: Record<string, unknown>
+): Promise<void> {
+    try {
+        await fetch(`${API_URL}/track/form`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                projectId: params.projectId,
+                source: params.source,
+                leadId: params.leadId,
+                visitId: params.visitId,
+                formData,
+                timestamp: Date.now(),
+            }),
+        });
+        console.log('📡 Form submission tracked for lead:', params.leadId);
+    } catch (error) {
+        console.error('Failed to track form submission:', error);
     }
 }

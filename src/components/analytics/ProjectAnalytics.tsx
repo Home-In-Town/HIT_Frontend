@@ -99,41 +99,6 @@ export default function ProjectAnalytics({
           ))}
         </div>
       </section>
-
-      {/* Call Logs */}
-      <section className="bg-white rounded-2xl shadow-sm p-6">
-        <h2 className="text-lg font-medium mb-4">Call Logs</h2>
-        <div className="space-y-3">
-          {callLogs.map(call => (
-            <div
-              key={call.id}
-              className="flex items-center justify-between border rounded-xl p-3"
-            >
-              <div>
-                <p className="text-sm font-medium">
-                  Started: {formatTime(call.startedAt)}
-                </p>
-
-                {call.endedAt && (
-                  <p className="text-xs text-gray-500">
-                    Ended: {formatTime(call.endedAt)}
-                  </p>
-                )}
-
-                <p className="text-xs text-gray-500 capitalize">
-                  Status: {call.status}
-                </p>
-              </div>
-
-              <div className="text-sm font-semibold flex items-center gap-1">
-                <Clock className="w-4 h-4 text-gray-400" />
-                {formatDuration(call.durationSeconds)}
-              </div>
-
-            </div>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }

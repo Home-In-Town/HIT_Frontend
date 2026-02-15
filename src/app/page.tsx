@@ -17,10 +17,10 @@ export default function Home() {
               </Link>
             </div>
             <Link
-              href="/dashboard"
+              href="/login"
               className="px-5 py-2.5 bg-[#2A2A2A] text-white text-sm sm:text-base font-medium rounded-lg hover:bg-black transition-colors"
             >
-              Dashboard
+              Login
             </Link>
           </div>
         </div>
@@ -48,10 +48,10 @@ export default function Home() {
               Create New Project
             </Link>
             <Link
-              href="/dashboard"
+              href="/login"
               className="px-8 py-4 bg-white text-[#2A2A2A] font-semibold rounded-lg border border-[#D6D3D1] hover:bg-[#F5F5F4] transition-colors text-base"
             >
-              View Dashboard
+              Login
             </Link>
           </div>
         </div>

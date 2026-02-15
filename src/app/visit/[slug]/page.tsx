@@ -204,7 +204,6 @@ useEffect(() => {
     return notFound();
   }
 
-
   const hasCoordinates =
   typeof project.latitude === 'number' &&
   typeof project.longitude === 'number';
@@ -246,65 +245,36 @@ const handleWhatsApp = () => {
     `Hi, I'm interested in ${project.name} at ${project.location}, ${project.city}. Please share more details.`
   );
 
-  // ✅ Universal WhatsApp deep link (mobile + desktop)
-  const whatsappUrl = `https://wa.me/${cleanNumber}?text=${message}`;
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-  window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-};
-
-
-const handleCall = async () => {
-  if (isCalling) return;
-  handleCallClick?.();
-
-  try {
-    if (!project.callNumber && !project.whatsappNumber) {
-      alert('Call not available');
-      return;
-    }
-
-    const toNumber = (project.callNumber || project.whatsappNumber || '')
-      .replace(/\D/g, '');
-
-    if (!toNumber) {
-      alert('Invalid phone number');
-      return;
-    }
-
-    setIsCalling(true);
-
-    const response = await callApi.initiateCall({
-      to: toNumber,
-      from: 'AI_AGENT',
-      projectId: project.id,
-      metadata: {
-        projectName: project.name,
-        source: 'cta_call_button',
-      },
-    });
-
-    setCallId(response.callId);
-    pollCallStatus(response.callId);
-  } catch (err: any) {
-    setIsCalling(false);
-    alert(err.message || 'Failed to initiate call');
-    console.error(err);
+  if (isMobile) {
+    window.location.href = `whatsapp://send?phone=${cleanNumber}&text=${message}`;
+  } else {
+    window.open(
+      `https://web.whatsapp.com/send?phone=${cleanNumber}&text=${message}`,
+      '_blank'
+    );
   }
 };
 
-const pollCallStatus = (callId: string) => {
-  const interval = setInterval(async () => {
-    try {
-      const status = await callApi.getCallStatus(callId);
+const handleCall = () => {
+  handleCallClick?.();
 
-      if (['completed', 'failed'].includes(status.status)) {
-        clearInterval(interval);
-        setIsCalling(false);
-      }
-    } catch {
-      clearInterval(interval);
-    }
-  }, 3000);
+  if (!project.callNumber && !project.whatsappNumber) {
+    alert('Call not available');
+    return;
+  }
+
+  const toNumber = (project.callNumber || project.whatsappNumber || '')
+    .replace(/\D/g, '');
+
+  if (!toNumber) {
+    alert('Invalid phone number');
+    return;
+  }
+
+  // Use native phone dialer
+  window.location.href = `tel:+91${toNumber}`;
 };
 
 const handleFormOpen = () => setShowFormModal(true);
