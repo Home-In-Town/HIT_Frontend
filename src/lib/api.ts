@@ -3,7 +3,7 @@
 export type { Project, ProjectFormData };
 import { Project, ProjectFormData } from '@/types/project';
 
-const API_URL = '/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 // Get mock user ID from localStorage (for RBAC)
 function getMockUserId(): string | null {
@@ -35,8 +35,9 @@ class ApiError extends Error {
 
 async function handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
-        const error = await response.json().catch(() => ({ message: 'An error occurred' }));
-        throw new ApiError(error.message || 'An error occurred', response.status);
+        const error = await response.json().catch(() => ({}));
+        const message = error.message || error.error || 'An error occurred';
+        throw new ApiError(message, response.status);
     }
     return response.json();
 }
@@ -352,9 +353,9 @@ export const usersApi = {
     },
 
     // Get users by role (for login dropdown)
-    async getByRole(role: string): Promise<{ id: string; name: string; email: string }[]> {
+    async getByRole(role: string): Promise<{ id: string; name: string; email: string; phone?: string }[]> {
         const response = await fetch(`${API_URL}/users/by-role/${role}`);
-        return handleResponse<{ id: string; name: string; email: string }[]>(response);
+        return handleResponse<{ id: string; name: string; email: string; phone?: string }[]>(response);
     },
 };
 
