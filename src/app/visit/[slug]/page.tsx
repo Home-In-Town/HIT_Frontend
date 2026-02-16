@@ -11,7 +11,7 @@ import ProjectMap from '@/components/public/ProjectMap';
 import { Project } from '@/types/project';
 import { projectsApi } from '@/lib/api'; // adjust path if needed
 import { useTracking } from '@/hooks/useTracking';
-import { callApi } from '@/lib/api';
+
 import { FaWhatsapp } from "react-icons/fa";
 import { MapPin, Map, Eye, MapPinCheckIcon, MapPinIcon } from 'lucide-react';
 import {
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import ProjectsBottomDrawer from '@/components/public/ProjectBottomDrawer';
 import EnquiryModal from '@/components/public/EnquiryModal';
+import SubNavbar from "@/components/public/SubNavbar";
 
 const getAmenityIcon = (amenity: string) => {
   const key = amenity.toLowerCase();
@@ -43,6 +44,17 @@ const getAmenityIcon = (amenity: string) => {
 
 export default function VisitProjectPage() {
   const params = useParams();
+
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+const sectionRefs = {
+  details: useRef<HTMLDivElement>(null),
+  facilities: useRef<HTMLDivElement>(null),
+  floor: useRef<HTMLDivElement>(null),
+  booking: useRef<HTMLDivElement>(null),
+  sellers: useRef<HTMLDivElement>(null),
+  brochure: useRef<HTMLDivElement>(null),
+};
 
   const rawSlug = Array.isArray(params.slug)
     ? params.slug[0]
@@ -299,6 +311,10 @@ const formatStatus = (status: string) =>
     .replace(/-/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
+const formatRera = (rera?: string) => {
+  if (!rera) return "RERA Approved";
+  return rera;
+};
 
 const openProjectDetails = () => {
   setOpen(true);
@@ -324,7 +340,9 @@ const CTAButtons = (
     <div className="grid gap-1.5">
 
       {/* ROW 1 — CALL + WHATSAPP */}
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className={`grid gap-1.5 ${
+        project.brochureUrl ? "grid-cols-3" : "grid-cols-2"
+      }`}>
 
         {/* CALL */}
         <button
@@ -351,7 +369,24 @@ const CTAButtons = (
           WhatsApp
         </button>
 
+        {/* BROCHURE */}
+        {project.brochureUrl && (
+          <button
+            onClick={downloadBrochure}
+            className="
+              rounded-md border border-[#3E5F16]
+              py-1.5 text-[10px] font-semibold
+              text-[#3E5F16]
+              hover:bg-[#3E5F16]/10
+              transition
+            "
+          >
+            Brochure
+          </button>
+        )}
+
       </div>
+     
 
       {/* ROW 2 — BOOK SITE VISIT */}
       <button
@@ -483,6 +518,47 @@ const onDragEnd = () => {
   isDragging.current = false;
 };
 
+const isPlot = project.type === "plot";
+type FloorPlan = {
+  title: string;
+  area: string;
+  price: string;
+  image?: string;
+  possession?: string; 
+};
+
+
+const floorPlans: FloorPlan[] = isPlot
+  ? [
+      {
+        title: "Residential Plot",
+        area: project.plotSizeRange || "1200 – 2400 sq.ft",
+        price: "₹ 25 L onwards",
+        image: project.coverImage,
+      },
+      {
+        title: "Corner Plot",
+        area: "1800 sq.ft",
+        price: "₹ 32 L onwards",
+        image: project.coverImage,
+      },
+    ]
+  : [
+      {
+        title: "2 BHK",
+        area: "1050 sq.ft",
+        possession: "Dec 2027",
+        price: "₹ 78 L onwards",
+        image: project.coverImage,
+      },
+      {
+        title: "3 BHK",
+        area: "1350 sq.ft",
+        possession: "Dec 2027",
+        price: "₹ 98 L onwards",
+        image: project.coverImage,
+      },
+    ];
 
 
   return (
@@ -569,14 +645,15 @@ const onDragEnd = () => {
         
 
          <div
+            ref={scrollRef}
             id="project-details-scroll"
-            className="overflow-y-auto overflow-x-visible overflow-visible max-h-[80vh] p-4"
+            className="overflow-y-auto overflow-x-visible  max-h-[80vh] "
 
           >
+            <div className="px-4">
           {/* TOP SECTION: DETAILS */}
           <div className="flex justify-center">
             
-            {/* LEFT: PROJECT DETAILS */}
             <div className="w-full max-w-md mr-3 text-center">
               <p className="mt-1 text-[11px] sm:text-[12px] font-medium text-gray-700">
                   {formatStatus(project.projectStatus)}
@@ -608,69 +685,72 @@ const onDragEnd = () => {
                
               </div>
                 
-            </div>
-            
-                
+            </div>              
             
           </div>
-
-
-
+          </div>
+          <div className="px-4 mt-3">
+          <SubNavbar
+            scrollContainerRef={scrollRef}
+            sectionRefs={sectionRefs}
+          />
+          </div>
+          <div className="px-4">
           {/* PRICE CARD */}
-          <div ref={priceRef} className="mt-2 relative">
+          <div ref={priceRef} className="mt-0.5 relative">
 
             {/* SOFT DIVIDER */}
             <div className="h-px bg-gray-100 mx-1 lg:mx-2" />
 
             {/* PRICE CONTENT */}
-<div className="p-2.5 flex items-start  gap-20">
+            <div className="p-2.5 flex items-start  gap-20">
 
-  {/* LEFT — PRICE */}
-  <div className="text-left pl-2">
-    <p className="text-[11px] text-gray-500">
-      Price starting from
-    </p>
+              {/* LEFT — PRICE */}
+              <div className="text-left pl-2">
+                <p className="text-[11px] text-gray-500">
+                  Price starting from
+                </p>
 
-    <p className="text-[15px] font-semibold text-gray-900">
-      ₹ 65 L onwards
-    </p>
+                <p className="text-[15px] font-semibold text-gray-900">
+                  ₹ 65 L onwards
+                </p>
 
-    <button
-      type="button"
-      onClick={() => setShowPriceBreakdown(prev => !prev)}
-      className="mt-1 inline-flex items-center gap-1
-                text-[10px] font-medium
-                text-blue-600 hover:underline"
-    >
-      See price details
-      <span
-        className={`inline-block transition-transform duration-200 ${
-          showPriceBreakdown ? "rotate-90" : ""
-        }`}
-      >
-        &gt;
-      </span>
-    </button>
-  </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPriceBreakdown(prev => !prev)}
+                  className="mt-1 inline-flex items-center gap-1
+                            text-[10px] font-medium
+                            text-blue-600 hover:underline"
+                >
+                  See price details
+                  <span
+                    className={`inline-block transition-transform duration-200 ${
+                      showPriceBreakdown ? "rotate-90" : ""
+                    }`}
+                  >
+                    &gt;
+                  </span>
+                </button>
+              </div>
 
-  {/* RIGHT — AREA */}
-  <div className="text-left pl-3 pt-3 shrink-0">
-    <p className="text-[11px] text-gray-500">
-      Saleable area
-    </p>
+              {/* RIGHT — AREA */}
+              <div className="text-left pl-3 pt-3 shrink-0">
+                <p className="text-[11px] text-gray-500">
+                  Saleable area
+                </p>
 
-    <p className="text-[12px] font-semibold text-gray-900">
-      850 – 1200 sq.ft
-    </p>
-  </div>
+                <p className="text-[12px] font-semibold text-gray-900">
+                  850 – 1200 sq.ft
+                </p>
+              </div>
 
-</div>
+            </div>
 
             {/* DROPDOWN */}
             {showPriceBreakdown && (
               <div
                 className="  absolute left-0 right-0 top-full z-50
-                mx-02 mr-35 lg:mx-3 mt-2
+                mx-02 mr-33 lg:mx-3 mt-2
                 rounded-lg bg-gray-50
                 p-2 lg:p-4
                 text-[11px]
@@ -748,6 +828,39 @@ const onDragEnd = () => {
 
                     Calculate EMI
                   </button>
+                  {/* LEGAL & FINANCE INFO */}
+                  <div className="pt-2 border-t border-gray-200 space-y-1 text-[10px]">
+
+                    {/* LEGAL CONTACT */}
+                    <a
+                      href="tel:+919876543210"
+                      className="flex justify-between items-center
+                                text-gray-600 hover:text-[#3E5F16]
+                                transition"
+                    >
+                      <span>Legal Contact</span>
+
+                      <span className="font-medium text-blue-600">
+                        +91 98765 43210
+                      </span>
+                    </a>
+
+                    {/* BANK FINANCE */}
+                    <a
+                      href="tel:+919123456789"
+                      className="flex justify-between items-center
+                                text-gray-600 hover:text-[#3E5F16]
+                                transition"
+                    >
+                      <span>Bank Finance Desk</span>
+
+                      <span className="font-medium text-blue-600">
+                        +91 91234 56789
+                      </span>
+                    </a>
+
+                  </div>
+
 
                 </div>
               </div>
@@ -939,6 +1052,23 @@ const onDragEnd = () => {
                  rounded-xl overflow-hidden
                  bg-gray-100 shadow-md"
     >
+      {/* RERA BADGE */}
+<div
+  className="
+    absolute top-2 left-2 z-10
+    bg-black/70 text-white
+    text-[9px] font-semibold
+    px-2 py-1 rounded-md
+    backdrop-blur-sm
+  "
+>
+  {formatRera(
+  
+  (project.reraApproved ? "RERA Approved" : undefined)
+)}
+
+</div>
+
       {/* MEDIA CONTENT */}
       {mediaItems[mediaIndex].type === "image" && (
         <Image
@@ -1023,9 +1153,9 @@ const onDragEnd = () => {
 
             {/* AMENITIES */}
             {project.amenities?.length > 0 && (
-              <div className="mt-4 rounded-xl  p-4">
+              <div ref={sectionRefs.facilities} className="mt-4 rounded-xl  p-4">
                 <p className="mb-3 text-sm font-semibold text-gray-900">
-                  Amenities
+                  Top Facilities
                 </p>
 
                 <div className="grid grid-cols-2 gap-x-4 gap-y-2">
@@ -1045,141 +1175,176 @@ const onDragEnd = () => {
             )}
             
 
-            {/* OTHER DETAILS — BUILDER + CARPET + FLOORS */}
-{(project.carpetAreaRange || project.floorRange) && (
-  <div className="mt-4 rounded-xl p-4">
+            {/* OTHER DETAILS —   CARPET + FLOORS */}
+                  {(project.carpetAreaRange || project.floorRange) && (
+                    <div ref={sectionRefs.details} className="mt-4 rounded-xl p-4">
 
-    {/* Heading */}
-    <p className="mb-2 text-sm font-semibold text-gray-900">
-      Other Details
-    </p>
+                      {/* Heading */}
+                      <p className="mb-2 text-sm font-semibold text-gray-900">
+                        Other Details
+                      </p>
 
-    {/* BUILDER — full row */}
-    {project.builderName && (
-      <p className="mb-3 text-xs sm:text-sm text-gray-600">
-        By <span className="font-medium text-gray-800">
-          {project.builderName}
-        </span>
-      </p>
-    )}
+                      {/* CARPET + FLOORS */}
+                      <div className="flex items-stretch gap-3">
 
-    {/* CARPET + FLOORS */}
-    <div className="flex items-stretch gap-3">
+                        {project.carpetAreaRange && (
+                          <div className="flex-1 rounded-lg bg-white px-3 py-2">
+                            <p className="text-[11px] text-gray-500">
+                              Carpet Area
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {project.carpetAreaRange}
+                            </p>
+                          </div>
+                        )}
 
-      {project.carpetAreaRange && (
-        <div className="flex-1 rounded-lg bg-white px-3 py-2">
-          <p className="text-[11px] text-gray-500">
-            Carpet Area
-          </p>
-          <p className="text-sm font-semibold text-gray-900">
-            {project.carpetAreaRange}
-          </p>
-        </div>
-      )}
+                        {/* divider */}
+                        {project.carpetAreaRange && project.floorRange && (
+                          <div className="w-px bg-gray-200 rounded-full" />
+                        )}
 
-      {/* divider */}
-      {project.carpetAreaRange && project.floorRange && (
-        <div className="w-px bg-gray-200 rounded-full" />
-      )}
+                        {project.floorRange && (
+                          <div className="flex-1 rounded-lg bg-white px-3 py-2">
+                            <p className="text-[11px] text-gray-500">
+                              Floors
+                            </p>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {project.floorRange}
+                            </p>
+                          </div>
+                        )}
 
-      {project.floorRange && (
-        <div className="flex-1 rounded-lg bg-white px-3 py-2">
-          <p className="text-[11px] text-gray-500">
-            Floors
-          </p>
-          <p className="text-sm font-semibold text-gray-900">
-            {project.floorRange}
-          </p>
-        </div>
-      )}
+                      </div>
+                    </div>
+                  )}
+                  {/* FLOOR PLANS & PRICING */}
+                  <div ref={sectionRefs.floor} className="mt-5">
+                    <p className="mb-3 text-sm font-semibold text-gray-900">
+                      Floor Plans & Pricing
+                    </p>
 
-    </div>
-  </div>
-)}
-{/* FLOOR PLANS & PRICING */}
-<div className="mt-5">
+                    <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+
+                      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+                      {floorPlans.map((plan, i) => (
+                        <div
+                          key={i}
+                          className="min-w-[210px] rounded-xl bg-white shadow-sm overflow-hidden flex flex-col"
+                        >
+                          {/* IMAGE */}
+                          <div className="relative h-32 w-full">
+                            <Image
+                              src={plan.image || "/placeholder.jpg"}
+                              alt="plan"
+                              fill
+                              className="object-cover"
+                            />
+
+                            <span className="absolute top-2 left-2 bg-[#3E5F16] text-white text-[9px] font-semibold px-2 py-0.5 rounded-full">
+                              {isPlot ? "Plot" : "New Launch"}
+                            </span>
+                          </div>
+
+                          {/* CONTENT */}
+                          <div className="p-3 flex flex-col gap-1">
+                            <p className="text-xs font-semibold text-gray-900">
+                              {plan.title} • {plan.area}
+                            </p>
+
+                            {!isPlot && plan.possession && (
+                              <p className="text-[11px] text-gray-500">
+                                Possession: {plan.possession}
+                              </p>
+                            )}
+
+                            <p className="text-sm font-bold text-[#3E5F16]">
+                              {plan.price}
+                            </p>
+
+                            <button
+                              onClick={handleCall}
+                              className="mt-2 rounded-md border border-[#3E5F16] py-1.5 text-[11px] font-semibold text-[#3E5F16] hover:bg-[#3E5F16]/10 transition"
+                            >
+                              Call Now
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    </div>
+                  </div>
+                  {/* BOOKING STATUS */}
+<div
+  ref={sectionRefs.booking}
+  className="mt-5 rounded-xl bg-white p-4 shadow-sm"
+>
   <p className="mb-3 text-sm font-semibold text-gray-900">
-    Floor Plans & Pricing
+    {isPlot ? "Plot Booking Status" : "Flat Booking Status"}
   </p>
 
-  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+  <div className="space-y-3 text-xs">
 
-    {[1, 2, 3, 4, 5].map((_, i) => (
-      <div
-        key={i}
-        className="
-          min-w-[210px]
-          rounded-xl
-          bg-white
-          shadow-sm
-          overflow-hidden
-          flex flex-col
-        "
-      >
-        {/* IMAGE */}
-        <div className="relative h-32 w-full">
-          <Image
-            src={project.coverImage || "/placeholder.jpg"}
-            alt="floor plan"
-            fill
-            className="object-cover"
-          />
+    {/* Availability */}
+    <div className="flex items-center justify-between">
+      <span className="text-gray-600">Availability</span>
 
-          {/* BADGE */}
-          <span className="
-            absolute top-2 left-2
-            bg-green-600 text-white
-            text-[9px] font-semibold
-            px-2 py-0.5 rounded-full
-          ">
-            New Launch
-          </span>
-        </div>
+      <span className="flex items-center gap-2 font-medium text-green-600">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        Available
+      </span>
+    </div>
 
-        {/* CONTENT */}
-        <div className="p-3 flex flex-col gap-1">
+    {/* Units */}
+    <div className="flex items-center justify-between">
+      <span className="text-gray-600">
+        {isPlot ? "Plots" : "Units"}
+      </span>
 
-          <p className="text-xs font-semibold text-gray-900">
-            2 BHK • 1050 sq.ft
-          </p>
+      <span className="font-medium text-gray-800">
+        {isPlot
+          ? "8 vacant / 20 total"
+          : "12 vacant / 30 total"}
+      </span>
+    </div>
 
-          <p className="text-[11px] text-gray-500">
-            Possession: Dec 2027
-          </p>
-
-          <p className="text-sm font-bold text-[#3E5F16]">
-            ₹ 78 L onwards
-          </p>
-
-          {/* CTA */}
-          <button
-            onClick={handleCall}
-            className="
-              mt-2
-              rounded-md
-              border border-[#3E5F16]
-              py-1.5
-              text-[11px]
-              font-semibold
-              text-[#3E5F16]
-              hover:bg-[#3E5F16]/10
-              transition
-            "
-          >
-            Call Now
-          </button>
-
-        </div>
+    {/* Progress */}
+    <div>
+      <div className="flex justify-between mb-1 text-gray-600">
+        <span>Booking Progress</span>
+        <span>
+          {isPlot ? "60% Sold" : "60% Sold"}
+        </span>
       </div>
-    ))}
+
+      <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+        <div
+          className="h-full bg-[#3E5F16]"
+          style={{ width: "60%" }}
+        />
+      </div>
+    </div>
+
+    {/* Note */}
+    <div className="rounded-md bg-gray-50 p-2 text-gray-600">
+      {isPlot
+        ? "Limited premium plots available. Early booking recommended."
+        : "Only a few premium flats remain. Price lock available."}
+    </div>
+
+    {/* CTA */}
+    <p className="text-gray-500">
+      Contact sales team to reserve this {isPlot ? "plot" : "flat"}.
+    </p>
 
   </div>
 </div>
 
+                  
 
                   {/* PLOT DETAILS */}
                   {project.type === 'plot' && (
-                    <div className="mt-4 rounded-xl border bg-gray-50 p-4">
+                    <div className="mt-4  p-4">
                         <p className="mb-2 text-sm font-semibold">Plot Details</p>
                         <div className="text-sm space-y-1 text-gray-700">
                           {project.plotSizeRange && (
@@ -1198,13 +1363,41 @@ const onDragEnd = () => {
                       </div>
                     )}
 
+                    {/* BUILDER ADDRESS */}
+                  <div
+                    ref={sectionRefs.sellers}
+                    className="mt-5 mb-10 rounded-xl p-4"
+                  >
+                    <p className="mb-2 text-sm font-semibold text-gray-900">
+                      Builder Address
+                    </p>
+
+                    <div className="text-xs text-gray-700 space-y-1">
+
+                      {/* Builder name (dynamic) */}
+                      <p className="font-medium text-gray-800">
+                        {project.builderName || "Builder Name"}
+                      </p>
+
+                      {/* Static address placeholder */}
+                      <p>
+                        Skyline Developers Pvt. Ltd.
+                        4th Floor, Landmark Business Plaza
+                        Ring Road, Civil Lines
+                        Nagpur, Maharashtra – 440001
+                      </p>
+
+                    </div>
+                  </div>
+
+
                     </div>
                    
               </div>
-              
+              </div>
             )}
         </div>
-                     
+                   
           
 
 
@@ -1219,86 +1412,87 @@ const onDragEnd = () => {
         />
 
         {viewerOpen && (
-  <div className="fixed inset-0 z-[9999] bg-black">
+      <div className="fixed inset-0 z-[9999] bg-black">
 
-    {/* CLOSE */}
-    <button
-      onClick={() => setViewerOpen(false)}
-      className="absolute top-4 right-4 text-white text-2xl z-50"
-    >
-      ✕
-    </button>
-
-    {/* MEDIA */}
-    <div className="w-full h-full flex items-center justify-center">
-
-      {mediaItems[mediaIndex].type === "image" && (
-        <Image
-          src={mediaItems[mediaIndex].src}
-          alt="fullscreen"
-          fill
-          className="object-contain"
-        />
-      )}
-
-      {mediaItems[mediaIndex].type === "video" && (
-        <video
-          src={mediaItems[mediaIndex].src}
-          controls
-          autoPlay
-          className="max-h-full max-w-full"
-        />
-      )}
-
-      {mediaItems[mediaIndex].type === "brochure" && (
+        {/* CLOSE */}
         <button
-          onClick={downloadBrochure}
-          className="text-white text-lg border px-6 py-3 rounded-xl"
+          onClick={() => setViewerOpen(false)}
+          className="absolute top-4 right-4 text-white text-2xl z-50"
         >
-          Download Brochure
+          ✕
         </button>
-      )}
-    </div>
 
-    {/* LEFT NAV */}
-    {mediaItems.length > 1 && (
-      <button
-        onClick={goPrevMedia}
-        className="absolute left-4 top-1/2 -translate-y-1/2
-                   bg-white/20 text-white p-3 rounded-full"
-      >
-        <ChevronLeft size={28} />
-      </button>
+        {/* MEDIA */}
+        <div className="w-full h-full flex items-center justify-center">
+
+          {mediaItems[mediaIndex].type === "image" && (
+            <Image
+              src={mediaItems[mediaIndex].src}
+              alt="fullscreen"
+              fill
+              className="object-contain"
+            />
+          )}
+
+          {mediaItems[mediaIndex].type === "video" && (
+            <video
+              src={mediaItems[mediaIndex].src}
+              controls
+              autoPlay
+              className="max-h-full max-w-full"
+            />
+          )}
+
+          {mediaItems[mediaIndex].type === "brochure" && (
+            <button
+              onClick={downloadBrochure}
+              className="text-white text-lg border px-6 py-3 rounded-xl"
+            >
+              Download Brochure
+            </button>
+          )}
+        </div>
+
+        {/* LEFT NAV */}
+        {mediaItems.length > 1 && (
+          <button
+            onClick={goPrevMedia}
+            className="absolute left-4 top-1/2 -translate-y-1/2
+                      bg-white/20 text-white p-3 rounded-full"
+          >
+            <ChevronLeft size={28} />
+          </button>
+        )}
+
+        {/* RIGHT NAV */}
+        {mediaItems.length > 1 && (
+          <button
+            onClick={goNextMedia}
+            className="absolute right-4 top-1/2 -translate-y-1/2
+                      bg-white/20 text-white p-3 rounded-full"
+          >
+            <ChevronRight size={28} />
+          </button>
+        )}
+
+        {/* indicator */}
+        <div className="absolute bottom-6 w-full flex justify-center gap-2">
+          {mediaItems.map((_, i) => (
+            <div
+              key={i}
+              className={`h-2 rounded-full transition-all ${
+                i === mediaIndex
+                  ? "w-6 bg-white"
+                  : "w-2 bg-white/40"
+              }`}
+            />
+          ))}
+        </div>
+
+      </div>
     )}
 
-    {/* RIGHT NAV */}
-    {mediaItems.length > 1 && (
-      <button
-        onClick={goNextMedia}
-        className="absolute right-4 top-1/2 -translate-y-1/2
-                   bg-white/20 text-white p-3 rounded-full"
-      >
-        <ChevronRight size={28} />
-      </button>
-    )}
-
-    {/* indicator */}
-    <div className="absolute bottom-6 w-full flex justify-center gap-2">
-      {mediaItems.map((_, i) => (
-        <div
-          key={i}
-          className={`h-2 rounded-full transition-all ${
-            i === mediaIndex
-              ? "w-6 bg-white"
-              : "w-2 bg-white/40"
-          }`}
-        />
-      ))}
-    </div>
-
-  </div>
-)}
-
+  
   </div>
 );
 }

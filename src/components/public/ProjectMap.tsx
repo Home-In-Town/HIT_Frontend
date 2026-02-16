@@ -7,6 +7,8 @@ import {
   OverlayView,
   DirectionsRenderer,
   useJsApiLoader,
+  Polygon,
+  GroundOverlay,
 } from '@react-google-maps/api';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { projectsApi } from '@/lib/api';
@@ -14,6 +16,14 @@ import { Project } from '@/types/project';
 import SearchFiltersPanel from "./SearchFiltersPanel";
 import ProjectsBottomDrawer from './ProjectBottomDrawer';
 import { DrawingManager } from '@react-google-maps/api';
+
+type PlotInventory = {
+  id: string;
+  status: "available" | "sold" | "reserved";
+  price: string;
+  area: string;
+  path: google.maps.LatLngLiteral[];
+};
 
 
 type MapOverlay =
@@ -63,24 +73,23 @@ const ProjectMap = forwardRef(({ lat, lng, focusOnly, logo, sqft, bhk, onMarkerC
 //   }
 // };
 const getNeighborhoodIcon = (type: string): google.maps.Icon => {
-  const iconMap: Record<string, string> = {
-    hospital: "🏥",
-    school: "🏫",
-    university: "🎓",
-    shopping_mall: "🛍️",
-    supermarket: "🛒",
-    restaurant: "🍽️",
-    park: "🌳",
-    subway_station: "🚇",
+  const iconPaths: Record<string, string> = {
+    hospital: "M10 2h4v6h6v4h-6v6h-4v-6H4V8h6z",
+    school: "M12 2L2 7l10 5 10-5-10-5zm0 7L2 4v10l10 5 10-5V4l-10 5z",
+    university: "M2 10l10-5 10 5-10 5-10-5zm0 4l10 5 10-5",
+    shopping_mall: "M4 6h16l-2 12H6L4 6zm4-3h8v3H8V3z",
+    restaurant: "M6 2v8M10 2v8M6 6h4M14 2v16",
+    park: "M12 2C8 2 6 6 6 8c0 2 2 4 6 4s6-2 6-4c0-2-2-6-6-6zm0 10v10",
+    subway_station: "M6 2h12v12H6zM8 16l-2 4m10-4l2 4",
   };
 
-  const emoji = iconMap[type] || "📍";
+  const path = iconPaths[type] || iconPaths.park;
 
   const svg = `
-    <svg width="48" height="64" viewBox="0 0 48 64"
+    <svg width="28" height="40" viewBox="0 0 48 64"
          xmlns="http://www.w3.org/2000/svg">
 
-      <!-- pin body -->
+      <!-- pin -->
       <path d="
         M24 2
         C12 2 4 10 4 22
@@ -88,27 +97,25 @@ const getNeighborhoodIcon = (type: string): google.maps.Icon => {
         C24 62 44 36 44 22
         C44 10 36 2 24 2
         Z"
-        fill="#2563eb"
+        fill="#000000"
         stroke="white"
         stroke-width="2"
       />
 
-      <!-- white circle background -->
+      <!-- white circle -->
       <circle cx="24" cy="22" r="11" fill="white"/>
 
-      <!-- emoji icon -->
-      <text x="24" y="27"
-            font-size="14"
-            text-anchor="middle">
-        ${emoji}
-      </text>
+      <!-- black icon -->
+      <path d="${path}"
+            transform="translate(14,12) scale(1)"
+            fill="#000000"/>
     </svg>
   `;
 
   return {
     url: "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg),
-    scaledSize: new google.maps.Size(36, 48),
-    anchor: new google.maps.Point(18, 48), // tip of pin
+    scaledSize: new google.maps.Size(28, 40),
+    anchor: new google.maps.Point(14, 40),
   };
 };
 
@@ -124,7 +131,42 @@ const categoryMap: Record<string, string> = {
   metro: "subway_station",
   school: "school",
 };
+const overlayBounds = {
+  north: lat + 0.001,
+  south: lat - 0.001,
+  east: lng + 0.001,
+  west: lng - 0.001,
+};
 
+const plotInventory: PlotInventory[] = [
+  {
+    id: "Plot 7",
+    status: "available",
+    price: "₹12L",
+    area: "1200 sqft",
+    path: [
+      { lat: lat + 0.0001, lng: lng - 0.0001 },
+      { lat: lat + 0.0001, lng: lng },
+      { lat: lat, lng: lng },
+      { lat: lat, lng: lng - 0.0001 },
+    ],
+  },
+  {
+    id: "Plot 12",
+    status: "sold",
+    price: "₹14L",
+    area: "1350 sqft",
+    path: [
+      { lat: lat, lng: lng },
+      { lat: lat, lng: lng + 0.0001 },
+      { lat: lat - 0.0001, lng: lng + 0.0001 },
+      { lat: lat - 0.0001, lng: lng },
+    ],
+  },
+];
+const [selectedPlot, setSelectedPlot] = useState<PlotInventory | null>(null);
+
+const [layoutBounds, setLayoutBounds] = useState<any>(null);
 
 const sourceIcon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'; // big map pin
 const destinationIcon = 'https://maps.google.com/mapfiles/ms/icons/red-flag.png'; // flag
@@ -173,6 +215,20 @@ const clearAllDrawings = () => {
 const onOverlayComplete = (
   e: google.maps.drawing.OverlayCompleteEvent
 ) => {
+  if (e.type === "polygon") {
+  const poly = e.overlay as google.maps.Polygon;
+
+  const path = poly
+    .getPath()
+    .getArray()
+    .map(p => p.toJSON());
+
+  const bounds = getPolygonBounds(path);
+
+  setLayoutBounds({ ...bounds });
+
+}
+
   const shape = e.overlay as MapOverlay;
 
   drawingsRef.current.push(shape);
@@ -211,7 +267,7 @@ const onOverlayComplete = (
   });
 
 useEffect(() => {
-  projectsApi.getAll().then((data) => {
+  projectsApi.getAllPublic().then((data) => {
     setAllProjects(data);
 
     if (focusOnly) {
@@ -423,6 +479,16 @@ const loadNeighborhood = (category: string) => {
           icon: getNeighborhoodIcon(category),
         });
 
+         const info = new google.maps.InfoWindow({
+          content: `
+            <strong>${place.name}</strong><br/>
+            ${category}
+          `,
+        });
+
+        marker.addListener("click", () => {
+          info.open(map, marker);
+        });
         neighborhoodMarkersRef.current.push(marker);
       });
     });
@@ -433,18 +499,70 @@ const loadNeighborhood = (category: string) => {
   // 🔹 Expose functions via ref
   useImperativeHandle(ref, () => ({
     getDirections: () => {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        const service = new google.maps.DirectionsService();
-        service.route(
-          {
-            origin: { lat: pos.coords.latitude, lng: pos.coords.longitude },
-            destination: { lat, lng },
-            travelMode: google.maps.TravelMode.DRIVING,
-          },
-          (res) => res && setDirections(res)
-        );
-      });
-    },
+  if (!mapRef.current || !window.google) return;
+
+  const map = mapRef.current;
+
+  // clear previous navigation
+  clearNavigation();
+
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const clientLoc = new google.maps.LatLng(
+      pos.coords.latitude,
+      pos.coords.longitude
+    );
+
+    const projectLoc = new google.maps.LatLng(lat, lng);
+
+    // =====================
+    // USER PIN
+    // =====================
+    clientMarkerRef.current = new google.maps.Marker({
+      position: clientLoc,
+      map,
+      title: "Your Location",
+      icon: {
+        url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
+        scaledSize: new google.maps.Size(40, 40),
+      },
+    });
+
+    // =====================
+    // PROJECT FLAG
+    // =====================
+    projectMarkerRef.current = new google.maps.Marker({
+      position: projectLoc,
+      map,
+      title: "Project",
+      icon: destinationIcon,
+    });
+
+    // =====================
+    // ROUTE
+    // =====================
+    const service = new google.maps.DirectionsService();
+
+    service.route(
+      {
+        origin: clientLoc,
+        destination: projectLoc,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status !== "OK" || !result) return;
+
+        setDirections(result);
+
+        // zoom to fit route
+        const bounds = new google.maps.LatLngBounds();
+        bounds.extend(clientLoc);
+        bounds.extend(projectLoc);
+        map.fitBounds(bounds);
+      }
+    );
+  });
+},
+
     toggleStreetView: () => {
         if (!mapRef.current) return;
 
@@ -684,7 +802,10 @@ clearNeighborhood: () => {
 
     const applySearch = () => {
     if (!pendingPlaceRef.current || !mapRef.current) return;
-
+    clearNeighborhoodMarkers();
+    clearNavigation();
+    setNeighborhoodType(null);
+    setDirections(null);
     const place = pendingPlaceRef.current;
 
     setIsFocusMode(false);
@@ -854,6 +975,25 @@ const shareDrawings = async () => {
   }
 };
 
+const getPolygonBounds = (
+  paths: google.maps.LatLngLiteral[]
+): google.maps.LatLngBoundsLiteral => {
+
+  const bounds = new google.maps.LatLngBounds();
+
+  paths.forEach(p => bounds.extend(p));
+
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+
+  return {
+    north: ne.lat(),
+    east: ne.lng(),
+    south: sw.lat(),
+    west: sw.lng(),
+  };
+};
+
 
   return (
     <div className="relative h-full w-full z-0">
@@ -980,6 +1120,13 @@ const shareDrawings = async () => {
                     
 
                   >
+                 {layoutBounds && (
+  <GroundOverlay
+    url="/sc.png"
+    bounds={layoutBounds}
+    opacity={0.8}
+  />
+)}
                     {directions && (
                       <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />
                     )}
@@ -1012,6 +1159,42 @@ const shareDrawings = async () => {
     },
   }}
 />
+{selectedPlot && (
+  <OverlayView
+    position={selectedPlot.path[0]}
+    mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+  >
+    <div className="
+      bg-white rounded-xl shadow-xl
+      p-3 text-xs w-40
+      -translate-x-1/2 -translate-y-full
+    ">
+      <p className="font-semibold">{selectedPlot.id}</p>
+      <p>{selectedPlot.area}</p>
+      <p>{selectedPlot.price}</p>
+
+      <p className={`
+        mt-1 font-medium
+        ${
+          selectedPlot.status === "sold"
+            ? "text-red-600"
+            : selectedPlot.status === "reserved"
+            ? "text-yellow-600"
+            : "text-green-600"
+        }
+      `}>
+        {selectedPlot.status.toUpperCase()}
+      </p>
+
+      <button
+        onClick={() => setSelectedPlot(null)}
+        className="mt-2 text-gray-500 text-[10px]"
+      >
+        Close
+      </button>
+    </div>
+  </OverlayView>
+)}
 
                     
 

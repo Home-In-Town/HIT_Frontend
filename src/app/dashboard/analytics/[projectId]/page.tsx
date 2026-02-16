@@ -3,16 +3,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-<<<<<<< HEAD
-import { analyticsApi, projectsApi, callApi } from '@/lib/api';
+import { analyticsApi, projectsApi} from '@/lib/api';
 import ProjectAnalytics, {
   VisitLog,
-  CallLog,
-=======
-import { analyticsApi, projectsApi } from '@/lib/api';
-import ProjectAnalytics, {
-  VisitLog,
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
+ 
+
 } from '@/components/analytics/ProjectAnalytics';
 
 export default function ProjectAnalyticsPage() {
@@ -29,10 +24,6 @@ export default function ProjectAnalyticsPage() {
     whatsappClicks: number;
     formClicks: number;
     visitLogs: VisitLog[];
-<<<<<<< HEAD
-    callLogs: CallLog[];
-=======
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
   } | null>(null);
 
   useEffect(() => {
@@ -55,40 +46,15 @@ export default function ProjectAnalyticsPage() {
           // form tracking future-ready
         }));
 
-<<<<<<< HEAD
-        // ---- Call logs by project ----
-    const rawCallLogs = await callApi.getLogsByProject(projectId);
-
-    const callLogs: CallLog[] = rawCallLogs.map((call: any) => ({
-      id: call.callId || call._id,
-      startedAt: call.startTime || call.createdAt,
-      endedAt: call.endTime || undefined,
-      durationSeconds: call.duration || 0,
-      status: call.status === 'completed'
-        ? 'completed'
-        : call.status === 'missed'
-        ? 'missed'
-        : 'failed',
-    }));
-
-        setAnalyticsData({
-          projectId,
-          projectName:project.name,
-=======
         setAnalyticsData({
           projectId,
           projectName: project.name,
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
           totalVisits: data.totalVisits,
           totalLeads: data.uniqueLeads,
           totalCalls,
           whatsappClicks,
           formClicks,
           visitLogs,
-<<<<<<< HEAD
-          callLogs,
-=======
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
         });
       } catch (err) {
         setError('Failed to load project analytics');

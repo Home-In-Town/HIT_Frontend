@@ -17,18 +17,12 @@ export default function DashboardLayout({
   // Fix: Strictly match /dashboard to prevent it from being active on /dashboard/analytics
   const isActive = (path: string) => {
     if (path === '/dashboard') {
-<<<<<<< HEAD
-      return pathname === '/dashboard' || pathname.startsWith('/dashboard/projects');
-    }
-    return pathname === path || pathname.startsWith(path + '/');
-=======
       return pathname === '/dashboard' || 
              pathname === '/dashboard/builder' || 
              pathname === '/dashboard/agent' || 
              pathname === '/dashboard/admin';
     }
     return pathname.startsWith(path);
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
   };
 
   return (
@@ -99,9 +93,6 @@ export default function DashboardLayout({
             href="/dashboard"
             onClick={() => setSidebarOpen(false)}
             className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-<<<<<<< HEAD
-              isActive('/dashboard') && !isActive('/dashboard/projects/new') 
-=======
               isActive('/dashboard') 
                 ? 'bg-gray-100 text-gray-900' 
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -118,7 +109,6 @@ export default function DashboardLayout({
             onClick={() => setSidebarOpen(false)}
             className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
               isActive('/dashboard/projects') 
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
                 ? 'bg-gray-100 text-gray-900' 
                 : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
             }`}
@@ -129,17 +119,6 @@ export default function DashboardLayout({
             Projects
           </Link>
 
-<<<<<<< HEAD
-          <a href="#" className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-400 cursor-not-allowed hover:text-gray-500">
-             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-             </svg>
-             Leads
-             <span className="ml-auto text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">Soon</span>
-          </a>
-=======
-
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
 
           <Link 
             href="/dashboard/analytics"
@@ -156,8 +135,6 @@ export default function DashboardLayout({
              Analytics
           </Link>
 
-<<<<<<< HEAD
-=======
           <Link
             href="/dashboard/organizations"
             onClick={() => setSidebarOpen(false)}
@@ -173,7 +150,6 @@ export default function DashboardLayout({
              Organizations
           </Link>
 
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14
 
 
         </nav>
@@ -194,7 +170,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-<<<<<<< HEAD
-=======
-
->>>>>>> 42e32dee571af049641cafa7122d400b63cf0e14

@@ -27,7 +27,7 @@ export interface ProjectAnalyticsProps {
   whatsappClicks: number;
   formClicks: number;
   visitLogs: VisitLog[];
-  callLogs: CallLog[];
+
 }
 
 // ---- Helpers ----
@@ -50,7 +50,7 @@ export default function ProjectAnalytics({
   whatsappClicks,
   formClicks,
   visitLogs = [],
-  callLogs = [],
+  
 }: ProjectAnalyticsProps) {
  
   return (
