@@ -9,7 +9,7 @@ import { Project } from '@/types/project';
 import { MapPin, ArrowRight } from 'lucide-react';
 
 // Simple tracking for the projects listing page
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sales-website-backend-624770114041.asia-south1.run.app/api';
 const TRACKING_INTERVAL = 30; // seconds
 
 function ProjectsContent() {
