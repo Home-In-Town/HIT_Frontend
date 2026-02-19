@@ -36,11 +36,16 @@ export default function AnalyticsPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const result = await analyticsApi.getAll();
+        const result = await analyticsApi.getOverview();
         setData(result);
-      } catch {
-        setError('Failed to load analytics data');
-      } finally {
+      } catch (err: any) {
+        if (err.message?.includes("401")) {
+          router.push("/login");
+          return;
+        }
+
+        setError(err.message || "Failed to load analytics data");
+      }finally {
         setLoading(false);
       }
     }
@@ -94,41 +99,48 @@ export default function AnalyticsPage() {
         <MiniStat label="Forms" value={totalForms} />
       </div>
 
-      {/* Project Overview Table */}
-      <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visits</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Time</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Call</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">WA</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Form</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {data.map(row => (
-                <tr
-                  key={row.id}
-                  onClick={() => router.push(`/dashboard/analytics/${row.id}`)}
-                  className="hover:bg-gray-50 cursor-pointer"
-                >
-                  <td className="px-6 py-4 font-medium">{row.name}</td>
-                  <td className="px-6 py-4 text-right">{row.totalVisits}</td>
-                  <td className="px-6 py-4 text-right text-emerald-700">{row.uniqueLeads}</td>
-                  <td className="px-6 py-4 text-right">{formatDuration(row.totalTimeSpent)}</td>
-                  <td className="px-6 py-4 text-center">{row.calls || '-'}</td>
-                  <td className="px-6 py-4 text-center">{row.whatsapp || '-'}</td>
-                  <td className="px-6 py-4 text-center">{row.forms || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {data.length === 0 && (
+        <div className="bg-white border rounded-xl p-8 text-center text-gray-500">
+          No analytics available for your projects.
         </div>
-      </div>
+      )}
+       {/* Project Overview Table */}
+      {data.length > 0 && ( 
+        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Visits</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Leads</th>
+                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Time</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Call</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">WA</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Form</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {data.map(row => (
+                  <tr
+                    key={row.id}
+                    onClick={() => router.push(`/dashboard/analytics/${row.id}`)}
+                    className="hover:bg-gray-50 cursor-pointer"
+                  >
+                    <td className="px-6 py-4 font-medium">{row.name}</td>
+                    <td className="px-6 py-4 text-right">{row.totalVisits}</td>
+                    <td className="px-6 py-4 text-right text-emerald-700">{row.uniqueLeads}</td>
+                    <td className="px-6 py-4 text-right">{formatDuration(row.totalTimeSpent)}</td>
+                    <td className="px-6 py-4 text-center">{row.calls || '-'}</td>
+                    <td className="px-6 py-4 text-center">{row.whatsapp || '-'}</td>
+                    <td className="px-6 py-4 text-center">{row.forms || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

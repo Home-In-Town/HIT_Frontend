@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Toaster } from 'react-hot-toast';
+import { useAuth } from '@/lib/authContext';
 
 export default function DashboardLayout({
   children,
@@ -14,16 +15,26 @@ export default function DashboardLayout({
   const pathname = usePathname();
   // Ensure active state updates correctly on navigation
 
+  const { user } = useAuth();
+
   // Fix: Strictly match /dashboard to prevent it from being active on /dashboard/analytics
   const isActive = (path: string) => {
+    if (!pathname) return false;
+
     if (path === '/dashboard') {
-      return pathname === '/dashboard' || 
-             pathname === '/dashboard/builder' || 
-             pathname === '/dashboard/agent' || 
-             pathname === '/dashboard/admin';
+      return pathname === '/dashboard' ||
+            pathname.startsWith('/dashboard/admin') ||
+            pathname.startsWith('/dashboard/builder') ||
+            pathname.startsWith('/dashboard/agent');
     }
+
     return pathname.startsWith(path);
   };
+const orgPath = user
+  ? '/dashboard/organizations'
+  : '/login';
+
+
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
@@ -120,7 +131,6 @@ export default function DashboardLayout({
           </Link>
 
 
-
           <Link 
             href="/dashboard/analytics"
             onClick={() => setSidebarOpen(false)}
@@ -137,7 +147,7 @@ export default function DashboardLayout({
           </Link>
 
           <Link
-            href="/dashboard/organizations"
+            href={orgPath}
             onClick={() => setSidebarOpen(false)}
             className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
               isActive('/dashboard/organizations')
@@ -171,4 +181,3 @@ export default function DashboardLayout({
     </div>
   );
 }
-

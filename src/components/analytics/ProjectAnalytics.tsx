@@ -1,4 +1,5 @@
 //components\analytics\ProjectAnalytics.tsx
+import { useMemo } from 'react';
 import { Phone, Eye, MessageCircle, FileText, Clock } from 'lucide-react';
 
 // ---- Types ----
@@ -7,6 +8,14 @@ export interface VisitLog {
   visitedAt: string; // ISO time
   durationSeconds: number;
   formStatus?: 'opened' | 'submitted';
+}
+
+export interface CallLog {
+  id: string;
+  startedAt: string; // ISO time
+  endedAt?: string;
+  durationSeconds: number;
+  status: 'completed' | 'missed' | 'failed';
 }
 
 export interface ProjectAnalyticsProps {
@@ -18,6 +27,7 @@ export interface ProjectAnalyticsProps {
   whatsappClicks: number;
   formClicks: number;
   visitLogs: VisitLog[];
+
 }
 
 // ---- Helpers ----
@@ -40,6 +50,7 @@ export default function ProjectAnalytics({
   whatsappClicks,
   formClicks,
   visitLogs = [],
+  
 }: ProjectAnalyticsProps) {
  
   return (
@@ -115,4 +126,3 @@ function StatCard({
     </div>
   );
 }
-

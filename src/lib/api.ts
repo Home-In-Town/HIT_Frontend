@@ -1,9 +1,11 @@
 // API Service for Dynamic Sales Website
 
-export type { Project, ProjectFormData };
 import { Project, ProjectFormData } from '@/types/project';
 
+//const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+export type { Project, ProjectFormData };
+
 
 // Get mock user ID from localStorage (for RBAC)
 function getMockUserId(): string | null {
@@ -23,24 +25,38 @@ function getAuthHeaders(): HeadersInit {
     return headers;
 }
 
-class ApiError extends Error {
-    status: number;
+export class ApiError extends Error {
+  status: number;
 
-    constructor(message: string, status: number) {
-        super(message);
-        this.name = 'ApiError';
-        this.status = status;
-    }
+  constructor(message: string | null | undefined, status: number) {
+    super(message ?? "Unknown error");
+    this.status = status;
+  }
 }
 
 async function handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        const message = error.message || error.error || 'An error occurred';
-        throw new ApiError(message, response.status);
-    }
-    return response.json();
+  let body: any = null;
+
+  try {
+    body = await response.json();
+  } catch {
+    body = null;
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof body?.message === "string"
+        ? body.message
+        : typeof body?.error === "string"
+        ? body.error
+        : `Request failed (${response.status})`;
+
+    throw new ApiError(String(message), response.status);
+  }
+
+  return body as T;
 }
+
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function transformBackendToFrontend(backendProject: any): Project {
@@ -246,54 +262,73 @@ export const projectsApi = {
     },
 };
 
-// Analytics API
+
+// ==============================
+// Types
+// ==============================
+
 export interface ProjectAnalytics {
-    totalVisits: number;
-    uniqueLeads: number;
-    totalTimeSpent: number;
-    ctaClicks: {
-        id: string;
-        type: string;
-        ctaType: string;
-        projectId: string;
-        source?: string;
-        leadId?: string;
-        timestamp: string;
-    }[];
-    recentVisits: {
-        _id: string;
-        timestamp: string;
-        duration: number;
-        leadId?: string;
-    }[];
+  totalVisits: number;
+  uniqueLeads: number;
+  totalTimeSpent: number;
+  ctaClicks: {
+    id: string;
+    type: string;
+    ctaType: string;
+    projectId: string;
+    source?: string;
+    leadId?: string;
+    timestamp: string;
+  }[];
+  recentVisits: {
+    _id: string;
+    timestamp: string;
+    duration: number;
+    leadId?: string;
+  }[];
 }
 
 export interface ProjectAnalyticsOverview {
-    id: string;
-    name: string;
-    totalVisits: number;
-    uniqueLeads: number;
-    totalTimeSpent: number;
-    ctaClicks: number;
-    calls: number;
-    whatsapp: number;
-    forms: number;
+  id: string;
+  name: string;
+  totalVisits: number;
+  uniqueLeads: number;
+  totalTimeSpent: number;
+  ctaClicks: number;
+  calls: number;
+  whatsapp: number;
+  forms: number;
 }
 
+// ==============================
+// Analytics API
+// ==============================
+
 export const analyticsApi = {
-    // Get analytics for a specific project
-    async getProjectAnalytics(projectId: string): Promise<ProjectAnalytics> {
-        const response = await fetch(`${API_URL}/analytics/projects/${projectId}`);
-        return handleResponse<ProjectAnalytics>(response);
-    },
+  // 🔎 Get analytics for one project
+  async getProjectAnalytics(projectId: string): Promise<ProjectAnalytics> {
+    const response = await fetch(
+      `${API_URL}/analytics/projects/${projectId}`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
 
-    // Get analytics overview for all projects
-    async getAll(): Promise<ProjectAnalyticsOverview[]> {
-        const response = await fetch(`${API_URL}/analytics/overview`);
-        return handleResponse<ProjectAnalyticsOverview[]>(response);
-    },
+    return handleResponse<ProjectAnalytics>(response);
+  },
+
+  // 📊 Get overview (role-based from backend)
+  async getOverview(): Promise<ProjectAnalyticsOverview[]> {
+    const response = await fetch(
+      `${API_URL}/analytics/overview`,
+      {
+        headers: getAuthHeaders(),
+      }
+    );
+
+    return handleResponse<ProjectAnalyticsOverview[]>(response);
+  },
 };
-
 
 
 
@@ -354,9 +389,13 @@ export const usersApi = {
 
     // Get users by role (for login dropdown)
     async getByRole(role: string): Promise<{ id: string; name: string; email: string; phone?: string }[]> {
-        const response = await fetch(`${API_URL}/users/by-role/${role}`);
-        return handleResponse<{ id: string; name: string; email: string; phone?: string }[]>(response);
-    },
+    const response = await fetch(`${API_URL}/users/by-role/${role}`, {
+        headers: getAuthHeaders(),  
+    });
+
+    return handleResponse(response);
+}
+
 };
 
 
@@ -364,52 +403,144 @@ export const usersApi = {
    Organization Types & API
 -----------------------------------*/
 
+
+export interface OrgProject {
+  _id: string;
+  projectName: string;
+  status: string;
+}
+export interface OrgAgent {
+    _id: string;
+    name: string;
+    email: string;
+    role?: string;
+}
+
 export interface Organization {
     id: string;
     name: string;
     description?: string;
-    agents: { id: string; name: string; email: string }[];
-    projects: { id: string; projectName: string; status: string }[];
+    agents: OrgAgent[];
+    projects?: OrgProject[];
+    createdBy?: string;
     createdAt?: string;
 }
 
+// ---------- TRANSFORMERS ----------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformOrgBackend(org: any): Organization {
+  return {
+    id: org?.id ? String(org.id) : "",
+
+    name: org?.name ?? "",
+    description: org?.description ?? "",
+
+    agents: Array.isArray(org?.agents)
+      ? org.agents.map((a: any) => ({
+          _id: a?._id ? String(a._id) : String(a),
+          name: a?.name ?? "",
+          email: a?.email ?? "",
+          role: a?.role,
+        }))
+      : [],
+
+    projects: Array.isArray(org?.projects)
+      ? org.projects.map((p: any) => ({
+          _id: p?._id ? String(p._id) : String(p),
+          projectName: p?.projectName ?? "",
+          status: p?.status ?? "",
+        }))
+      : [],
+
+    createdBy: org?.createdBy
+      ? String(org.createdBy)
+      : undefined,
+  };
+}
 export const organizationsApi = {
-    // Get organizations (filtered by role on backend)
-    async getAll(): Promise<Organization[]> {
-        const response = await fetch(`${API_URL}/organizations`, {
-            headers: getAuthHeaders(),
-        });
-        return handleResponse<Organization[]>(response);
-    },
 
-    // Create organization (admin only)
-    async create(data: { name: string; description?: string; agents?: string[]; projects?: string[] }): Promise<Organization> {
-        const response = await fetch(`${API_URL}/organizations`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(data),
-        });
-        return handleResponse<Organization>(response);
-    },
+  // =====================================
+  // GET — Role based (backend filtered)
+  // =====================================
+  async getAll(type?: 'all' | 'assigned' | 'created'): Promise<Organization[]> {
+  const query = type ? `?type=${type}` : '';
 
-    // Update organization (admin only)
-    async update(id: string, data: Partial<{ name: string; description: string; agents: string[]; projects: string[] }>): Promise<Organization> {
-        const response = await fetch(`${API_URL}/organizations/${id}`, {
-            method: 'PUT',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(data),
-        });
-        return handleResponse<Organization>(response);
-    },
+  const response = await fetch(`${API_URL}/organizations${query}`, {
+    headers: getAuthHeaders(),
+  });
 
-    // Delete organization (admin only)
-    async delete(id: string): Promise<void> {
-        const response = await fetch(`${API_URL}/organizations/${id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders(),
-        });
-        if (!response.ok) {
-            throw new ApiError('Failed to delete organization', response.status);
-        }
-    },
+  const data = await handleResponse<any[]>(response);
+  return data.map(transformOrgBackend);
+},
+
+
+  // =====================================
+  // CREATE — Admin / Builder / Agent
+  // =====================================
+  async create(data: {
+    name: string;
+    description?: string;
+    agents?: string[];
+    projects?: string[];
+  }): Promise<Organization> {
+
+    const response = await fetch(`${API_URL}/organizations`, {
+      method: "POST",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const org = await handleResponse<any>(response);
+    return transformOrgBackend(org);
+  },
+
+
+  // =====================================
+  // UPDATE — Role protected by backend
+  // =====================================
+  async update(
+    id: string,
+    data: Partial<{
+      name: string;
+      description: string;
+      agents: string[];
+      projects: string[];
+    }>
+  ): Promise<Organization> {
+
+    const response = await fetch(`${API_URL}/organizations/${id}`, {
+      method: "PUT",
+      headers: {
+        ...getAuthHeaders(),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(data),
+    });
+
+    const org = await handleResponse<any>(response);
+    return transformOrgBackend(org);
+  },
+
+
+  // =====================================
+  // DELETE — Backend handles permission
+  // =====================================
+  async delete(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/organizations/${id}`, {
+      method: "DELETE",
+      headers: getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      const body = await response.json().catch(() => null);
+      const message =
+        body?.message || body?.error || "Failed to delete organization";
+
+      throw new ApiError(message, response.status);
+    }
+  },
 };
