@@ -276,46 +276,13 @@ const priceBreakdown =   [
   return (
     <div className="min-h-screen">
       <div className="mx-auto bg-white  p-5 pl-10 ">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2 font-semibold text-3xl">
-            <div className="w-6 h-6 bg-[#3E5F16] rounded-md" />
-             HomeIn Town
-          </div>
-          {/* CTA */}
-
-  
-
-  <div className="grid grid-cols-3 gap-2">
-  <button
-    onClick={onCallClick}
-    className="bg-[#3E5F16] text-white py-2 rounded-lg flex items-center justify-center gap-1 text-sm font-medium"
-  >
-    <Phone size={14} /> Call
-  </button>
-
-  <button
-    onClick={onWhatsAppClick}
-    className="bg-white hover:bg-gray-100 text-[#3E5F16] border boerder-[#3E5F16] py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-  >
-    <MessageCircle size={14} /> WhatsApp
-  </button>
-
-  <button
-    onClick={onEnquireClick}
-    className="border border-[#3E5F16] text-[#3E5F16] py-2 px-5 rounded-lg flex items-center justify-center gap-1 text-sm font-medium hover:bg-green-50"
-  >
-    <Send size={14} /> Enquire Now
-  </button>
-</div>
-
-        </div>
+        
 
       
         {/* Layout */}
-        <div className="mt-10 grid grid-cols-2 gap-8 h-[calc(100vh-120px)]">
+        <div className="mt-2 grid grid-cols-2 gap-8 h-[calc(100vh-120px)]">
           {/* LEFT PANEL */}
-          <div className="overflow-y-auto pr-4 scrollbar-hide">
+          <div className="mt-2 overflow-y-auto pr-4 scrollbar-hide">
             {drawerOpen && drawerProjects.length > 0 ? (
               // SHOW DRAWER LIST
               <DrawerContent
@@ -546,7 +513,34 @@ const priceBreakdown =   [
 
           {/* RIGHT */}
           <div className="space-y-6 sticky top-6 self-start">
-            
+            {/* Header */}
+        <div className="flex  justify-end mb-6">
+          
+          {/* CTA */}
+          <div className=" grid grid-cols-3 gap-2">
+            <button
+              onClick={onCallClick}
+              className="bg-[#3E5F16] text-white py-2 rounded-lg flex items-center justify-center gap-1 text-sm font-medium"
+            >
+              <Phone size={14} /> Call
+            </button>
+
+            <button
+              onClick={onWhatsAppClick}
+              className="bg-white hover:bg-gray-100 text-[#3E5F16] border boerder-[#3E5F16] py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+            >
+              <MessageCircle size={14} /> WhatsApp
+            </button>
+
+            <button
+              onClick={onEnquireClick}
+              className="border border-[#3E5F16] text-[#3E5F16] py-2 px-5 rounded-lg flex items-center justify-center gap-1 text-sm font-medium hover:bg-green-50"
+            >
+              <Send size={14} /> Enquire Now
+            </button>
+          </div>
+
+        </div>
             <div className=" border border-gray-200 overflow-hidden">
               
 

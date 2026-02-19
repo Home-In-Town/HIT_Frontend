@@ -9,8 +9,11 @@ import ProjectAnalytics, {
  
 
 } from '@/components/analytics/ProjectAnalytics';
+import { useRouter } from 'next/navigation';
+
 
 export default function ProjectAnalyticsPage() {
+  const router = useRouter();
   const { projectId } = useParams<{ projectId: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,8 +59,18 @@ export default function ProjectAnalyticsPage() {
           formClicks,
           visitLogs,
         });
-      } catch (err) {
-        setError('Failed to load project analytics');
+      } catch (err: any) {
+        if (err.message?.includes("401")) {
+          router.push("/login");
+          return;
+        }
+
+        if (err.message?.includes("403")) {
+          setError("You do not have access to this project.");
+          return;
+        }
+
+        setError("Failed to load project analytics");
       } finally {
         setLoading(false);
       }

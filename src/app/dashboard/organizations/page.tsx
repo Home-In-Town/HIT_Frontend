@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { organizationsApi, Organization, projectsApi, usersApi, Project } from '@/lib/api';
+import { organizationsApi, Organization, projectsApi, usersApi, Project, ApiError } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 
 export default function OrganizationsPage() {
@@ -34,39 +34,61 @@ export default function OrganizationsPage() {
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showAgentDropdown, setShowAgentDropdown] = useState(false);
 
+  const [nameError, setNameError] = useState<string | null>(null);
+   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [editingOrg, setEditingOrg] = useState<Organization | null>(null);
+  const [selfRemoveTarget, setSelfRemoveTarget] = useState<string | null>(null);
+  const [filter, setFilter] = useState<'all' | 'assigned' | 'created'>('all');
+
   // Auth Protection
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) {
+    if (!authLoading && !user) {
       router.push('/dashboard');
     }
   }, [user, authLoading, router]);
 
   // Initial Fetch
   useEffect(() => {
-    if (user?.role === 'admin') {
-      fetchOrganizations();
+    if (user) {
+      fetchOrganizations(filter);
     }
-  }, [user]);
+  }, [user, filter]);
 
   // Fetch Modal Data when modal opens
   useEffect(() => {
-    if (isModalOpen) {
+    if (isModalOpen && availableProjects.length === 0) {
       fetchModalData();
     }
   }, [isModalOpen]);
 
-  const fetchOrganizations = async () => {
-    try {
-      setIsLoading(true);
-      const data = await organizationsApi.getAll();
-      setOrganizations(data);
-    } catch (error) {
-      console.error('Failed to fetch organizations', error);
+ const fetchOrganizations = async (type?: 'all' | 'assigned' | 'created') => {
+  if (!user) return;
+
+  try {
+    setIsLoading(true);
+
+    const data = await organizationsApi.getAll(type);
+
+    setOrganizations(data);
+  } catch (error) {
+    console.error('Failed to fetch organizations', error);
+
+    if (error instanceof ApiError) {
+      toast.error(error.message);
+    } else {
       toast.error('Failed to load organizations');
-    } finally {
-      setIsLoading(false);
     }
-  };
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   const fetchModalData = async () => {
     try {
@@ -84,40 +106,99 @@ export default function OrganizationsPage() {
       setIsDataLoading(false);
     }
   };
+const handleDelete = async (id: string) => {
+  try {
+    setIsDeleting(true);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.name.trim()) {
-      toast.error('Organization name is required');
+    await organizationsApi.delete(id);
+
+    setOrganizations(prev =>
+      prev.filter(org => org.id !== id)
+    );
+
+    toast.success('Organization deleted');
+
+    setDeleteTarget(null);
+
+  } catch (error) {
+    if (error instanceof ApiError) {
+      toast.error(error.message);
+    } else {
+      toast.error('Failed to delete organization');
+    }
+  } finally {
+    setIsDeleting(false);
+  }
+};
+
+
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  const trimmedName = formData.name.trim();
+  const trimmedDescription = formData.description.trim();
+
+  if (!trimmedName) {
+    setNameError("Organization name is required");
+    return;
+  }
+
+  try {
+    setIsSubmitting(true);
+    setNameError(null);
+
+    let result: Organization;
+
+    if (editingOrg) {
+      // UPDATE
+      result = await organizationsApi.update(editingOrg.id, {
+        name: trimmedName,
+        description: trimmedDescription,
+        projects: selectedProjects,
+        agents: selectedAgents,
+      });
+
+      // ✅ Replace updated org in state
+      setOrganizations(prev =>
+        prev.map(org =>
+          org.id === result.id ? result : org
+        )
+      );
+
+      toast.success("Organization updated");
+    } else {
+      // CREATE
+      result = await organizationsApi.create({
+        name: trimmedName,
+        description: trimmedDescription,
+        projects: selectedProjects,
+        agents: selectedAgents,
+      });
+
+      // ✅ Add new org to top (no refetch needed)
+      setOrganizations(prev => [result, ...prev]);
+
+      toast.success("Organization created");
+    }
+
+    resetModal();
+    setIsModalOpen(false);
+
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      error.message.toLowerCase().includes("exist")
+    ) {
+      setNameError("Organization name already exists");
       return;
     }
 
-    try {
-      setIsSubmitting(true);
-      await organizationsApi.create({
-        name: formData.name,
-        description: formData.description,
-        projects: selectedProjects,
-        agents: selectedAgents
-      });
-      
-      toast.success('Organization created successfully');
-      
-      // Reset Form
-      setFormData({ name: '', description: '' });
-      setSelectedProjects([]);
-      setSelectedAgents([]);
-      setIsModalOpen(false);
-      
-      fetchOrganizations(); // Refresh list
-    } catch (error) {
-      console.error('Failed to create organization', error);
-      toast.error('Failed to create organization');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    toast.error(editingOrg ? "Update failed" : "Create failed");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
+
 
   // Toggle Selection Helpers
   const toggleProject = (id: string) => {
@@ -140,6 +221,68 @@ export default function OrganizationsPage() {
     );
   }
 
+const openEditModal = (org: Organization) => {
+  resetModal();
+  setEditingOrg(org);
+
+  setFormData({
+    name: org.name,
+    description: org.description || '',
+  });
+
+  setSelectedProjects(org.projects?.map(p => p._id) ?? []);
+  setSelectedAgents(org.agents?.map(a => a._id) ?? []);
+
+  setIsModalOpen(true);
+};
+
+
+const resetModal = () => {
+  setEditingOrg(null);
+  setFormData({ name: '', description: '' });
+  setSelectedProjects([]);
+  setSelectedAgents([]);
+  setShowProjectDropdown(false);
+  setShowAgentDropdown(false);
+  setNameError(null);
+};
+
+
+ const openCreateModal = () => {
+  resetModal();
+
+  // If logged in user is agent → auto add himself
+  if (user?.role === "agent" && user.id) {
+    setSelectedAgents([user.id]);
+  }
+
+  setIsModalOpen(true);
+};
+
+const handleNameChange = (value: string) => {
+  setFormData(prev => ({ ...prev, name: value }));
+  setNameError(null);
+};
+
+
+const handleRemoveAgent = (id: string) => {
+  const isCurrentUser = user?.id === id;
+
+  // 🚫 Prevent removing self during CREATE
+  if (!editingOrg && isCurrentUser && user?.role === "agent") {
+    toast.error("You must remain part of the organization.");
+    return;
+  }
+
+  // Allow self removal only during edit
+  if (editingOrg && isCurrentUser && user?.role === "agent") {
+    setSelfRemoveTarget(id);
+    return;
+  }
+
+  toggleAgent(id);
+};
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -147,12 +290,12 @@ export default function OrganizationsPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Organizations</h1>
+              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{user.name} Organizations</h1>
               <p className="mt-1 text-sm text-gray-500">Manage your agency partners and teams</p>
             </div>
             
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={openCreateModal}
               className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all duration-200"
             >
               <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -162,6 +305,29 @@ export default function OrganizationsPage() {
             </button>
           </div>
         </div>
+      </div>
+      <div className='mt-4 ml-25'>
+        {user.role === 'agent' && (
+          <div className="flex gap-2 mb-6">
+            {[
+              { key: 'all', label: 'View All' },
+              { key: 'assigned', label: 'Assigned' },
+              { key: 'created', label: 'Created' },
+            ].map(btn => (
+              <button
+                key={btn.key}
+                onClick={() => setFilter(btn.key as any)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium border transition ${
+                  filter === btn.key
+                    ? 'bg-black text-white border-black'
+                    : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -184,7 +350,7 @@ export default function OrganizationsPage() {
               Get started by creating your first organization to structure your teams and projects.
             </p>
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={openCreateModal}
               className="mt-6 inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
             >
               Create Now
@@ -219,7 +385,7 @@ export default function OrganizationsPage() {
                     )}
                   </div>
                   
-                  <h3 className="mt-4 text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                  <h3 className="mt-4 text-lg font-semibold text-gray-900  transition-colors">
                     {org.name}
                   </h3>
                   
@@ -239,13 +405,28 @@ export default function OrganizationsPage() {
                   </div>
                 </div>
                 
-                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-3">
                   <span className="text-xs text-gray-400 font-mono">
                     ID: {org.id.substring(0, 8)}...
                   </span>
-                  <button className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
-                    Manage &rarr;
-                  </button>
+                  <div className="flex items-center gap-3">
+
+                    {/* Delete button */}
+                    <button
+                      onClick={() => setDeleteTarget({ id: org.id, name: org.name })}
+
+                      disabled={deletingId === org.id}
+                      className="text-sm font-medium text-red-600 hover:text-red-800 transition-colors disabled:opacity-50"
+                    >
+                      {deletingId === org.id ? "Deleting..." : "Delete"}
+                    </button>
+
+                    <button 
+                    onClick={() => openEditModal(org)}
+                    className="text-sm font-medium text-gray-900 hover:text-blue-600 transition-colors">
+                      Manage &rarr;
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -267,7 +448,7 @@ export default function OrganizationsPage() {
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
             <div className="inline-block align-middle bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:max-w-xl sm:w-full relative z-50">
-              <form onSubmit={handleCreate} className="flex flex-col max-h-[90vh]">
+              <form onSubmit={handleSubmit} className="flex flex-col max-h-[90vh]">
                 {/* Header */}
                 <div className="bg-white px-6 py-5 border-b border-gray-100">
                   <div className="flex items-center gap-3">
@@ -277,7 +458,8 @@ export default function OrganizationsPage() {
                       </svg>
                     </div>
                     <h3 className="text-lg leading-6 font-semibold text-gray-900">
-                      Create New Organization
+                      {editingOrg ? 'Edit Organization' : 'Create New Organization'}
+
                     </h3>
                   </div>
                 </div>
@@ -301,9 +483,11 @@ export default function OrganizationsPage() {
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-black focus:ring-black sm:text-sm px-3 py-2 border"
                           placeholder="e.g. Acme Realty Group"
                           value={formData.name}
-                          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                          onChange={(e) => handleNameChange(e.target.value)}
+
                           required
                         />
+                         <p className='text-red-700'>{nameError}</p>
                       </div>
                       
                       <div>
@@ -337,22 +521,35 @@ export default function OrganizationsPage() {
                         </div>
                         
                         {/* Selected Projects Chips */}
-                        {selectedProjects.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {selectedProjects.map(id => {
-                                    const proj = availableProjects.find(p => p.id === id);
-                                    return (
-                                        <span key={id} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                                            {proj?.name}
-                                            <button type="button" onClick={() => toggleProject(id)} className="ml-1.5 inline-flex items-center justify-center text-indigo-400 hover:text-indigo-600">
-                                                <span className="sr-only">Remove</span>
-                                                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                                            </button>
-                                        </span>
-                                    );
-                                })}
-                            </div>
-                        )}
+                        {selectedProjects.map(id => {
+                            const apiProject = availableProjects.find(p => p.id === id);
+                            const orgProject = editingOrg?.projects?.find(p => p._id === id);
+
+                            let name = "Unknown";
+
+                            if (apiProject) {
+                              name = apiProject.name;
+                            } else if (orgProject) {
+                              name = orgProject.projectName;
+                            }
+
+
+                            return (
+                              <span key={id}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800"
+                              >
+                              {name}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleProject(id)}
+                                  className="ml-1.5"
+                                >
+                                  ✕
+                                </button>
+                              </span>
+                            );
+                          })}
+
 
                         {/* Projects Dropdown */}
                         {showProjectDropdown && (
@@ -390,21 +587,38 @@ export default function OrganizationsPage() {
 
                          {/* Selected Agents Chips */}
                          {selectedAgents.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {selectedAgents.map(id => {
-                                    const agent = availableAgents.find(a => a.id === id);
-                                    return (
-                                        <span key={id} className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                            {agent?.name}
-                                            <button type="button" onClick={() => toggleAgent(id)} className="ml-1.5 inline-flex items-center justify-center text-green-400 hover:text-green-600">
-                                                <span className="sr-only">Remove</span>
-                                                <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" /></svg>
-                                            </button>
-                                        </span>
-                                    );
-                                })}
-                            </div>
-                        )}
+  <div className="flex flex-wrap gap-2 mb-2">
+    {selectedAgents.map(id => {
+      const apiAgent = availableAgents.find(a => a.id === id);
+      const orgAgent = editingOrg?.agents?.find(a => a._id === id);
+
+      const agentName = apiAgent?.name || orgAgent?.name || "Unknown";
+
+      const isCurrentUser = user?.id === id;
+
+      return (
+        <span
+          key={id}
+          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            isCurrentUser
+              ? "bg-blue-100 text-blue-800"
+              : "bg-green-100 text-green-800"
+          }`}
+        >
+          {isCurrentUser ? "You" : agentName}
+
+          <button
+            type="button"
+            onClick={() => handleRemoveAgent(id)}
+            className="ml-1.5 inline-flex items-center justify-center hover:opacity-70"
+          >
+            ✕
+          </button>
+        </span>
+      );
+    })}
+  </div>
+)}
 
                         {/* Agents Dropdown */}
                         {showAgentDropdown && (
@@ -417,6 +631,11 @@ export default function OrganizationsPage() {
                                             type="checkbox"
                                             className="h-4 w-4 text-black focus:ring-black border-gray-300 rounded"
                                             checked={selectedAgents.includes(agent.id)}
+                                             disabled={
+                                                !editingOrg &&
+                                                user?.role === "agent" &&
+                                                user.id === agent.id
+                                              }
                                             onChange={() => toggleAgent(agent.id)}
                                         />
                                         <div className="ml-3">
@@ -438,7 +657,8 @@ export default function OrganizationsPage() {
                   <button
                     type="button"
                     className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:w-auto sm:text-sm"
-                    onClick={() => setIsModalOpen(false)}
+                    onClick={() => 
+                      setIsModalOpen(false)}
                   >
                     Cancel
                   </button>
@@ -447,7 +667,14 @@ export default function OrganizationsPage() {
                     disabled={isSubmitting || isDataLoading}
                     className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-black text-base font-medium text-white hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSubmitting ? 'Creating...' : 'Create Organization'}
+                    {isSubmitting
+                    ? editingOrg
+                      ? 'Updating...'
+                      : 'Creating...'
+                    : editingOrg
+                      ? 'Update Organization'
+                      : 'Create Organization'
+                    }
                   </button>
                 </div>
               </form>
@@ -455,6 +682,81 @@ export default function OrganizationsPage() {
           </div>
         </div>
       )}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in">
+
+            <h3 className="text-lg font-semibold text-gray-900">
+              Delete Organization
+            </h3>
+
+            <p className="mt-2 text-sm text-gray-600">
+              Are you sure you want to delete{" "}
+              <span className="font-medium text-gray-900">
+                {deleteTarget.name}
+              </span>
+              ? This action cannot be undone.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+
+            <button
+                onClick={() => handleDelete(deleteTarget.id)}
+                disabled={isDeleting}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selfRemoveTarget && (
+        <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Leave Organization?
+            </h3>
+
+            <p className="mt-2 text-sm text-gray-600">
+              Do you want to remove this organization for yourself?
+              You will lose access to its projects.
+            </p>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setSelfRemoveTarget(null)}
+                className="px-4 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={() => {
+                  toggleAgent(selfRemoveTarget);
+                  setSelfRemoveTarget(null);
+                }}
+                className="px-4 py-2 text-sm rounded-lg bg-red-600 text-white hover:bg-red-700"
+              >
+                Yes, Remove Me
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }

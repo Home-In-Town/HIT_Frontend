@@ -13,6 +13,7 @@ interface UserOption {
   id: string;
   name: string;
   email: string;
+  phone?: string;
 }
 
 export default function LoginPage() {
@@ -54,12 +55,17 @@ export default function LoginPage() {
     setLoading(true);
     
     try {
-      const roleUsers = await usersApi.getByRole(role);
-      setUsers(roleUsers);
+      // Try to fetch users for this role, but don't block if it fails
+      try {
+        const roleUsers = await usersApi.getByRole(role);
+        setUsers(roleUsers);
+      } catch (err) {
+        console.warn('Failed to fetch users for role:', role, err);
+        setUsers([]);
+      }
+      
+      // Always move to the next step to allow manual entry
       setStep('enter-name');
-    } catch (err) {
-      console.error('Failed to fetch users:', err);
-      setError('Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -287,7 +293,10 @@ export default function LoginPage() {
                       <button
                         key={u.id}
                         type="button"
-                        onClick={() => setName(u.name)}
+                        onClick={() => {
+                          setName(u.name);
+                          if (u.phone) setPhone(u.phone);
+                        }}
                         className="px-3 py-1.5 bg-white border border-[#E7E5E4] rounded-full text-sm text-[#57534E] hover:border-[#B45309] hover:text-[#B45309] transition-colors cursor-pointer"
                       >
                         {u.name}
