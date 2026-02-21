@@ -75,7 +75,7 @@ export default function BuilderDashboardPage() {
               + New Project
             </Link>
             <Link
-              href="https://leadgen-ui.netlify.app/"
+              href="https://leadgen-ui.netlify.app/select-role"
               target="_blank"
               rel="noopener noreferrer"
               className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-white hover:text-black transition-all duration-300"
