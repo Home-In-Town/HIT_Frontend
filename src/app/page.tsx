@@ -40,20 +40,7 @@ export default function Home() {
             Create professional, mobile-ready property landing pages in minutes. 
             No coding required. Just results.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              href="/dashboard/projects/new"
-              className="px-8 py-4 bg-[#B45309] text-white font-semibold rounded-lg hover:bg-[#92400E] transition-colors shadow-sm text-base"
-            >
-              Create New Project
-            </Link>
-            <Link
-              href="/login"
-              className="px-8 py-4 bg-white text-[#2A2A2A] font-semibold rounded-lg border border-[#D6D3D1] hover:bg-[#F5F5F4] transition-colors text-base"
-            >
-              Login
-            </Link>
-          </div>
+
         </div>
       </section>
 
