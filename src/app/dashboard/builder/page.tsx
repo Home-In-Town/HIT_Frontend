@@ -60,19 +60,27 @@ export default function BuilderDashboardPage() {
 
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-0">
           <div>
             <h1 className="text-2xl font-light text-gray-900">
               Welcome, <span className="font-semibold">{user.name}</span>
             </h1>
             <p className="text-sm text-gray-500 mt-1">Builder Dashboard — Your Projects</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <Link
               href="/dashboard/projects/new"
               className="px-4 py-2 bg-black text-white text-sm font-medium hover:bg-gray-800 transition-colors"
             >
               + New Project
+            </Link>
+            <Link
+              href="https://leadgen-ui.netlify.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-white hover:text-black transition-all duration-300"
+            >
+              Generate Lead
             </Link>
             <button
               onClick={() => { logout(); router.push('/dashboard'); }}
