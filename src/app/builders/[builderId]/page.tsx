@@ -118,7 +118,7 @@ function BuilderPortfolioContent() {
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-        const data = await projectsApi.getProjectsByBuilderId(builderId);
+        const data = await projectsApi.getProjectsByOwnerId(builderId);
         setBuilder(data.builder);
         setProjects(data.projects);
       } catch (err) {
