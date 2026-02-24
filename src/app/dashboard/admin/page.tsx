@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
+import { usersApi } from '@/lib/api';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function AdminDashboardPage() {
   const { user, isLoading, logout } = useAuth();
@@ -15,6 +17,17 @@ export default function AdminDashboardPage() {
     }
   }, [user, isLoading, router]);
 
+  async function handleGenerateLead() {
+    try {
+      const { token } = await usersApi.getSsoToken();
+      const leadGenUrl = "https://leadgen-ui.netlify.app"; 
+      window.location.href = `${leadGenUrl}/sso?token=${token}`;
+    } catch (error) {
+      console.error('SSO Failed:', error);
+      toast.error('Failed to initiate secure handover');
+    }
+  }
+
   if (isLoading || !user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -25,6 +38,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Toaster position="top-right" />
       {/* Header Section */}
       <div className="border-b border-gray-100 bg-white px-8 py-8">
         <div className="max-w-6xl flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-0">
@@ -37,14 +51,12 @@ export default function AdminDashboardPage() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <Link
-              href="https://leadgen-ui.netlify.app/select-role"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handleGenerateLead}
               className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-white hover:text-black transition-all duration-300"
             >
               Generate Lead
-            </Link>
+            </button>
             <button
               onClick={() => { logout(); router.push('/dashboard'); }}
               className="text-sm text-gray-500 hover:text-gray-900 underline"

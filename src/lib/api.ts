@@ -394,6 +394,14 @@ export const usersApi = {
     });
 
     return handleResponse(response);
+  },
+
+  // Get SSO token for handover
+  async getSsoToken(): Promise<{ token: string }> {
+    const response = await fetch(`${API_URL}/users/sso/token`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<{ token: string }>(response);
   }
 
 };

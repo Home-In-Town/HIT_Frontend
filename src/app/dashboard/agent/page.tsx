@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { organizationsApi, Organization } from '@/lib/api';
+import { organizationsApi, Organization, usersApi } from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function AgentDashboardPage() {
@@ -24,6 +24,17 @@ export default function AgentDashboardPage() {
       fetchOrganizations();
     }
   }, [user, authLoading, router]);
+
+  async function handleGenerateLead() {
+    try {
+      const { token } = await usersApi.getSsoToken();
+      const leadGenUrl = "https://leadgen-ui.netlify.app"; 
+      window.location.href = `${leadGenUrl}/sso?token=${token}`;
+    } catch (error) {
+      console.error('SSO Failed:', error);
+      toast.error('Failed to initiate secure handover');
+    }
+  }
 
   async function fetchOrganizations() {
     try {
@@ -61,14 +72,12 @@ export default function AgentDashboardPage() {
             <p className="text-sm text-gray-500 mt-1">Agent Dashboard — Your Organizations</p>
           </div>
           <div className="flex flex-wrap items-center gap-4">
-            <Link
-              href="https://leadgen-ui.netlify.app/select-role"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handleGenerateLead}
               className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-white hover:text-black transition-all duration-300"
             >
               Generate Lead
-            </Link>
+            </button>
             <button
               onClick={() => { logout(); router.push('/dashboard'); }}
               className="text-sm text-gray-500 hover:text-gray-900 underline"

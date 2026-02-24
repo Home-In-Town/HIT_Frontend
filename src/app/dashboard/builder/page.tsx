@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { projectsApi } from '@/lib/api';
+import { usersApi, projectsApi } from '@/lib/api';
 import { Project } from '@/types/project';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -24,6 +24,19 @@ export default function BuilderDashboardPage() {
       fetchProjects();
     }
   }, [user, authLoading, router]);
+
+  async function handleGenerateLead() {
+    try {
+      const { token } = await usersApi.getSsoToken();
+      // Use window.location.href for external redirect
+      // In production you might want to use an env variable for the leadgen URL
+      const leadGenUrl = "https://leadgen-ui.netlify.app"; 
+      window.location.href = `${leadGenUrl}/sso?token=${token}`;
+    } catch (error) {
+      console.error('SSO Failed:', error);
+      toast.error('Failed to initiate secure handover');
+    }
+  }
 
   async function fetchProjects() {
     try {
@@ -74,14 +87,12 @@ export default function BuilderDashboardPage() {
             >
               + New Project
             </Link>
-            <Link
-              href="https://leadgen-ui.netlify.app/select-role"
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={handleGenerateLead}
               className="px-4 py-2 bg-black text-white text-sm font-medium border border-black hover:bg-white hover:text-black transition-all duration-300"
             >
               Generate Lead
-            </Link>
+            </button>
             <button
               onClick={() => { logout(); router.push('/dashboard'); }}
               className="text-sm text-gray-500 hover:text-gray-900 underline"
