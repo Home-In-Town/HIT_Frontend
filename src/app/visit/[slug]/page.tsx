@@ -64,7 +64,7 @@ const sectionRefs = {
     ? decodeURIComponent(rawSlug).toLowerCase().trim()
     : null;
 
-    
+  
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -432,6 +432,22 @@ const handleNeighborhoodView = () => {
 };
 
 
+const handleNeighborhoodToggle = () => {
+  const rect = neighborhoodBtnRef.current?.getBoundingClientRect();
+
+  const DROPDOWN_HEIGHT = 220; // slightly larger for safety
+  if(!rect) return;
+  setDropdownPos({
+    top: rect.top - DROPDOWN_HEIGHT - 8,
+    left: rect.left,
+  });
+  setShowNeighborhoodMenu(prev => !prev);
+};
+
+const handleNeighborhoodSelect = (key: string) => {
+  mapRef.current?.setNeighborhoodFilter(key);
+  setShowNeighborhoodMenu(false);
+};
 
 
   return (
@@ -453,7 +469,12 @@ const handleNeighborhoodView = () => {
         on3DView={handle3DView}
         onSatelliteView={handleSatelliteView}
         onStreetView={handleStreetView}
-        onNeighborhoodView={handleNeighborhoodView}
+        
+        neighborhoodBtnRef={neighborhoodBtnRef}
+        showNeighborhoodMenu={showNeighborhoodMenu}
+        dropdownPos={dropdownPos}
+        onNeighborhoodToggle={handleNeighborhoodToggle}
+        onNeighborhoodSelect={handleNeighborhoodSelect}
 
       // 🔥 DRAWER SYNC
       drawerProjects={drawerProjects}
@@ -570,6 +591,7 @@ const floorPlans: FloorPlan[] = isPlot
 <div className="relative h-screen w-full"> 
   {hasCoordinates ? (
     <ProjectMap
+    projectId={project.id}
     ref={mapRef}
       lat={project.latitude!}
       lng={project.longitude!}
@@ -604,8 +626,6 @@ const floorPlans: FloorPlan[] = isPlot
 
   </div>
 )}
-
-
 </div>    
       <div >
 
@@ -989,56 +1009,56 @@ const floorPlans: FloorPlan[] = isPlot
             </div>
 
             {showNeighborhoodMenu && (
-  <div
-    className="
-      fixed z-[9999]
-      w-25
-      bg-white
-      rounded-xl
-      shadow-xl border border-gray-200
-      p-1.5
-      flex flex-col gap-1
-      max-h-56 overflow-y-auto
-    "
-    style={{
-      top: dropdownPos.top,
-      left: dropdownPos.left,
-    }}
-  >
-    {[
-      { label: "Hospitals", key: "hospital" },
-      { label: "Market", key: "market" },
-      { label: "Restaurant", key: "restaurant" },
-      { label: "Metro", key: "metro" },
-      { label: "Schools", key: "school" },
-    ].map(item => (
-      <button
-        key={item.key}
-        onClick={(e) => {
-          e.stopPropagation();
+              <div
+                className="
+                  fixed z-[9999]
+                  w-25
+                  bg-white
+                  rounded-xl
+                  shadow-xl border border-gray-200
+                  p-1.5
+                  flex flex-col gap-1
+                  max-h-56 overflow-y-auto
+                "
+                style={{
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                }}
+              >
+                {[
+                  { label: "Hospitals", key: "hospital" },
+                  { label: "Market", key: "market" },
+                  { label: "Restaurant", key: "restaurant" },
+                  { label: "Metro", key: "metro" },
+                  { label: "Schools", key: "school" },
+                ].map(item => (
+                  <button
+                    key={item.key}
+                    onClick={(e) => {
+                      e.stopPropagation();
 
-          closeProjectDetails();          // ⭐ close panel first
-          mapRef.current?.setNeighborhoodFilter(item.key);
+                      closeProjectDetails();          // ⭐ close panel first
+                      mapRef.current?.setNeighborhoodFilter(item.key);
 
-          setShowNeighborhoodMenu(false);
-        }}
+                      setShowNeighborhoodMenu(false);
+                    }}
 
-        className="
-          w-[50px] text-left
-          px-3 py-2
-          rounded-lg
-          text-[11px]
-          font-medium
-          text-gray-700
-          hover:bg-[#3E5F16] hover:text-white
-          transition
-        "
-      >
-        {item.label}
-      </button>
-    ))}
-  </div>
-)}
+                    className="
+                      w-[50px] text-left
+                      px-3 py-2
+                      rounded-lg
+                      text-[11px]
+                      font-medium
+                      text-gray-700
+                      hover:bg-[#3E5F16] hover:text-white
+                      transition
+                    "
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )}
 
 
       </div>

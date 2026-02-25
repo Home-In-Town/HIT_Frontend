@@ -59,9 +59,18 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function transformBackendToFrontend(backendProject: any): Project {
+export function transformBackendToFrontend(backendProject: any): Project {
+    const id =
+        backendProject?.id ??
+        backendProject?._id ??
+        backendProject?.projectId;
+
+    if (!id) {
+        console.error("❌ Missing project ID:", backendProject);
+    }
+
     return {
-        id: backendProject.id,
+        id: String(id),   // ✅ guaranteed string (or "undefined" logged above)
         name: backendProject.projectName || backendProject.name || '',
         type: backendProject.projectType || backendProject.type || 'flat',
         builderName: backendProject.builderName || '',
@@ -70,47 +79,31 @@ function transformBackendToFrontend(backendProject: any): Project {
         latitude: backendProject.latitude,
         longitude: backendProject.longitude,
         googleMapLink: backendProject.googleMapLink || '',
-
-        // Legal & Trust
         reraApproved: backendProject.reraApproved || false,
         reraNumber: backendProject.reraNumber || '',
         projectStatus: backendProject.projectStatus || 'pre-launch',
-
-        // Pricing - flatten from nested object
         startingPrice: backendProject.pricing?.startingPrice ?? backendProject.startingPrice ?? 0,
         pricePerSqFt: backendProject.pricing?.pricePerSqFt ?? backendProject.pricePerSqFt ?? 0,
         priceRange: backendProject.pricing?.totalPriceRange ?? backendProject.priceRange ?? '',
         paymentPlan: backendProject.pricing?.paymentPlan ?? backendProject.paymentPlan ?? '',
         bankLoanAvailable: backendProject.pricing?.bankLoanAvailable ?? backendProject.bankLoanAvailable ?? false,
-
-        // Configuration - flatten from nested object
         bhkOptions: backendProject.configuration?.bhkOptions ?? backendProject.bhkOptions ?? [],
         carpetAreaRange: backendProject.configuration?.carpetAreaRange ?? backendProject.carpetAreaRange ?? '',
         floorRange: backendProject.configuration?.floorRange ?? backendProject.floorRange ?? '',
         plotSizeRange: backendProject.configuration?.plotSizeRange ?? backendProject.plotSizeRange ?? '',
         facingOptions: backendProject.configuration?.facingOptions ?? backendProject.facingOptions ?? [],
         gatedCommunity: backendProject.configuration?.gatedCommunity ?? backendProject.gatedCommunity ?? false,
-
-        // Amenities
         amenities: backendProject.amenities || [],
-
-        // Media - flatten from nested object
         coverImage: backendProject.media?.coverImage ?? backendProject.coverImage ?? '',
         galleryImages: backendProject.media?.galleryImages ?? backendProject.galleryImages ?? [],
         videos: backendProject.media?.videos ?? backendProject.videos ?? [],
         brochureUrl: backendProject.media?.brochurePdf ?? backendProject.brochureUrl ?? '',
-
-        // Sales CTA - flatten from nested object
         ctaButtonText: backendProject.cta?.buttonText ?? backendProject.ctaButtonText ?? 'Contact Us',
         whatsappNumber: backendProject.cta?.whatsappNumber ?? backendProject.whatsappNumber ?? '',
         callNumber: backendProject.cta?.callNumber ?? backendProject.callNumber ?? '',
-
-        // Generated fields
         slug: backendProject.slug || '',
         trackableLink: backendProject.slug ? `/visit/${backendProject.slug}` : '',
-        isPublished: backendProject.status === 'published' || backendProject.isPublished || false,
-        createdAt: backendProject.createdAt,
-        updatedAt: backendProject.updatedAt,
+        isPublished: backendProject.status === 'published' || backendProject.isPublished,
     };
 }
 
@@ -202,13 +195,23 @@ export const projectsApi = {
         return transformBackendToFrontend(data);
     },
 
-    // Get projects by builder ID (Public Portfolio)
-    async getProjectsByBuilderId(builderId: string): Promise<{ builder: any, projects: Project[] }> {
-        const response = await fetch(`${API_URL}/public/builders/${builderId}/projects`);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   // Get projects by owner ID (Public Portfolio)
+    async getProjectsByOwnerId(ownerId: string): Promise<{ owner: any, projects: Project[] }> {
+        const response = await fetch(`${API_URL}/projects/public/owners/${ownerId}/projects`);
+        
         const data = await handleResponse<any>(response);
+
         return {
-            builder: data.builder,
+            owner: data.builder, // backend still sends "builder" key
+            projects: data.projects.map(transformBackendToFrontend)
+        };
+    },
+    async getProjectsByOwnerPhone(phone: string) {
+        const response = await fetch(`${API_URL}/projects/by-owner-phone/${phone}`);
+        const data = await handleResponse<any>(response);
+
+        return {
+            owner: data.builder,
             projects: data.projects.map(transformBackendToFrontend)
         };
     },
@@ -263,6 +266,34 @@ export const projectsApi = {
 };
 
 
+export interface Landmark {
+  placeId: string;
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  address: string;
+}
+
+
+export async function saveProjectLandmarks(projectId: string, landmarks: Landmark[]) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/landmarks`, {
+    method: 'PUT',
+    headers: { 
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ landmarks }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || 'Failed to save landmarks');
+  }
+
+  const data = await res.json();
+  return data.landmarks as Landmark[];
+}
 // ==============================
 // Types
 // ==============================
@@ -389,13 +420,16 @@ export const usersApi = {
 
     // Get users by role (for login dropdown)
     async getByRole(role: string): Promise<{ id: string; name: string; email: string; phone?: string }[]> {
-    const response = await fetch(`${API_URL}/users/by-role/${role}`, {
-        headers: getAuthHeaders(),  
-    });
+      const response = await fetch(`${API_URL}/users/by-role/${role}`, {
+          headers: getAuthHeaders(),  
+      });
 
-    return handleResponse(response);
-}
-
+      return handleResponse(response);
+  },
+  async verifyUser(phone: string) {
+    const response = await fetch(`${API_URL}/projects/verify-user/${phone}`);
+    return handleResponse<any>(response);
+},
 };
 
 
@@ -406,8 +440,54 @@ export const usersApi = {
 
 export interface OrgProject {
   _id: string;
-  projectName: string;
-  status: string;
+  projectName?: string;
+  projectType?: string;
+  builderName?: string;
+  city?: string;
+  location?: string;
+
+  latitude?: number;
+  longitude?: number;
+  googleMapLink?: string;
+
+  reraApproved?: boolean;
+  reraNumber?: string;
+  projectStatus?: string;
+
+  startingPrice?: number;
+  pricePerSqFt?: number;
+  priceRange?: string;
+  paymentPlan?: string;
+  bankLoanAvailable?: boolean;
+
+  bhkOptions?: any[];
+  carpetAreaRange?: string;
+  floorRange?: string;
+
+  plotSizeRange?: string;
+  facingOptions?: string[];
+  gatedCommunity?: boolean;
+
+  amenities?: any[];
+  landmarks?: any[];
+
+  coverImage?: string;
+  galleryImages?: string[];
+  videos?: string[];
+  brochureUrl?: string;
+
+  ctaButtonText?: string;
+  whatsappNumber?: string;
+  callNumber?: string;
+
+  slug?: string;
+  trackableLink?: string;
+  isPublished?: boolean;
+
+  createdAt?: string;
+  updatedAt?: string;
+
+  status?: string;
 }
 export interface OrgAgent {
     _id: string;
@@ -445,13 +525,21 @@ function transformOrgBackend(org: any): Organization {
         }))
       : [],
 
-    projects: Array.isArray(org?.projects)
-      ? org.projects.map((p: any) => ({
-          _id: p?._id ? String(p._id) : String(p),
-          projectName: p?.projectName ?? "",
-          status: p?.status ?? "",
-        }))
-      : [],
+   projects: Array.isArray(org?.projects)
+  ? org.projects
+      .map((p: any) => {
+        if (typeof p === "string") {
+          // 🚫 Skip or return minimal object
+          return null;
+        }
+
+        return {
+          ...transformBackendToFrontend(p),
+          _id: p?._id ? String(p._id) : "",
+        };
+      })
+      .filter(Boolean)
+  : [],
 
     createdBy: org?.createdBy
       ? String(org.createdBy)

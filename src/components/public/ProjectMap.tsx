@@ -9,22 +9,15 @@ import {
   useJsApiLoader,
   Polygon,
   GroundOverlay,
+  Polyline,
 } from '@react-google-maps/api';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { projectsApi } from '@/lib/api';
-import { Project } from '@/types/project';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import { projectsApi, saveProjectLandmarks } from '@/lib/api';
+import { Landmark, Project } from '@/types/project';
 import SearchFiltersPanel from "./SearchFiltersPanel";
-import ProjectsBottomDrawer from './ProjectBottomDrawer';
 import { DrawingManager } from '@react-google-maps/api';
-
-type PlotInventory = {
-  id: string;
-  status: "available" | "sold" | "reserved";
-  price: string;
-  area: string;
-  path: google.maps.LatLngLiteral[];
-};
-
+import { useRouter } from 'next/navigation';
+import React from 'react';
 
 type MapOverlay =
   | google.maps.Polygon
@@ -33,9 +26,12 @@ type MapOverlay =
   | google.maps.Polyline;
 
 type Props = {
+  projectId:string;
   lat: number;
   lng: number;
   focusOnly?:boolean;
+  drawingMode?: google.maps.drawing.OverlayType | null;
+  drawingType?: MapEntityType;
   logo?: string;
   sqft?: string;
   bhk?: string;
@@ -45,6 +41,32 @@ type Props = {
     selectedId: string | null;
     open: boolean;
   }) => void;
+  onPlotSelect?: (id: string) => void;
+  onOpenPlotPanel?: (id: string) => void;
+};
+type MapEntityType = "project-boundary" | "subplot" | "road";
+
+type PlotStatus = "available" | "sold" | "reserved";
+
+type Facing = "north" | "south" | "east" | "west";
+
+type MapEntity = {
+  id: string;
+  type: MapEntityType;
+  geometryType: "polygon" | "polyline";
+  path: google.maps.LatLngLiteral[];
+
+  // plot specific
+  status?: PlotStatus;
+  plotNumber?: string;
+  area?: number;
+  facing?: Facing;
+
+  // road specific
+  roadName?: string;
+
+  // control flags
+  saved?: boolean;
 };
 
 const containerStyle = {
@@ -53,7 +75,25 @@ const containerStyle = {
 };
 
 
-const ProjectMap = forwardRef(({ lat, lng, focusOnly, logo, sqft, bhk, onMarkerClick, onDrawerData }: Props, ref) => {
+const ProjectMap = forwardRef(
+  (
+    {
+      projectId,
+      lat,
+      lng,
+      focusOnly,
+      drawingMode,
+      drawingType,
+      logo,
+      sqft,
+      bhk,
+      onMarkerClick,
+      onDrawerData,
+      onPlotSelect,
+      onOpenPlotPanel,
+    }: Props,
+    ref
+  ) => {
   // 🔹 Always run hooks first
   const mapRef = useRef<google.maps.Map | null>(null);
 //   const getNeighborhoodIcon = (type: string) => {
@@ -131,43 +171,38 @@ const categoryMap: Record<string, string> = {
   metro: "subway_station",
   school: "school",
 };
-const overlayBounds = {
-  north: lat + 0.001,
-  south: lat - 0.001,
-  east: lng + 0.001,
-  west: lng - 0.001,
+
+const [history, setHistory] = useState<MapEntity[][]>([]);
+const [redoStack, setRedoStack] = useState<MapEntity[][]>([]);
+const [editingPlotId, setEditingPlotId] = useState<string | null>(null);
+const [currentDrawingType, setCurrentDrawingType] =
+  useState<MapEntityType>("project-boundary");
+const [mapEntities, setMapEntities] = useState<MapEntity[]>([]);
+const selectedPlot =
+  mapEntities.find(e => e.id === editingPlotId);
+  const openPlotStatusEditor = (id: string) => {
+  setEditingPlotId(id);
 };
 
-const plotInventory: PlotInventory[] = [
-  {
-    id: "Plot 7",
-    status: "available",
-    price: "₹12L",
-    area: "1200 sqft",
-    path: [
-      { lat: lat + 0.0001, lng: lng - 0.0001 },
-      { lat: lat + 0.0001, lng: lng },
-      { lat: lat, lng: lng },
-      { lat: lat, lng: lng - 0.0001 },
-    ],
-  },
-  {
-    id: "Plot 12",
-    status: "sold",
-    price: "₹14L",
-    area: "1350 sqft",
-    path: [
-      { lat: lat, lng: lng },
-      { lat: lat, lng: lng + 0.0001 },
-      { lat: lat - 0.0001, lng: lng + 0.0001 },
-      { lat: lat - 0.0001, lng: lng },
-    ],
-  },
-];
-const [selectedPlot, setSelectedPlot] = useState<PlotInventory | null>(null);
+const updatePlotStatus = (status: PlotStatus) => {
+  if (!editingPlotId) return;
 
+  updateEntities(
+    mapEntities.map(p =>
+      p.id === editingPlotId ? { ...p, status } : p
+    )
+  );
+
+  setEditingPlotId(null);
+}
+const router = useRouter();
+const [availableLandmarks, setAvailableLandmarks] = useState<Landmark[]>([]);
+const [selectedLandmarks, setSelectedLandmarksState] = useState<Landmark[]>([]);
+useEffect(() => {
+  console.log("🎯 SELECTED LANDMARKS STATE UPDATED:", selectedLandmarks);
+}, [selectedLandmarks]);
+const landmarkMarkersRef = useRef<google.maps.Marker[]>([]);
 const [layoutBounds, setLayoutBounds] = useState<any>(null);
-
 const sourceIcon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'; // big map pin
 const destinationIcon = 'https://maps.google.com/mapfiles/ms/icons/red-flag.png'; // flag
 
@@ -177,9 +212,6 @@ const clientMarkerRef = useRef<google.maps.Marker | null>(null);
 const projectMarkerRef = useRef<google.maps.Marker | null>(null);
 const routePolylineRef = useRef<google.maps.Polyline | null>(null);
 const [drawMenuOpen, setDrawMenuOpen] = useState(false);
-
-  const [drawingMode, setDrawingMode] =
-  useState<google.maps.drawing.OverlayType | null>(null);
 
   const drawingsRef = useRef<MapOverlay[]>([]);
 const selectedShapeRef = useRef<MapOverlay | null>(null);
@@ -212,34 +244,12 @@ const clearAllDrawings = () => {
   drawingsRef.current = [];
   selectedShapeRef.current = null;
 };
-const onOverlayComplete = (
-  e: google.maps.drawing.OverlayCompleteEvent
-) => {
-  if (e.type === "polygon") {
-  const poly = e.overlay as google.maps.Polygon;
 
-  const path = poly
-    .getPath()
-    .getArray()
-    .map(p => p.toJSON());
-
-  const bounds = getPolygonBounds(path);
-
-  setLayoutBounds({ ...bounds });
-
-}
-
-  const shape = e.overlay as MapOverlay;
-
-  drawingsRef.current.push(shape);
-
-  setSelection(shape);
-  setDrawingMode(null);
-
-  shape.addListener('click', () => setSelection(shape));
+const undoLastDrawing = () => {
+    updateEntities(mapEntities.slice(0, -1));
 };
-
-
+  const mapCenter = useMemo(() => ({ lat, lng }), [lat, lng]);
+  const hasCenteredRef = useRef(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [isFocusMode, setIsFocusMode] = useState(() => !!focusOnly);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
@@ -263,37 +273,17 @@ const onOverlayComplete = (
   const is3D = useRef(false);
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ['places', 'drawing'],
+    libraries: ['places', 'drawing', 'geometry'],
   });
 
 useEffect(() => {
   projectsApi.getAllPublic().then((data) => {
     setAllProjects(data);
-
-    if (focusOnly) {
-      const match = data.find(
-        p => p.latitude === lat && p.longitude === lng
-      );
-
-      if (match) {
-        setFocusedProject(match);
-        setVisibleProjects([match]);
-
-        // center map
-        mapRef.current?.panTo({
-          lat: match.latitude!,
-          lng: match.longitude!,
-        });
-
-        mapRef.current?.setZoom(17);
-      }
-    }
   });
-}, [focusOnly, lat, lng]);
-
-
+}, []);
 useEffect(() => {
-  if (!focusOnly || allProjects.length === 0) return;
+  if (!focusOnly || !mapRef.current) return;
+  if (hasCenteredRef.current) return;
 
   const match = allProjects.find(
     p => p.latitude === lat && p.longitude === lng
@@ -303,18 +293,18 @@ useEffect(() => {
 
   setFocusedProject(match);
   setVisibleProjects([match]);
-
   setSelectedProjectId(match.id);
-  // force camera sync
-  if (mapRef.current) {
-    mapRef.current.panTo({
-      lat: match.latitude!,
-      lng: match.longitude!,
-    });
-    mapRef.current.setZoom(17);
-  }
 
-}, [focusOnly, lat, lng, allProjects]);
+  mapRef.current.panTo({
+    lat: match.latitude!,
+    lng: match.longitude!,
+  });
+
+  mapRef.current.setZoom(17);
+
+  hasCenteredRef.current = true; 
+}, [focusOnly, allProjects, lat, lng]);
+
 
 useEffect(() => {
   onDrawerData?.({
@@ -324,7 +314,11 @@ useEffect(() => {
   });
 }, [showDrawer, visibleProjects, selectedProjectId]);
 
-
+useEffect(() => {
+  if (drawingType) {
+    setCurrentDrawingType(drawingType);
+  }
+}, [drawingType]);
   const filterProjectsInView = useCallback(() => {
      if (isFocusMode && focusedProject) {
       setVisibleProjects([focusedProject]);
@@ -361,6 +355,55 @@ useEffect(() => {
   if (!mapRef.current) return;
   filterProjectsInView();
 }, [filterProjectsInView]);
+useEffect(() => {
+  if (!projectId) return;
+
+  const loadSavedLandmarks = async () => {
+    try {
+      const project = await projectsApi.getById(projectId);
+
+      if (!project?.landmarks) return;
+
+      console.log("🔥 LOADED FROM DB:", project.landmarks);
+console.log("TYPE FROM DB:", typeof project.landmarks);
+console.log("IS ARRAY:", Array.isArray(project.landmarks));
+console.log("DATA:", project.landmarks);
+      setSelectedLandmarksState(
+        typeof project.landmarks === "string"
+          ? JSON.parse(project.landmarks)
+          : project.landmarks
+      );
+    } catch (err) {
+      console.error("Failed to load landmarks", err);
+    }
+  };
+
+  loadSavedLandmarks();
+}, [projectId]);
+const isInitialLoad = useRef(true);
+
+// useEffect(() => {
+//   if (!projectId) return;
+
+//   const save = async () => {
+//     if (isInitialLoad.current) {
+//       isInitialLoad.current = false;
+//       return; // 🚫 skip first run
+//     }
+
+//     try {
+//       console.log("💾 Saving landmarks:", selectedLandmarks);
+
+//       await saveProjectLandmarks(projectId, selectedLandmarks);
+//     } catch (err) {
+//       console.error("❌ Save failed", err);
+//     }
+//   };
+
+//   const debounce = setTimeout(save, 500);
+//   return () => clearTimeout(debounce);
+
+// }, [selectedLandmarks, projectId]);
  const clearNavigation = () => {
   clientMarkerRef.current?.setMap(null);
   projectMarkerRef.current?.setMap(null);
@@ -494,19 +537,189 @@ const loadNeighborhood = (category: string) => {
     });
   });
 };
-
-
   // 🔹 Expose functions via ref
   useImperativeHandle(ref, () => ({
+    fetchLandmarks: () => {
+      fetchNearbyLandmarks();
+    },
+
+    getAvailableLandmarks: () => availableLandmarks,
+
+    toggleLandmarkSelection: (landmark: Landmark) => {
+      setSelectedLandmarksState((prev) => {
+        const exists = prev.find((l) => l.placeId === landmark.placeId);
+        if (exists) {
+          return prev.filter((l) => l.placeId !== landmark.placeId);
+        }
+        return [...prev, landmark];
+      });
+    },
+    
+
+    getSelectedLandmarks: () => selectedLandmarks,
+
+    setSelectedLandmarks: (placeIds: string[]) => {
+  if (availableLandmarks.length === 0) {
+    console.warn("⚠️ Landmarks not loaded yet");
+    return;
+  }
+
+  const fullLandmarks = availableLandmarks.filter((l) =>
+    placeIds.includes(l.placeId)
+  );
+
+  setSelectedLandmarksState(fullLandmarks);
+},
+      openLastUnsavedPlot: () => {
+        const lastUnsaved = [...mapEntities]
+          .reverse()
+          .find(e => e.type === "subplot" && !e.saved);
+
+        if (!lastUnsaved) return;
+
+        onOpenPlotPanel?.(lastUnsaved.id);
+      },
+      getPlot: (id: string) => {
+        return mapEntities.find(e => e.id === id);
+      },
+
+      updatePlotField: (id: string, field: string, value: any) => {
+        updateEntities(
+          mapEntities.map(e =>
+            e.id === id ? { ...e, [field]: value } : e
+          )
+        );
+      },
+
+    confirmPlot: (id: string) => {
+        updateEntities(
+          mapEntities.map(e =>
+            e.id === id ? { ...e, saved: true } : e
+          )
+        );
+      },
+      editPlot: (id: string) => {
+    updateEntities(
+      mapEntities.map(e =>
+        e.id === id ? { ...e, saved: false } : e
+      )
+    );
+  },
+
+
+editBoundary: () => {
+  updateEntities(
+    mapEntities.map(e =>
+      e.type === "project-boundary"
+        ? { ...e, saved: false }
+        : e
+    )
+  );
+},
+
+  savePlot: async (id: string) => {
+    onOpenPlotPanel?.(id); 
+    const plot = mapEntities.find(e => e.id === id);
+    if (!plot) return;
+    onPlotSelect?.(id);
+  },
+   saveBoundary: async () => {
+    const boundary = mapEntities.find(e => e.type === "project-boundary");
+    if (!boundary) return;
+
+    updateEntities(
+      mapEntities.map(e =>
+        e.id === boundary.id ? { ...e, saved: true } : e
+      )
+    );
+
+    console.log("Boundary saved locally:", boundary);
+  },
+    undo: () => {
+      setHistory(prev => {
+        if (prev.length === 0) return prev;
+
+        const last = prev[prev.length - 1];
+        setRedoStack(r => [...r, mapEntities]);
+        setMapEntities(last);
+
+        return prev.slice(0, -1);
+      });
+    },
+    redo: () => {
+      setRedoStack(prev => {
+        if (prev.length === 0) return prev;
+
+        const last = prev[prev.length - 1];
+        setHistory(h => [...h, mapEntities]);
+        updateEntities(last);
+
+        return prev.slice(0, -1);
+      });
+    },
+      undoLastDrawing: () => {
+      setMapEntities(prev => prev.slice(0, -1));
+    },
+
+    clearAll: () => {
+      updateEntities([]);
+    },
+    lockToBoundary: () => {
+      if (!mapRef.current) return;
+
+      const map = mapRef.current;
+
+      const boundary = mapEntities.find(
+        e => e.type === "project-boundary"
+      );
+
+      if (!boundary) return;
+
+      const bounds = new google.maps.LatLngBounds();
+
+      boundary.path.forEach(p => {
+        bounds.extend(p);
+      });
+
+      map.fitBounds(bounds);
+
+      // small delay so zoom stabilizes
+      setTimeout(() => {
+        const zoom = map.getZoom();
+
+        map.setOptions({
+          draggable: false,
+          scrollwheel: false,
+          disableDoubleClickZoom: true,
+          gestureHandling: "none",
+          zoomControl: false,
+          minZoom: zoom,
+          maxZoom: zoom,
+        });
+      }, 300);
+    },
+    unlockCanvas: () => {
+      if (!mapRef.current) return;
+
+      mapRef.current.setOptions({
+        draggable: true,
+        scrollwheel: true,
+        disableDoubleClickZoom: false,
+        gestureHandling: "greedy",
+        zoomControl: true,
+        minZoom: undefined,
+        maxZoom: undefined,
+      });
+    },
     getDirections: () => {
-  if (!mapRef.current || !window.google) return;
+    if (!mapRef.current || !window.google) return;
 
-  const map = mapRef.current;
+    const map = mapRef.current;
 
-  // clear previous navigation
-  clearNavigation();
+    // clear previous navigation
+    clearNavigation();
 
-  navigator.geolocation.getCurrentPosition((pos) => {
+    navigator.geolocation.getCurrentPosition((pos) => {
     const clientLoc = new google.maps.LatLng(
       pos.coords.latitude,
       pos.coords.longitude
@@ -771,20 +984,13 @@ clientMarkerRef.current = clientMarker;
     });
   });
 },
-
-
 setNeighborhoodFilter: (category: string) => {
   loadNeighborhood(category);
 },
-
 clearNeighborhood: () => {
   setNeighborhoodType(null);
   clearNeighborhoodMarkers();
 },
-
-
-
-
       }));
 
       const handlePlaceChanged = useCallback(() => {
@@ -865,115 +1071,77 @@ clearNeighborhood: () => {
     mapRef.current.setZoom(17);
   }, [focusedProject]);
 
+const fetchNearbyLandmarks = async () => {
+  if (!mapRef.current || !window.google) return;
 
+  const map = mapRef.current;
+  const service = new google.maps.places.PlacesService(map);
+  console.log("RENDER LANDMARKS:", selectedLandmarks);
+  // Use project location for all searches
+  const projectLoc = new google.maps.LatLng(lat, lng);
+
+  const types: string[] = [
+    "school",
+    "hospital",
+    "shopping_mall",
+    "restaurant",
+    "park",
+    "university",
+  ];
+
+  const results: Landmark[] = [];
+
+  for (const type of types) {
+    await new Promise<void>((resolve) => {
+      service.nearbySearch(
+        {
+          location: projectLoc,
+          radius: 2500, // 2.5 km radius around project
+          type: type as any,
+        },
+        (places, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && places) {
+            places.forEach((place) => {
+              if (
+                !place.geometry?.location ||
+                typeof place.geometry.location.lat !== "function" ||
+                typeof place.geometry.location.lng !== "function"
+              ) return;
+
+              const latVal = place.geometry.location.lat();
+              const lngVal = place.geometry.location.lng();
+
+              if (!latVal || !lngVal) return; // safety check
+
+              results.push({
+                placeId: place.place_id!,
+                name: place.name || "",
+                type,
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+                address: place.vicinity || "",
+              });
+            });
+           
+          }
+          resolve();
+        }
+        
+      );
+      
+    });
+  }
+  const unique = Array.from(
+    new Map(results.map(l => [l.placeId, l])).values()
+  );
+  // Update state with landmarks near the project
+  setAvailableLandmarks(unique);
+};
   
 
   // 🔹 Conditional render only for map, hooks always run
   if (!isLoaded) return <div>Loading map…</div>;
 
-    
-  const serializeDrawings = () => {
-  return drawingsRef.current.map(shape => {
-    if (shape instanceof google.maps.Circle) {
-      return {
-        type: "circle",
-        center: shape.getCenter()?.toJSON(),
-        radius: shape.getRadius(),
-      };
-    }
-
-    if (shape instanceof google.maps.Rectangle) {
-      return {
-        type: "rectangle",
-        bounds: shape.getBounds()?.toJSON(),
-      };
-    }
-
-    if (shape instanceof google.maps.Polygon) {
-      return {
-        type: "polygon",
-        path: shape.getPath().getArray().map(p => p.toJSON()),
-      };
-    }
-
-    if (shape instanceof google.maps.Polyline) {
-      return {
-        type: "polyline",
-        path: shape.getPath().getArray().map(p => p.toJSON()),
-      };
-    }
-
-    return null;
-  });
-};
-const restoreDrawings = (data: any[]) => {
-  if (!mapRef.current) return;
-
-  clearAllDrawings();
-
-  data.forEach(item => {
-    let shape: MapOverlay | null = null;
-
-    if (item.type === "circle") {
-      shape = new google.maps.Circle({
-        map: mapRef.current!,
-        center: item.center,
-        radius: item.radius,
-        editable: true,
-      });
-    }
-
-    if (item.type === "rectangle") {
-      shape = new google.maps.Rectangle({
-        map: mapRef.current!,
-        bounds: item.bounds,
-        editable: true,
-      });
-    }
-
-    if (item.type === "polygon") {
-      shape = new google.maps.Polygon({
-        map: mapRef.current!,
-        paths: item.path,
-        editable: true,
-      });
-    }
-
-    if (item.type === "polyline") {
-      shape = new google.maps.Polyline({
-        map: mapRef.current!,
-        path: item.path,
-        editable: true,
-      });
-    }
-
-    if (shape) {
-      drawingsRef.current.push(shape);
-      shape.addListener("click", () => setSelection(shape));
-    }
-  });
-};
-const saveDrawings = () => {
-  const data = serializeDrawings();
-  localStorage.setItem("mapDrawings", JSON.stringify(data));
-  alert("Drawings saved!");
-};
-const loadDrawings = () => {
-  const raw = localStorage.getItem("mapDrawings");
-  if (!raw) return alert("No saved drawings");
-
-  restoreDrawings(JSON.parse(raw));
-};
-const shareDrawings = async () => {
-  const data = JSON.stringify(serializeDrawings());
-
-  try {
-    await navigator.clipboard.writeText(data);
-    alert("Drawing copied — share anywhere!");
-  } catch {
-    alert(data);
-  }
-};
 
 const getPolygonBounds = (
   paths: google.maps.LatLngLiteral[]
@@ -993,8 +1161,82 @@ const getPolygonBounds = (
     west: sw.lng(),
   };
 };
+const updateEntities = (newState: MapEntity[]) => {
+  setHistory(prev => [...prev, mapEntities]);
+  setRedoStack([]);
+  setMapEntities(newState);
+};
+const updateEntityPath = (id: string, newPath: any[]) => {
+  updateEntities(
+    mapEntities.map(e =>
+      e.id === id ? { ...e, path: newPath } : e
+    )
+  );
+};
+const updatePlotField = (id: string, field: string, value: any) => {
+  updateEntities(
+    mapEntities.map(e =>
+      e.id === id ? { ...e, [field]: value } : e
+    )
+  );
+};
 
+const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
+  const id = crypto.randomUUID();
 
+  if (e.type === "polygon") {
+      const poly = e.overlay as google.maps.Polygon;
+      const path = poly.getPath().getArray().map(p => p.toJSON());
+
+      const entityType = currentDrawingType;
+
+      let area: number | undefined;
+      let plotNumber: string | undefined;
+
+      if (entityType === "subplot") {
+        area = google.maps.geometry.spherical.computeArea(
+          path.map(p => new google.maps.LatLng(p))
+        );
+
+        const subplotCount =
+          mapEntities.filter(e => e.type === "subplot").length + 1;
+
+        plotNumber = `P-${subplotCount}`;
+      }
+
+      const newEntity: MapEntity = {
+        id,
+        type: entityType,
+        geometryType: "polygon",
+        path,
+        status: entityType === "subplot" ? "available" : undefined,
+        area,
+        plotNumber,
+        saved: false,
+      };
+
+     updateEntities([...mapEntities, newEntity]);
+
+      e.overlay.setMap(null);
+      setDrawMenuOpen(false);
+  }
+
+  if (e.type === "polyline") {
+    const line = e.overlay as google.maps.Polyline;
+    const path = line.getPath().getArray().map(p => p.toJSON());
+
+    const newEntity: MapEntity = {
+      id,
+      type: "road",
+      geometryType: "polyline",
+      path,
+    }
+
+    updateEntities([...mapEntities, newEntity]);
+  }
+
+  e.overlay.setMap(null); // remove raw overlay
+};
   return (
     <div className="relative h-full w-full z-0">
       <div
@@ -1041,92 +1283,118 @@ const getPolygonBounds = (
 
  {/* DRAW MENU */}
 <div className="absolute bottom-35 left-4 z-20">
-
+ 
   {/* Main Draw Button */}
   <button
-    onClick={() => setDrawMenuOpen(v => !v)}
-    className="
-      bg-[#3E5F16] text-white
-      px-4 py-2 rounded-full
-      shadow-lg text-sm font-semibold
-      hover:opacity-90 transition
-    "
-  >
-    ✏ Draw
-  </button>
-
-  {/* Dropdown */}
-  {drawMenuOpen && (
-    <div
-      className="
-        mt-2 w-44
-        bg-white rounded-xl shadow-xl
-        p-2 flex flex-col gap-1
-      "
-    >
-
-      <button onClick={() => setDrawingMode(google.maps.drawing.OverlayType.POLYGON)}>
-        Polygon
-      </button>
-
-      <button onClick={() => setDrawingMode(google.maps.drawing.OverlayType.RECTANGLE)}>
-        Rectangle
-      </button>
-
-      <button onClick={() => setDrawingMode(google.maps.drawing.OverlayType.CIRCLE)}>
-        Circle
-      </button>
-
-      <button onClick={() => setDrawingMode(google.maps.drawing.OverlayType.POLYLINE)}>
-        Line
-      </button>
-
-      <hr />
-
-      <button onClick={deleteSelectedShape}>Delete Selected</button>
-      <button onClick={clearAllDrawings}>Clear All</button>
-
-      <hr />
-
-      <button onClick={saveDrawings}>Save</button>
-      <button onClick={loadDrawings}>Load</button>
-      <button onClick={shareDrawings}>Share</button>
-
-    </div>
-  )}
+  onClick={() => {
+    router.push(`/dashboard/projects/${projectId}/layout-editor`);
+  }}
+>
+  ✏ Layout Editor
+</button>
 </div>
-
-   
                   <GoogleMap
-                    mapContainerStyle={containerStyle}
-                    center={{ lat, lng }}
-                    zoom={16}
-                    onLoad={(map: google.maps.Map) => {
-                      mapRef.current = map;
-                    }}
-                    onIdle={() => {
-                        if (!isFocusMode) filterProjectsInView();
-                      }}
-                    options={{
-                      fullscreenControl: false,
-                      streetViewControl: false,
-                      mapTypeControl: false,
-                        zoomControl: true,
-                        gestureHandling:"greedy",
-                        draggable: true,
+  mapContainerStyle={containerStyle}
+  center={mapCenter}
+  zoom={16}
+  onLoad={(map: google.maps.Map) => {
+    mapRef.current = map;
+  }}
+  onIdle={() => {
+    if (!isFocusMode) filterProjectsInView();
+  }}
+  options={{
+    fullscreenControl: false,
+    streetViewControl: false,
+    mapTypeControl: false,
+    zoomControl: true,
+    gestureHandling: "greedy",
+    draggable: true,
+    tilt: 45,
+  }}
+>
+  {mapEntities.map((entity) => {
 
-                      tilt: 45,
-                    }}
-                    
+  if (entity.geometryType === "polygon") {
+    return (
+      <React.Fragment key={entity.id}>
+        <Polygon
+          paths={entity.path}
+          editable={!entity.saved}
+          draggable={!entity.saved}
+          options={{
+            fillColor:
+              entity.type === "project-boundary"
+                ? "#111827"
+                : entity.status === "sold"
+                ? "#dc2626"
+                : entity.status === "reserved"
+                ? "#f59e0b"
+                : "#16a34a",
+            fillOpacity: 0.4,
+            strokeWeight: 2,
+          }}
+          onClick={() => {
+            if (entity.type === "subplot") {
+              onPlotSelect?.(entity.id);
+            }
+          }}
+        />
 
-                  >
-                 {layoutBounds && (
-  <GroundOverlay
-    url="/sc.png"
-    bounds={layoutBounds}
-    opacity={0.8}
-  />
-)}
+        {entity.type === "subplot" && entity.saved && (
+          <OverlayView
+            position={entity.path[0]}
+            mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+          >
+            <div className="bg-white text-[10px] font-semibold pl-3 pr-12 py-1 rounded shadow -translate-x-1/2 -translate-y-full  whitespace-nowrap text-center">
+              {entity.plotNumber}
+              {entity.facing && (
+                <div className="text-gray-500">
+                  {entity.facing.toUpperCase()}
+                </div>
+              )}
+              {entity.status}
+            </div>
+          </OverlayView>
+        )}
+      </React.Fragment>
+    );
+  }
+
+  if (entity.geometryType === "polyline") {
+    return (
+      <Polyline
+        key={entity.id}
+        path={entity.path}
+        editable={!entity.saved}
+        draggable={!entity.saved}
+        onClick={() => {
+          openPlotStatusEditor(entity.id);
+        }}
+        options={{
+          strokeColor: "#111827",
+          strokeWeight: 10,
+          icons: [
+            {
+              icon: {
+                path: "M 0,-1 0,1",
+                strokeOpacity: 1,
+                scale: 4,
+                strokeColor: "#ffffff",
+              },
+              offset: "0",
+              repeat: "20px",
+            },
+          ],
+        }}
+      />
+    );
+  }
+
+  return null;
+})}
+               
+                  
                     {directions && (
                       <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />
                     )}
@@ -1159,47 +1427,39 @@ const getPolygonBounds = (
     },
   }}
 />
-{selectedPlot && (
+{selectedPlot && selectedPlot.type === "road" && (
   <OverlayView
     position={selectedPlot.path[0]}
     mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
   >
-    <div className="
-      bg-white rounded-xl shadow-xl
-      p-3 text-xs w-40
-      -translate-x-1/2 -translate-y-full
-    ">
-      <p className="font-semibold">{selectedPlot.id}</p>
-      <p>{selectedPlot.area}</p>
-      <p>{selectedPlot.price}</p>
-
-      <p className={`
-        mt-1 font-medium
-        ${
-          selectedPlot.status === "sold"
-            ? "text-red-600"
-            : selectedPlot.status === "reserved"
-            ? "text-yellow-600"
-            : "text-green-600"
+    <div className="bg-white p-3 rounded-xl shadow text-xs">
+      <input
+        placeholder="Road Name"
+        value={selectedPlot.roadName || ""}
+        onChange={(e) =>
+          updatePlotField(selectedPlot.id, "roadName", e.target.value)
         }
-      `}>
-        {selectedPlot.status.toUpperCase()}
-      </p>
+        className="border p-1 w-full"
+      />
 
       <button
-        onClick={() => setSelectedPlot(null)}
-        className="mt-2 text-gray-500 text-[10px]"
+        onClick={() => {
+          updateEntities(
+            mapEntities.map(e =>
+              e.id === selectedPlot.id ? { ...e, saved: true } : e
+            )
+          );
+        }}
+        className="mt-2 text-blue-600 text-xs"
       >
-        Close
+        Save Road
       </button>
     </div>
   </OverlayView>
 )}
 
-                    
-
-                  {visibleProjects.map((project) => {
-                    if (project.latitude == null || project.longitude == null) return null;
+              {visibleProjects.map((project) => {
+                if (project.latitude == null || project.longitude == null) return null;
 
               return (
                 <OverlayView
@@ -1234,7 +1494,7 @@ const getPolygonBounds = (
                       });
                     }}
 
-                  >
+                    >
                     <div className="flex flex-col items-center">
 
                     {/* Circular image marker */}
@@ -1257,12 +1517,28 @@ const getPolygonBounds = (
                     {/* pointer */}
                     <div className="h-2 w-2 rotate-45 bg-white shadow -mt-1" />
 
-                  </div>
+                    </div>
 
+                     
                   </div>
                 </OverlayView>
               );
             })}
+            {focusOnly &&
+              selectedLandmarks.map((landmark, index) => (
+                <OverlayView
+                  key={landmark.placeId || `${landmark.lat}-${landmark.lng}-${index}`}
+                  position={{ lat: landmark.lat, lng: landmark.lng }}
+                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                >
+                  <div className="-translate-x-1/2 -translate-y-full">
+                    <img
+                      src={getNeighborhoodIcon(landmark.type).url}
+                      style={{ width: 28, height: 40 }}
+                    />
+                  </div>
+                </OverlayView>
+              ))}
 
             </GoogleMap>
             

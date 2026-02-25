@@ -17,7 +17,7 @@ const formatDuration = (seconds?: number) => {
 // ---------------- Mini Stat ----------------
 function MiniStat({ label, value }: { label: string; value: number }) {
   return (
-    <div className="bg-white border rounded-lg px-3 py-2">
+    <div className="bg-white shadow rounded-lg px-3 py-2">
       <p className="text-xs text-gray-500">{label}</p>
       <p className="text-lg font-semibold">{value}</p>
     </div>
@@ -106,7 +106,7 @@ export default function AnalyticsPage() {
       )}
        {/* Project Overview Table */}
       {data.length > 0 && ( 
-        <div className="bg-white border rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-white  rounded-xl shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
