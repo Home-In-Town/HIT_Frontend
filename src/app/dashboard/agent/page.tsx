@@ -28,7 +28,7 @@ export default function AgentDashboardPage() {
   async function handleGenerateLead() {
     try {
       const { token } = await usersApi.getSsoToken();
-      const leadGenUrl = "https://www.oneemployee.in/"; 
+      const leadGenUrl = "https://www.oneemployee.in"; 
       window.location.href = `${leadGenUrl}/sso?token=${token}`;
     } catch (error) {
       console.error('SSO Failed:', error);
