@@ -9,20 +9,20 @@ export type { Project, ProjectFormData };
 
 // Get mock user ID from localStorage (for RBAC)
 function getMockUserId(): string | null {
-    if (typeof window === 'undefined') return null;
-    return localStorage.getItem('mock_user_id');
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('mock_user_id');
 }
 
 // Get headers with auth
 function getAuthHeaders(): HeadersInit {
-    const userId = getMockUserId();
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-    };
-    if (userId) {
-        headers['x-mock-user-id'] = userId;
-    }
-    return headers;
+  const userId = getMockUserId();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  if (userId) {
+    headers['x-mock-user-id'] = userId;
+  }
+  return headers;
 }
 
 export class ApiError extends Error {
@@ -48,8 +48,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
       typeof body?.message === "string"
         ? body.message
         : typeof body?.error === "string"
-        ? body.error
-        : `Request failed (${response.status})`;
+          ? body.error
+          : `Request failed (${response.status})`;
 
     throw new ApiError(String(message), response.status);
   }
@@ -109,91 +109,91 @@ export function transformBackendToFrontend(backendProject: any): Project {
 
 // Transform frontend Project to backend format for sending
 function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<string, unknown> {
-    return {
-        projectName: project.name,
-        projectType: project.type,
-        builderName: project.builderName,
-        city: project.city,
-        location: project.location,
-        latitude: project.latitude,
-        longitude: project.longitude,
-        googleMapLink: project.googleMapLink,
+  return {
+    projectName: project.name,
+    projectType: project.type,
+    builderName: project.builderName,
+    city: project.city,
+    location: project.location,
+    latitude: project.latitude,
+    longitude: project.longitude,
+    googleMapLink: project.googleMapLink,
 
-        reraApproved: project.reraApproved,
-        reraNumber: project.reraNumber,
-        projectStatus: project.projectStatus,
+    reraApproved: project.reraApproved,
+    reraNumber: project.reraNumber,
+    projectStatus: project.projectStatus,
 
-        pricing: {
-            startingPrice: project.startingPrice,
-            pricePerSqFt: project.pricePerSqFt,
-            totalPriceRange: project.priceRange,
-            paymentPlan: project.paymentPlan,
-            bankLoanAvailable: project.bankLoanAvailable,
-        },
+    pricing: {
+      startingPrice: project.startingPrice,
+      pricePerSqFt: project.pricePerSqFt,
+      totalPriceRange: project.priceRange,
+      paymentPlan: project.paymentPlan,
+      bankLoanAvailable: project.bankLoanAvailable,
+    },
 
-        configuration: {
-            bhkOptions: project.bhkOptions,
-            carpetAreaRange: project.carpetAreaRange,
-            floorRange: project.floorRange,
-            plotSizeRange: project.plotSizeRange,
-            facingOptions: project.facingOptions,
-            gatedCommunity: project.gatedCommunity,
-        },
+    configuration: {
+      bhkOptions: project.bhkOptions,
+      carpetAreaRange: project.carpetAreaRange,
+      floorRange: project.floorRange,
+      plotSizeRange: project.plotSizeRange,
+      facingOptions: project.facingOptions,
+      gatedCommunity: project.gatedCommunity,
+    },
 
-        amenities: project.amenities,
+    amenities: project.amenities,
 
-        media: {
-            coverImage: project.coverImage,
-            galleryImages: project.galleryImages,
-            videos: project.videos,
-            brochurePdf: project.brochureUrl,
-        },
+    media: {
+      coverImage: project.coverImage,
+      galleryImages: project.galleryImages,
+      videos: project.videos,
+      brochurePdf: project.brochureUrl,
+    },
 
-        cta: {
-            buttonText: project.ctaButtonText,
-            whatsappNumber: project.whatsappNumber,
-            callNumber: project.callNumber,
-        },
-    };
+    cta: {
+      buttonText: project.ctaButtonText,
+      whatsappNumber: project.whatsappNumber,
+      callNumber: project.callNumber,
+    },
+  };
 }
 
 // Projects API
 export const projectsApi = {
-    // Get all public projects (for projects list page)
-    async getAllPublic(): Promise<Project[]> {
-        const response = await fetch(`${API_URL}/public/projects`);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await handleResponse<any[]>(response);
-        return data.map(transformBackendToFrontend);
-    },
+  // Get all public projects (for projects list page)
+  async getAllPublic(): Promise<Project[]> {
+    const response = await fetch(`${API_URL}/public/projects`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any[]>(response);
+    return data.map(transformBackendToFrontend);
+  },
 
-    // Get all projects (filtered by role on backend)
-    async getAll(): Promise<Project[]> {
-        const response = await fetch(`${API_URL}/projects`, {
-            headers: getAuthHeaders(),
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await handleResponse<any[]>(response);
-        return data.map(transformBackendToFrontend);
-    },
+  // Get all projects (filtered by role on backend)
+  async getAll(): Promise<Project[]> {
+    const response = await fetch(`${API_URL}/projects`, {
+      headers: getAuthHeaders(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any[]>(response);
+    return data.map(transformBackendToFrontend);
+  },
 
-    // Get single project by ID
-    async getById(id: string): Promise<Project> {
-        const response = await fetch(`${API_URL}/projects/${id}`, {
-            headers: getAuthHeaders(),
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await handleResponse<any>(response);
-        return transformBackendToFrontend(data);
-    },
+  // Get single project by ID
+  async getById(id: string): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${id}`, {
+      headers: getAuthHeaders(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
 
-    // Get project by slug (for public pages)
-    async getBySlug(slug: string): Promise<Project> {
-        const response = await fetch(`${API_URL}/public/projects/${slug}`);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const data = await handleResponse<any>(response);
-        return transformBackendToFrontend(data);
-    },
+  // Get project by slug (for public pages)
+  async getBySlug(slug: string): Promise<Project> {
+    const response = await fetch(`${API_URL}/public/projects/${slug}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
 
    // Get projects by owner ID (Public Portfolio)
     async getProjectsByOwnerId(ownerId: string): Promise<{ owner: any, projects: Project[] }> {
@@ -216,53 +216,53 @@ export const projectsApi = {
         };
     },
 
-    // Create new project
-    async create(data: ProjectFormData): Promise<Project> {
-        const response = await fetch(`${API_URL}/projects`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(transformFrontendToBackend(data)),
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await handleResponse<any>(response);
-        return transformBackendToFrontend(result);
-    },
+  // Create new project
+  async create(data: ProjectFormData): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(transformFrontendToBackend(data)),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await handleResponse<any>(response);
+    return transformBackendToFrontend(result);
+  },
 
-    // Update project
-    async update(id: string, data: Partial<ProjectFormData>): Promise<Project> {
-        const response = await fetch(`${API_URL}/projects/${id}`, {
-            method: 'PUT',
-            headers: getAuthHeaders(),
-            body: JSON.stringify(transformFrontendToBackend(data)),
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await handleResponse<any>(response);
-        return transformBackendToFrontend(result);
-    },
+  // Update project
+  async update(id: string, data: Partial<ProjectFormData>): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(transformFrontendToBackend(data)),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await handleResponse<any>(response);
+    return transformBackendToFrontend(result);
+  },
 
-    // Delete project
-    async delete(id: string): Promise<void> {
-        const response = await fetch(`${API_URL}/projects/${id}`, {
-            method: 'DELETE',
-            headers: getAuthHeaders(),
-        });
-        if (!response.ok) {
-            throw new ApiError('Failed to delete project', response.status);
-        }
-    },
+  // Delete project
+  async delete(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/projects/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new ApiError('Failed to delete project', response.status);
+    }
+  },
 
-    // Publish project and generate trackable link
-    async publish(id: string): Promise<{ trackableLink: string }> {
-        const response = await fetch(`${API_URL}/projects/${id}/publish`, {
-            method: 'POST',
-            headers: getAuthHeaders(),
-        });
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const result = await handleResponse<any>(response);
-        return {
-            trackableLink: result.publicUrl || `/visit/${result.slug}`,
-        };
-    },
+  // Publish project and generate trackable link
+  async publish(id: string): Promise<{ trackableLink: string }> {
+    const response = await fetch(`${API_URL}/projects/${id}/publish`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await handleResponse<any>(response);
+    return {
+      trackableLink: result.publicUrl || `/visit/${result.slug}`,
+    };
+  },
 };
 
 
@@ -369,60 +369,71 @@ export const analyticsApi = {
 -----------------------------------*/
 
 export interface MockUser {
-    id: string;
-    name: string;
-    email: string;
-    role: 'admin' | 'builder' | 'agent';
-    companyName?: string;
-    phone?: string;
+  id: string;
+  name: string;
+  email: string;
+  role: 'admin' | 'builder' | 'agent';
+  companyName?: string;
+  phone?: string;
 }
 
 export const usersApi = {
-    // Get current user based on mock header
-    async getMe(): Promise<MockUser | null> {
-        try {
-            const response = await fetch(`${API_URL}/users/me`, {
-                headers: getAuthHeaders(),
-            });
-            if (!response.ok) return null;
-            return handleResponse<MockUser>(response);
-        } catch {
-            return null;
-        }
-    },
-
-    // Get available mock accounts for role switcher
-    async getMockAccounts(): Promise<MockUser[]> {
-        const response = await fetch(`${API_URL}/users/mock-accounts`);
-        return handleResponse<MockUser[]>(response);
-    },
-
-    // Get all users (admin only)
-    async getAll(role?: string): Promise<MockUser[]> {
-        const url = role
-            ? `${API_URL}/users?role=${role}`
-            : `${API_URL}/users`;
-        const response = await fetch(url, {
-            headers: getAuthHeaders(),
-        });
-        return handleResponse<MockUser[]>(response);
-    },
-
-    // Login by name and role (for mock login flow)
-    async loginByName(name: string, role: string, phone: string): Promise<MockUser> {
-        const response = await fetch(`${API_URL}/users/login-by-name`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, role, phone }),
-        });
-        return handleResponse<MockUser>(response);
-    },
-
-    // Get users by role (for login dropdown)
-    async getByRole(role: string): Promise<{ id: string; name: string; email: string; phone?: string }[]> {
-      const response = await fetch(`${API_URL}/users/by-role/${role}`, {
-          headers: getAuthHeaders(),  
+  // Get current user based on mock header
+  async getMe(): Promise<MockUser | null> {
+    try {
+      const response = await fetch(`${API_URL}/users/me`, {
+        headers: getAuthHeaders(),
       });
+      if (!response.ok) return null;
+      return handleResponse<MockUser>(response);
+    } catch {
+      return null;
+    }
+  },
+
+  // Get available mock accounts for role switcher
+  async getMockAccounts(): Promise<MockUser[]> {
+    const response = await fetch(`${API_URL}/users/mock-accounts`);
+    return handleResponse<MockUser[]>(response);
+  },
+
+  // Get all users (admin only)
+  async getAll(role?: string): Promise<MockUser[]> {
+    const url = role
+      ? `${API_URL}/users?role=${role}`
+      : `${API_URL}/users`;
+    const response = await fetch(url, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<MockUser[]>(response);
+  },
+
+  // Login by name and role (for mock login flow)
+  async loginByName(name: string, role: string, phone: string): Promise<MockUser> {
+    const response = await fetch(`${API_URL}/users/login-by-name`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, role, phone }),
+    });
+    return handleResponse<MockUser>(response);
+  },
+
+  // Get users by role (for login dropdown)
+  async getByRole(role: string): Promise<{ id: string; name: string; email: string; phone?: string }[]> {
+    const response = await fetch(`${API_URL}/users/by-role/${role}`, {
+      headers: getAuthHeaders(),
+    });
+
+    return handleResponse(response);
+  },
+
+  // Get SSO token for handover
+  async getSsoToken(): Promise<{ token: string }> {
+    const response = await fetch(`${API_URL}/users/sso/token`, {
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<{ token: string }>(response);
+  
 
       return handleResponse(response);
   },
@@ -490,20 +501,20 @@ export interface OrgProject {
   status?: string;
 }
 export interface OrgAgent {
-    _id: string;
-    name: string;
-    email: string;
-    role?: string;
+  _id: string;
+  name: string;
+  email: string;
+  role?: string;
 }
 
 export interface Organization {
-    id: string;
-    name: string;
-    description?: string;
-    agents: OrgAgent[];
-    projects?: OrgProject[];
-    createdBy?: string;
-    createdAt?: string;
+  id: string;
+  name: string;
+  description?: string;
+  agents: OrgAgent[];
+  projects?: OrgProject[];
+  createdBy?: string;
+  createdAt?: string;
 }
 
 // ---------- TRANSFORMERS ----------
@@ -518,11 +529,11 @@ function transformOrgBackend(org: any): Organization {
 
     agents: Array.isArray(org?.agents)
       ? org.agents.map((a: any) => ({
-          _id: a?._id ? String(a._id) : String(a),
-          name: a?.name ?? "",
-          email: a?.email ?? "",
-          role: a?.role,
-        }))
+        _id: a?._id ? String(a._id) : String(a),
+        name: a?.name ?? "",
+        email: a?.email ?? "",
+        role: a?.role,
+      }))
       : [],
 
    projects: Array.isArray(org?.projects)
@@ -552,15 +563,15 @@ export const organizationsApi = {
   // GET — Role based (backend filtered)
   // =====================================
   async getAll(type?: 'all' | 'assigned' | 'created'): Promise<Organization[]> {
-  const query = type ? `?type=${type}` : '';
+    const query = type ? `?type=${type}` : '';
 
-  const response = await fetch(`${API_URL}/organizations${query}`, {
-    headers: getAuthHeaders(),
-  });
+    const response = await fetch(`${API_URL}/organizations${query}`, {
+      headers: getAuthHeaders(),
+    });
 
-  const data = await handleResponse<any[]>(response);
-  return data.map(transformOrgBackend);
-},
+    const data = await handleResponse<any[]>(response);
+    return data.map(transformOrgBackend);
+  },
 
 
   // =====================================

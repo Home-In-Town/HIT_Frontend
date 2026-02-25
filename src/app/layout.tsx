@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const playfair = Playfair_Display({
+  variable: "--font-serif",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "HomeInTown - Real Estate Sales Websites",
-  description: "Create dynamic sales websites for real estate projects with trackable links",
+  title: "HomeInTown | Intelligent Real Estate Sales Suite",
+  description: "Identity and Intelligence for modern builders. Dynamic property websites and AI-powered lead qualification.",
+  keywords: ["real estate", "sales", "AI", "lead qualification", "property websites"],
 };
 
 export default function RootLayout({
@@ -25,8 +26,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="icon" href="/favicon.ico" />
+      </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${playfair.variable} antialiased`}
       >
         <Providers>
           {children}

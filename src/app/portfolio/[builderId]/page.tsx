@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, Suspense, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,7 +8,10 @@ import { projectsApi } from '@/lib/api';
 import { Project } from '@/types/project';
 import { MapPin, ArrowRight, Building2 } from 'lucide-react';
 
-function BuilderPortfolioContent() {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sales-website-backend-624770114041.asia-south1.run.app/api';
+const TRACKING_INTERVAL = 30; // seconds
+
+function PortfolioContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const leadId = searchParams.get('leadId');
@@ -19,15 +22,108 @@ function BuilderPortfolioContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // Tracking state
+  const startTimeRef = useRef<number>(Date.now());
+  const lastTrackedTimeRef = useRef<number>(0);
+  const [visitId] = useState<string>(() => {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    return Math.random().toString(36).substring(2) + Date.now().toString(36);
+  });
+
+  // Track page view and time spent when leadId is present
+  useEffect(() => {
+    if (!leadId) return;
+
+    const trackPageView = async () => {
+      try {
+        await fetch(`${API_URL}/track/pageview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: `builder-portfolio-${builderId}`,
+            leadId,
+            visitId,
+            timestamp: Date.now(),
+          }),
+        });
+        console.log('📡 Portfolio page view tracked for lead:', leadId);
+      } catch (error) {
+        console.error('Failed to track page view:', error);
+      }
+    };
+
+    trackPageView();
+    startTimeRef.current = Date.now();
+    lastTrackedTimeRef.current = 0;
+
+    // Track time spent periodically
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      if (elapsed > lastTrackedTimeRef.current) {
+        const duration = elapsed - lastTrackedTimeRef.current;
+        fetch(`${API_URL}/track/time`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: `builder-portfolio-${builderId}`,
+            leadId,
+            visitId,
+            duration,
+            timestamp: Date.now(),
+          }),
+          keepalive: true,
+        }).catch(() => {});
+        lastTrackedTimeRef.current = elapsed;
+      }
+    }, TRACKING_INTERVAL * 1000);
+
+    // Track time on page unload
+    const handleUnload = () => {
+      const totalTime = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      const newDuration = totalTime - lastTrackedTimeRef.current;
+      if (newDuration > 0) {
+        fetch(`${API_URL}/track/time`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: `builder-portfolio-${builderId}`,
+            leadId,
+            visitId,
+            duration: newDuration,
+            timestamp: Date.now(),
+          }),
+          keepalive: true,
+        }).catch(() => {});
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleUnload();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('beforeunload', handleUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [leadId, visitId, builderId]);
+
   useEffect(() => {
     const fetchPortfolio = async () => {
       try {
-        const data = await projectsApi.getProjectsByBuilderId(builderId);
+        const data = await projectsApi.getProjectsByOwnerId(builderId);
         setBuilder(data.builder);
         setProjects(data.projects);
       } catch (err) {
         console.error('Failed to fetch builder portfolio:', err);
-        setError('Builder portfolio not found.');
+        setError('Portfolio not found.');
       } finally {
         setLoading(false);
       }
@@ -172,10 +268,10 @@ function ProjectCard({ project, leadId }: { project: Project; leadId: string | n
   );
 }
 
-export default function BuilderPortfolioPage() {
+export default function PortfolioPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <BuilderPortfolioContent />
+      <PortfolioContent />
     </Suspense>
   );
 }
