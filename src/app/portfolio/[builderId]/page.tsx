@@ -11,7 +11,7 @@ import { MapPin, ArrowRight, Building2 } from 'lucide-react';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://sales-website-backend-624770114041.asia-south1.run.app/api';
 const TRACKING_INTERVAL = 30; // seconds
 
-function BuilderPortfolioContent() {
+function PortfolioContent() {
   const params = useParams();
   const searchParams = useSearchParams();
   const leadId = searchParams.get('leadId');
@@ -48,7 +48,7 @@ function BuilderPortfolioContent() {
             timestamp: Date.now(),
           }),
         });
-        console.log('📡 Builder portfolio page view tracked for lead:', leadId);
+        console.log('📡 Portfolio page view tracked for lead:', leadId);
       } catch (error) {
         console.error('Failed to track page view:', error);
       }
@@ -123,7 +123,7 @@ function BuilderPortfolioContent() {
         setProjects(data.projects);
       } catch (err) {
         console.error('Failed to fetch builder portfolio:', err);
-        setError('Builder portfolio not found.');
+        setError('Portfolio not found.');
       } finally {
         setLoading(false);
       }
@@ -268,10 +268,10 @@ function ProjectCard({ project, leadId }: { project: Project; leadId: string | n
   );
 }
 
-export default function BuilderPortfolioPage() {
+export default function PortfolioPage() {
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <BuilderPortfolioContent />
+      <PortfolioContent />
     </Suspense>
   );
 }
