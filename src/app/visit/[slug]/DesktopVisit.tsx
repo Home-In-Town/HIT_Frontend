@@ -19,7 +19,7 @@ import {
 
 import { DrawerContent } from "@/components/public/ProjectBottomDrawer";
 import Image from "next/image";
-import { Phone, MessageCircle, Send, FileText, MapPin, Home, Banknote, Building2, Eye, Map, MapPinMinus } from "lucide-react";
+import { Phone, MessageCircle, Send, FileText, MapPin, Home, Banknote, Building2, Eye, Map, MapPinMinus, X } from "lucide-react";
 import { motion } from "framer-motion";
 import { Project } from "@/types/project";
 import React, { useRef } from "react";
@@ -27,7 +27,13 @@ import EnquiryModal from "@/components/public/EnquiryModal";
 import ProjectMap from "@/components/public/ProjectMap";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { MapPinAreaIcon } from "@phosphor-icons/react/dist/ssr";
-
+type FloorPlan = {
+  title: string;
+  area: string;
+  price: string;
+  possession?: string;
+  image?: string;
+};
 type DesktopVisitProps = {
   project: Project & {
     images?: string[];
@@ -37,6 +43,7 @@ type DesktopVisitProps = {
     possessionDate?: string;
     towers?: string;
   };
+  floorPlans: FloorPlan[]
   onCallClick?: () => void;
   onWhatsAppClick?: () => void;
   onEnquireClick?: () => void;
@@ -66,8 +73,18 @@ type DesktopVisitProps = {
     open: boolean;
   }) => void;
 };
-function AutoMediaSlider({ items }: { items: any[] }) {
+
+type AutoMediaSliderProps = {
+  items: any[];
+  project?: {
+    reraApproved?: boolean;
+    reraNumber?: string;
+  };
+};
+
+function AutoMediaSlider({ items, project }: AutoMediaSliderProps) {
   const [index, setIndex] = React.useState(0);
+  const [lightboxOpen, setLightboxOpen] = React.useState(false);
 
   const goNext = React.useCallback(() => {
     setIndex((i) => (i + 1) % items.length);
@@ -77,85 +94,135 @@ function AutoMediaSlider({ items }: { items: any[] }) {
     setIndex((i) => (i - 1 + items.length) % items.length);
   }, [items.length]);
 
-  // auto change
-  React.useEffect(() => {
-    if (items.length <= 1) return;
-    const id = setInterval(goNext, 3500);
-    return () => clearInterval(id);
-  }, [goNext, items.length]);
+  // auto change in slider
+  // auto change in slider
+React.useEffect(() => {
+  if (items.length <= 1 || lightboxOpen) return; 
+  const id = setInterval(goNext, 3500);
+  return () => clearInterval(id);
+}, [goNext, items.length, lightboxOpen]); 
+
+  const handleOpenLightbox = (i: number) => {
+    setIndex(i);
+    setLightboxOpen(true);
+  };
+
+  const handleCloseLightbox = () => {
+    setLightboxOpen(false);
+  };
 
   const item = items[index];
 
   return (
-    <div className="mt-10 mb-6 ml-40 relative w-[400px] h-[400px] rounded-xl overflow-hidden bg-gray-100 group">
-      <motion.div
-        key={index}
-        initial={{ opacity: 0, scale: 0.98 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="w-full h-full"
-      >
-        {item.type === "image" && (
-          <Image src={item.src} alt="media" fill className="object-cover" />
+    <>
+      {/* Slider */}
+      <div className="mt-10 mb-6 relative w-[690px] h-[400px] rounded-[5px] overflow-hidden bg-gray-100 group">
+        
+        {/* RERA badge at top-left */}
+        {project?.reraApproved && (
+          <span className=" absolute top-3 left-3 z-10
+          bg-black/70 text-white
+          text-[13px] font-semibold
+          px-2 py-1 rounded-md
+          backdrop-blur-sm">
+            RERA Approved
+            {project.reraNumber && (
+              <span className="ml-2 text-white">{project.reraNumber}</span>
+            )}
+          </span>
         )}
 
-        {item.type === "video" && (
-          <video
-            src={item.src}
-            autoPlay
-            muted
-            loop
-            className="w-full h-full object-cover"
-          />
-        )}
-
-        {item.type === "brochure" && (
-          <a
-            href={item.src}
-            target="_blank"
-            className="flex flex-col items-center justify-center w-full h-full bg-blue-50 hover:bg-blue-100 transition"
+        {items.map((media, i) => (
+          <motion.div
+            key={i}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: i === index ? 1 : 0, scale: i === index ? 1 : 0.98 }}
+            transition={{ duration: 0.4 }}
+            className="w-full h-full absolute top-0 left-0 cursor-pointer"
+            onClick={() => handleOpenLightbox(i)}
           >
-            <FileText size={36} className="text-blue-600 mb-2" />
-            <p className="font-medium text-blue-700">Open Brochure</p>
-          </a>
-        )}
-      </motion.div>
+            {media.type === "image" && (
+              <Image src={media.src} alt="media" fill className="object-cover" />
+            )}
+            {media.type === "video" && (
+              <video src={media.src} autoPlay muted loop className="w-full h-full object-cover" />
+            )}
+            {media.type === "brochure" && (
+              <div className="flex flex-col items-center justify-center w-full h-full bg-blue-50 hover:bg-blue-100 transition">
+                <p className="font-medium text-blue-700">Open Brochure</p>
+              </div>
+            )}
+          </motion.div>
+        ))}
 
-      {/* arrows */}
-      {items.length > 1 && (
-        <>
+        {/* Slider arrows */}
+        {items.length > 1 && (
+          <>
+            <button
+              onClick={goPrev}
+              className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            <button
+              onClick={goNext}
+              className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+            >
+              <ChevronRight size={18} />
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* LIGHTBOX */}
+      {lightboxOpen && (
+        <div className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4">
+          {/* Close button */}
           <button
-            onClick={goPrev}
-            className="absolute left-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+            onClick={handleCloseLightbox}
+            className="absolute top-5 right-5 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full z-50"
           >
-            <ChevronLeft size={18} />
+            <X size={24} />
           </button>
 
-          <button
-            onClick={goNext}
-            className="absolute right-3 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
-          >
-            <ChevronRight size={18} />
-          </button>
-        </>
-      )}
+          {/* Left arrow */}
+          {items.length > 1 && (
+            <button
+              onClick={goPrev}
+              className="absolute left-5 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full z-50"
+            >
+              <ChevronLeft size={28} />
+            </button>
+          )}
 
-      {/* indicator */}
-      {items.length > 1 && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1">
-          {items.map((_, i) => (
-            <div
-              key={i}
-              className={`h-1.5 rounded-full transition-all ${
-                i === index ? "w-5 bg-white" : "w-1.5 bg-white/50"
-              }`}
-            />
-          ))}
+          {/* Right arrow */}
+          {items.length > 1 && (
+            <button
+              onClick={goNext}
+              className="absolute right-5 top-1/2 -translate-y-1/2 text-white bg-black/50 hover:bg-black/70 p-2 rounded-full z-50"
+            >
+              <ChevronRight size={28} />
+            </button>
+          )}
+
+          {/* Media content */}
+          <div className="max-w-[90vw] max-h-[90vh] flex items-center justify-center">
+            {item.type === "image" && (
+              <Image src={item.src} alt="media" width={1200} height={800} className="object-contain max-h-full max-w-full" />
+            )}
+            {item.type === "video" && (
+              <video src={item.src} controls autoPlay className="max-h-full max-w-full" />
+            )}
+            {item.type === "brochure" && (
+              <iframe src={item.src} className="w-full h-full max-w-4xl max-h-[90vh]" />
+            )}
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
+
 
 const formatIndianPrice = (price: number | string) => {
   const value = Number(price);
@@ -213,6 +280,7 @@ const getAmenityVisual = (amenity: string) => {
 
 export default function DesktopVisit({
   project,
+  floorPlans,
   onCallClick,
   onWhatsAppClick,
   onEnquireClick,
@@ -305,13 +373,9 @@ const memoizedMap = React.useMemo(() => {
   onDrawerData,
 ]);
 
-
   return (
     <div className="min-h-screen">
-      <div className="mx-auto bg-white  p-5 pl-10 ">
-        
-
-      
+      <div className="mx-auto bg-white  p-5 pl-10 ">        
         {/* Layout */}
         <div className="mt-2 grid grid-cols-2 gap-8 h-[calc(100vh-120px)]">
           {/* LEFT PANEL */}
@@ -333,7 +397,7 @@ const memoizedMap = React.useMemo(() => {
            
 
             {/* Title */}
-            {/* Status + RERA badges */}
+            {/* Status */}
             <div className="flex flex-wrap items-center gap-2 mb-3">
 
               {/* Status */}
@@ -341,25 +405,13 @@ const memoizedMap = React.useMemo(() => {
                 <span className="px-3 py-1 text-xs bg-[#5F7F33] rounded-full  text-white">
                   {project.projectStatus}
                 </span>
-              )}
-
-              {/* RERA combined */}
-              {project.reraApproved && (
-                <span className="px-3 py-1 text-xs font-medium rounded-full border border-[#5F7F33] bg-white text-[#5F7F33]">
-                  RERA Approved
-                  {project.reraNumber && (
-                    <span className="ml-2 bg-white text-[#5F7F33]">
-                      {project.reraNumber}
-                    </span>
-                  )}
-                </span>
-              )}
+              )}            
 
             </div>
 
 
                 {/* Title + Price Row */}
-            <div className="flex items-start justify-between gap-6 mb-10">
+            <div className="flex items-start justify-between pr-3 gap-6 mb-10">
 
               {/* LEFT — Title + Location (stacked) */}
               <div className="flex flex-col">
@@ -371,10 +423,14 @@ const memoizedMap = React.useMemo(() => {
                     By <span className="font-medium">{project.builderName}</span>
                   </p>
                 )}
-                <p className="flex items-center gap-1 text-gray-500 text-sm mt-1">
-                  <MapPin size={14} className="text-gray-400" />
-                  {project.location}
-                </p>
+                 {/* Location with Map Pin, Location + City */}
+                  <p className="flex items-center gap-1 text-gray-500 text-sm mt-3">
+                    <MapPin size={20} className="text-gray-400" />
+                    <span>
+                      {project.location || ""}
+                      {project.city ? `, ${project.city}` : ""}
+                    </span>
+                  </p>
               </div>
 
               {/* RIGHT — Price + Breakdown */}
@@ -460,8 +516,26 @@ const memoizedMap = React.useMemo(() => {
 
 
             </div>
-                        {/* Project Details */}
+                     
+                        {/* Media Auto Slider — Images + Videos + Brochure */}
+                        {/* <h3 className="font-medium mb-3">Media</h3> */}
 
+                        {mediaItems.length === 0 ? (
+                          <div className="mb-10 border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
+                            <p className="text-sm font-medium text-gray-700">
+                              No media available
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Request photos & videos from our team
+                            </p>
+                          </div>
+                        ) : (
+                          <AutoMediaSlider items={mediaItems} project={project} />
+                        )}
+
+                           {/* Project Details */}
+                        <div>
+                          <h3 className="font-semibold text-lg mb-5 mt-10 text-gray-900">Other Details</h3>
                         <div className="grid grid-cols-3 gap-3">
                           {detailItems.map(({ label, value, icon: Icon }) => (
                             <div
@@ -478,63 +552,189 @@ const memoizedMap = React.useMemo(() => {
                               </div>
                             </div>
                           ))}             
+                        </div>
                         </div> 
 
-                        {/* Media Auto Slider — Images + Videos + Brochure */}
-                        {/* <h3 className="font-medium mb-3">Media</h3> */}
-
-                        {mediaItems.length === 0 ? (
-                          <div className="mb-10 border border-dashed border-gray-300 bg-gray-50 p-8 text-center">
-                            <p className="text-sm font-medium text-gray-700">
-                              No media available
-                            </p>
-                            <p className="text-xs text-gray-500 mt-1">
-                              Request photos & videos from our team
-                            </p>
-                          </div>
-                        ) : (
-                          <AutoMediaSlider items={mediaItems} />
-                        )}
-
-                        
 
                         {/* Amenities Section */}
-            {project.amenities?.length > 0 && (
-              <div className="mt-10">
-                <h3 className="text-lg font-semibold mb-5 text-gray-900">
-                  Amenities
-                </h3>
+                          {project.amenities?.length > 0 && (
+                            <div className="mt-10">
+                              <h3 className="text-lg font-semibold mb-5 text-gray-900">
+                                Top Facilities
+                              </h3>
 
-                <div className="grid grid-cols-2 gap-2">
-                  {project.amenities.map((amenity: string, i: number) => {
-                    const visual = getAmenityVisual(amenity);
-                    const Icon = visual.icon;
+                              <div className="grid grid-cols-2 gap-2">
+                                {project.amenities.map((amenity: string, i: number) => {
+                                  const visual = getAmenityVisual(amenity);
+                                  const Icon = visual.icon;
 
-                    return (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 bg-white  rounded-xl p-4 transition"
-                      >
-                        <div
-                          className={`w-11 h-11 rounded-xl flex items-center justify-center ${visual.bg}`}
-                        >
-                          <Icon
-                            size={22}
-                            weight="duotone"
-                            className={visual.color}
-                          />
-                        </div>
+                                  return (
+                                    <div
+                                      key={i}
+                                      className="flex items-center gap-3 bg-white  rounded-xl p-4 transition"
+                                    >
+                                      <div
+                                        className={`w-11 h-11 rounded-xl flex items-center justify-center ${visual.bg}`}
+                                      >
+                                        <Icon
+                                          size={22}
+                                          weight="duotone"
+                                          className={visual.color}
+                                        />
+                                      </div>
 
-                        <p className="text-sm font-medium text-gray-800">
-                          {amenity}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            </div>
+                                      <p className="text-sm font-medium text-gray-800">
+                                        {amenity}
+                                      </p>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          
+                          )}
+                           <div className="mt-5">
+  <p className="mb-3 text-sm font-semibold text-gray-900">
+    Floor Plans & Pricing
+  </p>
+
+  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+    {floorPlans.map((plan, i) => (
+      <div key={i} className="min-w-[210px] rounded-xl bg-white shadow-sm overflow-hidden flex flex-col">
+        <div className="relative h-32 w-full">
+          <Image src={plan.image || "/placeholder.jpg"} alt="plan" fill className="object-cover" />
+          <span className="absolute top-2 left-2 bg-[#3E5F16] text-white text-[9px] font-semibold px-2 py-0.5 rounded-full">
+            {project.type === "plot" ? "Plot" : "New Launch"}
+          </span>
+        </div>
+
+        <div className="p-3 flex flex-col gap-1">
+          <p className="text-xs font-semibold text-gray-900">
+            {plan.title} • {plan.area}
+          </p>
+
+          {plan.possession && (
+            <p className="text-[11px] text-gray-500">
+              Possession: {plan.possession}
+            </p>
+          )}
+
+          <p className="text-sm font-bold text-[#3E5F16]">
+            {plan.price}
+          </p>
+
+          <button
+            onClick={onCallClick}
+            className="mt-2 rounded-md border border-[#3E5F16] py-1.5 text-[11px] font-semibold text-[#3E5F16] hover:bg-[#3E5F16]/10 transition"
+          >
+            Call Now
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+</div>
+                          {/* ----------------------------- */}
+{/* BOOKING STATUS */}
+{/* ----------------------------- */}
+<div
+  className="mt-5 rounded-xl bg-white p-4 shadow-sm"
+>
+  <p className="mb-3 text-sm font-semibold text-gray-900">
+    {project.type === "plot" ? "Plot Booking Status" : "Flat Booking Status"}
+  </p>
+
+  <div className="space-y-3 text-xs">
+
+    {/* Availability */}
+    <div className="flex items-center justify-between">
+      <span className="text-gray-600">Availability</span>
+      <span className="flex items-center gap-2 font-medium text-green-600">
+        <span className="h-2 w-2 rounded-full bg-green-500" />
+        Available
+      </span>
+    </div>
+
+    {/* Units */}
+    <div className="flex items-center justify-between">
+      <span className="text-gray-600">
+        {project.type === "plot" ? "Plots" : "Units"}
+      </span>
+      <span className="font-medium text-gray-800">
+        {project.type === "plot" ? "8 vacant / 20 total" : "12 vacant / 30 total"}
+      </span>
+    </div>
+
+    {/* Progress */}
+    <div>
+      <div className="flex justify-between mb-1 text-gray-600">
+        <span>Booking Progress</span>
+        <span>{project.type === "plot" ? "60% Sold" : "60% Sold"}</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+        <div
+          className="h-full bg-[#3E5F16]"
+          style={{ width: "60%" }}
+        />
+      </div>
+    </div>
+
+    {/* Note */}
+    <div className="rounded-md bg-gray-50 p-2 text-gray-600">
+      {project.type === "plot"
+        ? "Limited premium plots available. Early booking recommended."
+        : "Only a few premium flats remain. Price lock available."}
+    </div>
+
+    {/* CTA */}
+    <p className="text-gray-500">
+      Contact sales team to reserve this {project.type === "plot" ? "plot" : "flat"}.
+    </p>
+  </div>
+</div>
+
+{/* ----------------------------- */}
+{/* PLOT DETAILS */}
+{/* ----------------------------- */}
+{project.type === "plot" && (
+  <div className="mt-4 rounded-xl bg-white p-4 shadow-sm">
+    <p className="mb-2 text-sm font-semibold text-gray-900">Plot Details</p>
+    <div className="text-sm space-y-1 text-gray-700">
+      {project.plotSizeRange && (
+        <p><strong>Plot Size:</strong> {project.plotSizeRange}</p>
+      )}
+      {project.facingOptions && (
+        <p><strong>Facing:</strong> {project.facingOptions.join(', ')}</p>
+      )}
+      {typeof project.gatedCommunity === 'boolean' && (
+        <p>
+          <strong>Gated Community:</strong>{' '}
+          {project.gatedCommunity ? 'Yes' : 'No'}
+        </p>
+      )}
+    </div>
+  </div>
+)}
+
+{/* ----------------------------- */}
+{/* BUILDER ADDRESS */}
+{/* ----------------------------- */}
+<div
+  className="mt-5 mb-10 rounded-xl bg-white p-4 shadow-sm"
+>
+  <p className="mb-2 text-sm font-semibold text-gray-900">Builder Address</p>
+  <div className="text-xs text-gray-700 space-y-1">
+    <p className="font-medium text-gray-800">{project.builderName || "Builder Name"}</p>
+    <p>
+      Skyline Developers Pvt. Ltd.<br />
+      4th Floor, Landmark Business Plaza<br />
+      Ring Road, Civil Lines<br />
+      Nagpur, Maharashtra – 440001
+    </p>
+  </div>
+</div>
+                        
+                  </div>
               </>
             )}
           </div>

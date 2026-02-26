@@ -6,7 +6,7 @@ import { Project, ProjectFormData, AMENITIES, ProjectType, ProjectStatus } from 
 import { projectsApi } from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useRef } from 'react';
-import { uploadToCloudinary } from '@/lib/cloudinary';
+import { uploadPdfToCloudinary, uploadToCloudinary } from '@/lib/cloudinary';
 
 
 interface ProjectFormProps {
@@ -1004,9 +1004,9 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
             try {
               setUploading(true);
-              const url = await uploadToCloudinary(file);
-              updateField('brochureUrl', url);
-            } catch {
+              const result = await uploadPdfToCloudinary(file);
+              updateField('brochureUrl', result.url); 
+            } catch (error) {
               toast.error('Brochure upload failed');
             } finally {
               setUploading(false);

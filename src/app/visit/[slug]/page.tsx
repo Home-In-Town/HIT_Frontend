@@ -27,6 +27,7 @@ import {
 import ProjectsBottomDrawer from '@/components/public/ProjectBottomDrawer';
 import EnquiryModal from '@/components/public/EnquiryModal';
 import SubNavbar from "@/components/public/SubNavbar";
+import BrochureSection from "@/components/public/BrochureSection";
 
 const getAmenityIcon = (amenity: string) => {
   const key = amenity.toLowerCase();
@@ -403,6 +404,47 @@ const CTAButtons = (
 );
 
 
+const isPlot = project.type === "plot";
+type FloorPlan = {
+  title: string;
+  area: string;
+  price: string;
+  image?: string;
+  possession?: string; 
+};
+
+
+const floorPlans: FloorPlan[] = isPlot
+  ? [
+      {
+        title: "Residential Plot",
+        area: project.plotSizeRange || "1200 – 2400 sq.ft",
+        price: "₹ 25 L onwards",
+        image: project.coverImage,
+      },
+      {
+        title: "Corner Plot",
+        area: "1800 sq.ft",
+        price: "₹ 32 L onwards",
+        image: project.coverImage,
+      },
+    ]
+  : [
+      {
+        title: "2 BHK",
+        area: "1050 sq.ft",
+        possession: "Dec 2027",
+        price: "₹ 78 L onwards",
+        image: project.coverImage,
+      },
+      {
+        title: "3 BHK",
+        area: "1350 sq.ft",
+        possession: "Dec 2027",
+        price: "₹ 98 L onwards",
+        image: project.coverImage,
+      },
+    ];
 
 
  if (isDesktop) {
@@ -454,6 +496,7 @@ const handleNeighborhoodSelect = (key: string) => {
     <>
     <DesktopVisit
       project={project}
+      floorPlans={floorPlans}
       onCallClick={handleCall}
       onWhatsAppClick={handleWhatsApp}
       onEnquireClick={handleFormOpen}
@@ -485,6 +528,8 @@ const handleNeighborhoodSelect = (key: string) => {
         setDrawerSelected(selectedId);
         setDrawerOpen(open);
       }}
+
+      
     />
      <EnquiryModal
         open={showFormModal}
@@ -539,47 +584,6 @@ const onDragEnd = () => {
   isDragging.current = false;
 };
 
-const isPlot = project.type === "plot";
-type FloorPlan = {
-  title: string;
-  area: string;
-  price: string;
-  image?: string;
-  possession?: string; 
-};
-
-
-const floorPlans: FloorPlan[] = isPlot
-  ? [
-      {
-        title: "Residential Plot",
-        area: project.plotSizeRange || "1200 – 2400 sq.ft",
-        price: "₹ 25 L onwards",
-        image: project.coverImage,
-      },
-      {
-        title: "Corner Plot",
-        area: "1800 sq.ft",
-        price: "₹ 32 L onwards",
-        image: project.coverImage,
-      },
-    ]
-  : [
-      {
-        title: "2 BHK",
-        area: "1050 sq.ft",
-        possession: "Dec 2027",
-        price: "₹ 78 L onwards",
-        image: project.coverImage,
-      },
-      {
-        title: "3 BHK",
-        area: "1350 sq.ft",
-        possession: "Dec 2027",
-        price: "₹ 98 L onwards",
-        image: project.coverImage,
-      },
-    ];
 
 
   return (
@@ -1387,7 +1391,7 @@ const floorPlans: FloorPlan[] = isPlot
                   <div
                     ref={sectionRefs.sellers}
                     className="mt-5 mb-10 rounded-xl p-4"
-                  >
+                    >
                     <p className="mb-2 text-sm font-semibold text-gray-900">
                       Builder Address
                     </p>
@@ -1410,6 +1414,12 @@ const floorPlans: FloorPlan[] = isPlot
                     </div>
                   </div>
 
+                    {/* ✅ BROCHURE SECTION */}
+                    {project.brochureUrl && (
+                      <div ref={sectionRefs.brochure} className="mt-4">
+                        <BrochureSection pdfUrl={project.brochureUrl} />
+                      </div>
+                    )}
 
                     </div>
                    
