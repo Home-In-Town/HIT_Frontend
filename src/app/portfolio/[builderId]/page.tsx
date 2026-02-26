@@ -119,7 +119,7 @@ function PortfolioContent() {
     const fetchPortfolio = async () => {
       try {
         const data = await projectsApi.getProjectsByOwnerId(builderId);
-        setBuilder(data.builder);
+        setBuilder(data.owner);
         setProjects(data.projects);
       } catch (err) {
         console.error('Failed to fetch builder portfolio:', err);
