@@ -3,7 +3,14 @@
 export type ProjectType = 'flat' | 'plot';
 
 export type ProjectStatus = 'pre-launch' | 'under-construction' | 'ready-to-move';
-
+export interface Landmark {
+  name: string;
+  type: string;
+  lat: number;
+  lng: number;
+  address: string;
+  placeId: string;
+}
 export interface Project {
   id: string;
   name: string;
@@ -39,7 +46,7 @@ export interface Project {
 
   // Amenities
   amenities: string[];
-
+  landmarks?: Landmark[];
   // Media
   coverImage: string;
   galleryImages: string[];

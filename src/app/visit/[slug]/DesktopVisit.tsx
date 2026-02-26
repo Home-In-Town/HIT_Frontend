@@ -46,9 +46,13 @@ type DesktopVisitProps = {
   onSatelliteView: () => void;
   on3DView: () => void;
   onStreetView: () => void;
-  onNeighborhoodView: () => void;
-
-   // 🔥 map props
+  //  Neighborhood
+  neighborhoodBtnRef: React.RefObject<HTMLDivElement | null>;
+  showNeighborhoodMenu: boolean;
+  dropdownPos: { top: number; left: number };
+  onNeighborhoodToggle: () => void;
+  onNeighborhoodSelect: (key: string) => void;
+  //  map props
   mapRef: React.RefObject<any>;
   hasCoordinates: boolean;
   onMarkerClick: () => void;
@@ -218,7 +222,13 @@ export default function DesktopVisit({
   onStreetView,
   onMapView,
   onSatelliteView,
-  onNeighborhoodView,
+  
+  neighborhoodBtnRef,
+  showNeighborhoodMenu,
+  dropdownPos,
+  onNeighborhoodToggle,
+  onNeighborhoodSelect,
+
   mapRef,
   hasCoordinates,
   onMarkerClick,
@@ -270,7 +280,30 @@ const priceBreakdown =   [
   { label: "Government Charges", value: "₹ 75,000" },
   { label: "Legal Charges", value: "₹ 50,000" },
 ];
+const memoizedMap = React.useMemo(() => {
+  if (!hasCoordinates) return null;
 
+  return (
+    <ProjectMap
+      projectId={project.id}
+      ref={mapRef}
+      lat={project.latitude!}
+      lng={project.longitude!}
+      logo={project.coverImage}
+      focusOnly
+      onMarkerClick={onMarkerClick}
+      onDrawerData={onDrawerData}
+    />
+  );
+}, [
+  hasCoordinates,
+  project.id,
+  project.latitude,
+  project.longitude,
+  project.coverImage,
+  onMarkerClick,
+  onDrawerData,
+]);
 
 
   return (
@@ -542,25 +575,14 @@ const priceBreakdown =   [
 
         </div>
             <div className=" border border-gray-200 overflow-hidden">
-              
-
               <div className="relative h-[calc(100vh-180px)] bg-gray-200 flex items-center justify-center text-sm text-gray-600">
-               {hasCoordinates ? (
-                <ProjectMap
-                  ref={mapRef}
-                  lat={project.latitude!}
-                  lng={project.longitude!}
-                  logo={project.coverImage}
-                  focusOnly
-                  onMarkerClick={onMarkerClick}
-                  onDrawerData={onDrawerData}
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center bg-gray-200 text-sm text-gray-600">
-                  Map location not available
-                </div>
-              )}
-
+                {memoizedMap ? (
+                  memoizedMap
+                ) : (
+                  <div className="flex h-full items-center justify-center bg-gray-200 text-sm text-gray-600">
+                    Map location not available
+                  </div>
+                )}
               </div>
             </div>
 
@@ -655,25 +677,82 @@ const priceBreakdown =   [
     <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
     Virtual View
   </button>
+              {/* NEIGHBORHOOD BUTTON + DROPDOWN */}
+              <div ref={neighborhoodBtnRef} className="relative shrink-0">
   <button
-    onClick={onNeighborhoodView}
-      className="
-      flex shrink-0 items-center justify-center gap-1.5
-      rounded-full bg-[#3E5F16]
+    onClick={(e) => {
+      e.stopPropagation();
+      onNeighborhoodToggle();
+    }}
+    className="
+      flex shrink-0 items-center gap-2
+      rounded-full
+      bg-[#3E5F16]
       px-4 py-2
       text-xs sm:text-sm
       font-medium text-white
+      shadow-sm
       hover:bg-[#365312]
-      transition shadow-sm
+      transition
     "
-
   >
-    <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+    <MapPin className="h-4 w-4" />
     Neighborhood
   </button>
-
 </div>
 
+            </div>
+            {showNeighborhoodMenu && (
+              <motion.div
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="
+                  fixed z-[9999]
+                  w-40
+                  bg-white
+                  rounded-xl
+                  shadow-2xl
+                  border border-gray-200
+                  p-2
+                  flex flex-col gap-1
+                "
+                style={{
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                }}
+              >
+                {[
+                  { label: "Hospitals", key: "hospital" },
+                  { label: "Market", key: "market" },
+                  { label: "Restaurants", key: "restaurant" },
+                  { label: "Metro", key: "metro" },
+                  { label: "Schools", key: "school" },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    onClick={() => onNeighborhoodSelect(item.key)}
+                    className="
+                      flex items-center justify-between
+                      px-3 py-2
+                      rounded-lg
+                      text-sm
+                      font-medium
+                      text-gray-700
+                      hover:bg-[#3E5F16]
+                      hover:text-white
+                      transition
+                    "
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+   
+            
+      
 
           </div>
         </div>
