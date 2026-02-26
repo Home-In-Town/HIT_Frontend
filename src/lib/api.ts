@@ -60,51 +60,52 @@ async function handleResponse<T>(response: Response): Promise<T> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function transformBackendToFrontend(backendProject: any): Project {
-    const id =
-        backendProject?.id ??
-        backendProject?._id ??
-        backendProject?.projectId;
+  const id =
+    backendProject?.id ??
+    backendProject?._id ??
+    backendProject?.projectId;
 
-    if (!id) {
-        console.error("❌ Missing project ID:", backendProject);
-    }
+  if (!id) {
+    console.error("❌ Missing project ID:", backendProject);
+  }
 
-    return {
-        id: String(id),   // ✅ guaranteed string (or "undefined" logged above)
-        name: backendProject.projectName || backendProject.name || '',
-        type: backendProject.projectType || backendProject.type || 'flat',
-        builderName: backendProject.builderName || '',
-        city: backendProject.city || '',
-        location: backendProject.location || '',
-        latitude: backendProject.latitude,
-        longitude: backendProject.longitude,
-        googleMapLink: backendProject.googleMapLink || '',
-        reraApproved: backendProject.reraApproved || false,
-        reraNumber: backendProject.reraNumber || '',
-        projectStatus: backendProject.projectStatus || 'pre-launch',
-        startingPrice: backendProject.pricing?.startingPrice ?? backendProject.startingPrice ?? 0,
-        pricePerSqFt: backendProject.pricing?.pricePerSqFt ?? backendProject.pricePerSqFt ?? 0,
-        priceRange: backendProject.pricing?.totalPriceRange ?? backendProject.priceRange ?? '',
-        paymentPlan: backendProject.pricing?.paymentPlan ?? backendProject.paymentPlan ?? '',
-        bankLoanAvailable: backendProject.pricing?.bankLoanAvailable ?? backendProject.bankLoanAvailable ?? false,
-        bhkOptions: backendProject.configuration?.bhkOptions ?? backendProject.bhkOptions ?? [],
-        carpetAreaRange: backendProject.configuration?.carpetAreaRange ?? backendProject.carpetAreaRange ?? '',
-        floorRange: backendProject.configuration?.floorRange ?? backendProject.floorRange ?? '',
-        plotSizeRange: backendProject.configuration?.plotSizeRange ?? backendProject.plotSizeRange ?? '',
-        facingOptions: backendProject.configuration?.facingOptions ?? backendProject.facingOptions ?? [],
-        gatedCommunity: backendProject.configuration?.gatedCommunity ?? backendProject.gatedCommunity ?? false,
-        amenities: backendProject.amenities || [],
-        coverImage: backendProject.media?.coverImage ?? backendProject.coverImage ?? '',
-        galleryImages: backendProject.media?.galleryImages ?? backendProject.galleryImages ?? [],
-        videos: backendProject.media?.videos ?? backendProject.videos ?? [],
-        brochureUrl: backendProject.media?.brochurePdf ?? backendProject.brochureUrl ?? '',
-        ctaButtonText: backendProject.cta?.buttonText ?? backendProject.ctaButtonText ?? 'Contact Us',
-        whatsappNumber: backendProject.cta?.whatsappNumber ?? backendProject.whatsappNumber ?? '',
-        callNumber: backendProject.cta?.callNumber ?? backendProject.callNumber ?? '',
-        slug: backendProject.slug || '',
-        trackableLink: backendProject.slug ? `/visit/${backendProject.slug}` : '',
-        isPublished: backendProject.status === 'published' || backendProject.isPublished,
-    };
+  return {
+    id: String(id),   // ✅ guaranteed string (or "undefined" logged above)
+    name: backendProject.projectName || backendProject.name || '',
+    type: backendProject.projectType || backendProject.type || 'flat',
+    builderName: backendProject.builderName || '',
+    city: backendProject.city || '',
+    location: backendProject.location || '',
+    latitude: backendProject.latitude,
+    longitude: backendProject.longitude,
+    googleMapLink: backendProject.googleMapLink || '',
+    reraApproved: backendProject.reraApproved || false,
+    reraNumber: backendProject.reraNumber || '',
+    projectStatus: backendProject.projectStatus || 'pre-launch',
+    startingPrice: backendProject.pricing?.startingPrice ?? backendProject.startingPrice ?? 0,
+    pricePerSqFt: backendProject.pricing?.pricePerSqFt ?? backendProject.pricePerSqFt ?? 0,
+    priceRange: backendProject.pricing?.totalPriceRange ?? backendProject.priceRange ?? '',
+    paymentPlan: backendProject.pricing?.paymentPlan ?? backendProject.paymentPlan ?? '',
+    bankLoanAvailable: backendProject.pricing?.bankLoanAvailable ?? backendProject.bankLoanAvailable ?? false,
+    bhkOptions: backendProject.configuration?.bhkOptions ?? backendProject.bhkOptions ?? [],
+    carpetAreaRange: backendProject.configuration?.carpetAreaRange ?? backendProject.carpetAreaRange ?? '',
+    floorRange: backendProject.configuration?.floorRange ?? backendProject.floorRange ?? '',
+    plotSizeRange: backendProject.configuration?.plotSizeRange ?? backendProject.plotSizeRange ?? '',
+    facingOptions: backendProject.configuration?.facingOptions ?? backendProject.facingOptions ?? [],
+    gatedCommunity: backendProject.configuration?.gatedCommunity ?? backendProject.gatedCommunity ?? false,
+    amenities: backendProject.amenities || [],
+    coverImage: backendProject.media?.coverImage ?? backendProject.coverImage ?? '',
+    galleryImages: backendProject.media?.galleryImages ?? backendProject.galleryImages ?? [],
+    videos: backendProject.media?.videos ?? backendProject.videos ?? [],
+    brochureUrl: backendProject.media?.brochurePdf ?? backendProject.brochureUrl ?? '',
+    ctaButtonText: backendProject.cta?.buttonText ?? backendProject.ctaButtonText ?? 'Contact Us',
+    whatsappNumber: backendProject.cta?.whatsappNumber ?? backendProject.whatsappNumber ?? '',
+    callNumber: backendProject.cta?.callNumber ?? backendProject.callNumber ?? '',
+    slug: backendProject.slug || '',
+    trackableLink: backendProject.slug ? `/visit/${backendProject.slug}` : '',
+    isPublished: backendProject.status === 'published' || backendProject.isPublished,
+    landmarks: backendProject.landmarks || [],
+  };
 }
 
 // Transform frontend Project to backend format for sending
@@ -195,26 +196,26 @@ export const projectsApi = {
     return transformBackendToFrontend(data);
   },
 
-   // Get projects by owner ID (Public Portfolio)
-    async getProjectsByOwnerId(ownerId: string): Promise<{ owner: any, projects: Project[] }> {
-        const response = await fetch(`${API_URL}/projects/public/owners/${ownerId}/projects`);
-        
-        const data = await handleResponse<any>(response);
+  // Get projects by owner ID (Public Portfolio)
+  async getProjectsByOwnerId(ownerId: string): Promise<{ owner: any, projects: Project[] }> {
+    const response = await fetch(`${API_URL}/projects/public/owners/${ownerId}/projects`);
 
-        return {
-            owner: data.builder, // backend still sends "builder" key
-            projects: data.projects.map(transformBackendToFrontend)
-        };
-    },
-    async getProjectsByOwnerPhone(phone: string) {
-        const response = await fetch(`${API_URL}/projects/by-owner-phone/${phone}`);
-        const data = await handleResponse<any>(response);
+    const data = await handleResponse<any>(response);
 
-        return {
-            owner: data.builder,
-            projects: data.projects.map(transformBackendToFrontend)
-        };
-    },
+    return {
+      owner: data.builder, // backend still sends "builder" key
+      projects: data.projects.map(transformBackendToFrontend)
+    };
+  },
+  async getProjectsByOwnerPhone(phone: string) {
+    const response = await fetch(`${API_URL}/projects/by-owner-phone/${phone}`);
+    const data = await handleResponse<any>(response);
+
+    return {
+      owner: data.builder,
+      projects: data.projects.map(transformBackendToFrontend)
+    };
+  },
 
   // Create new project
   async create(data: ProjectFormData): Promise<Project> {
@@ -279,7 +280,7 @@ export interface Landmark {
 export async function saveProjectLandmarks(projectId: string, landmarks: Landmark[]) {
   const res = await fetch(`${API_URL}/projects/${projectId}/landmarks`, {
     method: 'PUT',
-    headers: { 
+    headers: {
       'Content-Type': 'application/json',
       ...getAuthHeaders()
     },
@@ -433,14 +434,14 @@ export const usersApi = {
       headers: getAuthHeaders(),
     });
     return handleResponse<{ token: string }>(response);
-  
 
-      return handleResponse(response);
+
+    return handleResponse(response);
   },
   async verifyUser(phone: string) {
     const response = await fetch(`${API_URL}/projects/verify-user/${phone}`);
     return handleResponse<any>(response);
-},
+  },
 };
 
 
@@ -536,21 +537,21 @@ function transformOrgBackend(org: any): Organization {
       }))
       : [],
 
-   projects: Array.isArray(org?.projects)
-  ? org.projects
-      .map((p: any) => {
-        if (typeof p === "string") {
-          // 🚫 Skip or return minimal object
-          return null;
-        }
+    projects: Array.isArray(org?.projects)
+      ? org.projects
+        .map((p: any) => {
+          if (typeof p === "string") {
+            // 🚫 Skip or return minimal object
+            return null;
+          }
 
-        return {
-          ...transformBackendToFrontend(p),
-          _id: p?._id ? String(p._id) : "",
-        };
-      })
-      .filter(Boolean)
-  : [],
+          return {
+            ...transformBackendToFrontend(p),
+            _id: p?._id ? String(p._id) : "",
+          };
+        })
+        .filter(Boolean)
+      : [],
 
     createdBy: org?.createdBy
       ? String(org.createdBy)

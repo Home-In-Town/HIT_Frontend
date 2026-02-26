@@ -364,13 +364,9 @@ useEffect(() => {
 
       if (!project?.landmarks) return;
 
-      console.log("🔥 LOADED FROM DB:", project.landmarks);
-console.log("TYPE FROM DB:", typeof project.landmarks);
-console.log("IS ARRAY:", Array.isArray(project.landmarks));
-console.log("DATA:", project.landmarks);
       setSelectedLandmarksState(
         typeof project.landmarks === "string"
-          ? JSON.parse(project.landmarks)
+          ? JSON.parse(project.landmarks as unknown as string)
           : project.landmarks
       );
     } catch (err) {

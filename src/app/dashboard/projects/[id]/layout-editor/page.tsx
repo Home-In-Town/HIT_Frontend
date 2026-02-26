@@ -371,19 +371,11 @@ function ToolButton({
           <button
             onClick={async () => {
               try {
-                const handleSaveLandmarks = async () => {
-                try {
-                  console.log("💾 Manual Save:", selectedLandmarks);
-                  await saveProjectLandmarks(projectId, selectedLandmarks);
-                  alert("Saved successfully");
-                } catch (err) {
-                  console.error(err);
-                  alert("Save failed");
-                }
-              };
-              handleSaveLandmarks();
+                // Read fresh selected landmarks directly from map (avoids stale state)
+                const toSave = mapRef.current?.getSelectedLandmarks() || selectedLandmarks;
+                await saveProjectLandmarks(projectId, toSave);
+                alert("Saved successfully");
               } catch (err: any) {
-                console.error(err);
                 alert(err.message || 'Failed to save landmarks');
               }
             }}
