@@ -645,7 +645,7 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
                             if (apiProject) {
                               name = apiProject.name;
                             } else if (orgProject) {
-                              name = orgProject.projectName || "Unknown";
+                              name = orgProject.name || orgProject.projectName || "Unknown";
                             }
 
 

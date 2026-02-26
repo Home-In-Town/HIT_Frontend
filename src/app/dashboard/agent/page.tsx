@@ -145,11 +145,11 @@ export default function AgentDashboardPage() {
                   <div className="border-t border-gray-100">
                     {org.projects && org.projects.length > 0 ? (
                       <div className="divide-y divide-gray-50">
-                        {org.projects.map((project: { id?: string; _id?: string; projectName: string; status: string }) => (
+                        {org.projects.map((project: { id?: string; _id?: string; name?: string; projectName?: string; status?: string }) => (
                           <div key={project.id || project._id} className="px-6 py-3 flex items-center justify-between bg-gray-50">
                             <div className="flex items-center gap-3">
                               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                              <span className="text-sm text-gray-700">{project.projectName}</span>
+                              <span className="text-sm text-gray-700">{project.name || project.projectName}</span>
                             </div>
                             <span className={`text-xs px-2 py-1 rounded ${
                               project.status === 'published' 
