@@ -6,16 +6,18 @@ import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { usersApi } from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
+import UserApprovals from '@/components/dashboard/UserApprovals';
 
 export default function AdminDashboardPage() {
-  const { user, isLoading, logout } = useAuth();
+  const { user, status, logout } = useAuth();
+  const isLoading = status === 'loading';
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && (!user || user.role !== 'admin')) {
-      router.push('/dashboard');
+      router.push('/login');
     }
-  }, [user, isLoading, router]);
+  }, [user, status, router, isLoading]);
 
   async function handleGenerateLead() {
     try {
@@ -58,16 +60,26 @@ export default function AdminDashboardPage() {
               Generate Lead
             </button>
             <button
-              onClick={() => { logout(); router.push('/dashboard'); }}
+              onClick={async () => { await logout(); router.push('/login'); }}
               className="text-sm text-gray-500 hover:text-gray-900 underline"
             >
-              Switch Role
+              Sign Out
             </button>
           </div>
         </div>
       </div>
 
       <div className="max-w-6xl px-8 py-10 space-y-12">
+        {/* New User Approvals Section */}
+        <div>
+           <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-light text-gray-900 tracking-tight">
+                New User <span className="font-semibold">Approvals</span>
+              </h2>
+           </div>
+           <UserApprovals />
+        </div>
+
         {/* Metrics Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Card 1 */}

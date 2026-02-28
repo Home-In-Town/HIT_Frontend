@@ -6,13 +6,13 @@ import { useAuth } from '@/lib/authContext';
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, isLoading } = useAuth();
+  const { user, status } = useAuth();
+  const isLoading = status === 'loading';
 
   useEffect(() => {
     if (isLoading) return;
 
     if (!user) {
-      // Not logged in, redirect to login
       router.replace('/login');
       return;
     }
@@ -28,10 +28,13 @@ export default function DashboardPage() {
       case 'agent':
         router.replace('/dashboard/agent');
         break;
+      case 'unassigned':
+        router.replace('/dashboard/pending');
+        break;
       default:
         router.replace('/login');
     }
-  }, [user, isLoading, router]);
+  }, [user, status, router, isLoading]);
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center">

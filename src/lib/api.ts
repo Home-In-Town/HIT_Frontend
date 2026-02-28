@@ -15,7 +15,7 @@ function getMockUserId(): string | null {
 
 // Get headers with auth
 function getAuthHeaders(): HeadersInit {
-  const userId = getMockUserId();
+  const userId = typeof window !== 'undefined' ? localStorage.getItem('mock_user_id') : null;
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
@@ -24,6 +24,10 @@ function getAuthHeaders(): HeadersInit {
   }
   return headers;
 }
+
+const COMMON_FETCH_OPTIONS: RequestInit = {
+  credentials: 'include'
+};
 
 export class ApiError extends Error {
   status: number;
@@ -162,7 +166,9 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
 export const projectsApi = {
   // Get all public projects (for projects list page)
   async getAllPublic(): Promise<Project[]> {
-    const response = await fetch(`${API_URL}/public/projects`);
+    const response = await fetch(`${API_URL}/public/projects`, {
+      ...COMMON_FETCH_OPTIONS, credentials: 'include'
+    });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any[]>(response);
     return data.map(transformBackendToFrontend);
@@ -171,6 +177,7 @@ export const projectsApi = {
   // Get all projects (filtered by role on backend)
   async getAll(): Promise<Project[]> {
     const response = await fetch(`${API_URL}/projects`, {
+      ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -181,6 +188,7 @@ export const projectsApi = {
   // Get single project by ID
   async getById(id: string): Promise<Project> {
     const response = await fetch(`${API_URL}/projects/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -190,7 +198,7 @@ export const projectsApi = {
 
   // Get project by slug (for public pages)
   async getBySlug(slug: string): Promise<Project> {
-    const response = await fetch(`${API_URL}/public/projects/${slug}`);
+    const response = await fetch(`${API_URL}/public/projects/${slug}`, COMMON_FETCH_OPTIONS);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any>(response);
     return transformBackendToFrontend(data);
@@ -198,7 +206,7 @@ export const projectsApi = {
 
   // Get projects by owner ID (Public Portfolio)
   async getProjectsByOwnerId(ownerId: string): Promise<{ owner: any, projects: Project[] }> {
-    const response = await fetch(`${API_URL}/projects/public/owners/${ownerId}/projects`);
+    const response = await fetch(`${API_URL}/projects/public/owners/${ownerId}/projects`, COMMON_FETCH_OPTIONS);
 
     const data = await handleResponse<any>(response);
 
@@ -208,7 +216,7 @@ export const projectsApi = {
     };
   },
   async getProjectsByOwnerPhone(phone: string) {
-    const response = await fetch(`${API_URL}/projects/by-owner-phone/${phone}`);
+    const response = await fetch(`${API_URL}/projects/by-owner-phone/${phone}`, COMMON_FETCH_OPTIONS);
     const data = await handleResponse<any>(response);
 
     return {
@@ -220,6 +228,7 @@ export const projectsApi = {
   // Create new project
   async create(data: ProjectFormData): Promise<Project> {
     const response = await fetch(`${API_URL}/projects`, {
+      ...COMMON_FETCH_OPTIONS,
       method: 'POST',
       headers: getAuthHeaders(),
       body: JSON.stringify(transformFrontendToBackend(data)),
@@ -232,6 +241,7 @@ export const projectsApi = {
   // Update project
   async update(id: string, data: Partial<ProjectFormData>): Promise<Project> {
     const response = await fetch(`${API_URL}/projects/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(transformFrontendToBackend(data)),
@@ -244,6 +254,7 @@ export const projectsApi = {
   // Delete project
   async delete(id: string): Promise<void> {
     const response = await fetch(`${API_URL}/projects/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
@@ -255,6 +266,7 @@ export const projectsApi = {
   // Publish project and generate trackable link
   async publish(id: string): Promise<{ trackableLink: string }> {
     const response = await fetch(`${API_URL}/projects/${id}/publish`, {
+      ...COMMON_FETCH_OPTIONS,
       method: 'POST',
       headers: getAuthHeaders(),
     });
@@ -279,6 +291,7 @@ export interface Landmark {
 
 export async function saveProjectLandmarks(projectId: string, landmarks: Landmark[]) {
   const res = await fetch(`${API_URL}/projects/${projectId}/landmarks`, {
+    ...COMMON_FETCH_OPTIONS,
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -340,10 +353,10 @@ export const analyticsApi = {
   // 🔎 Get analytics for one project
   async getProjectAnalytics(projectId: string): Promise<ProjectAnalytics> {
     const response = await fetch(
-      `${API_URL}/analytics/projects/${projectId}`,
-      {
-        headers: getAuthHeaders(),
-      }
+      `${API_URL}/analytics/projects/${projectId}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    }
     );
 
     return handleResponse<ProjectAnalytics>(response);
@@ -352,10 +365,10 @@ export const analyticsApi = {
   // 📊 Get overview (role-based from backend)
   async getOverview(): Promise<ProjectAnalyticsOverview[]> {
     const response = await fetch(
-      `${API_URL}/analytics/overview`,
-      {
-        headers: getAuthHeaders(),
-      }
+      `${API_URL}/analytics/overview`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    }
     );
 
     return handleResponse<ProjectAnalyticsOverview[]>(response);
@@ -373,7 +386,7 @@ export interface MockUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'builder' | 'agent';
+  role: 'admin' | 'builder' | 'agent' | 'unassigned';
   companyName?: string;
   phone?: string;
 }
@@ -383,6 +396,7 @@ export const usersApi = {
   async getMe(): Promise<MockUser | null> {
     try {
       const response = await fetch(`${API_URL}/users/me`, {
+        ...COMMON_FETCH_OPTIONS,
         headers: getAuthHeaders(),
       });
       if (!response.ok) return null;
@@ -394,7 +408,7 @@ export const usersApi = {
 
   // Get available mock accounts for role switcher
   async getMockAccounts(): Promise<MockUser[]> {
-    const response = await fetch(`${API_URL}/users/mock-accounts`);
+    const response = await fetch(`${API_URL}/users/mock-accounts`, COMMON_FETCH_OPTIONS);
     return handleResponse<MockUser[]>(response);
   },
 
@@ -404,6 +418,7 @@ export const usersApi = {
       ? `${API_URL}/users?role=${role}`
       : `${API_URL}/users`;
     const response = await fetch(url, {
+      ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
     return handleResponse<MockUser[]>(response);
@@ -412,6 +427,7 @@ export const usersApi = {
   // Login by name and role (for mock login flow)
   async loginByName(name: string, role: string, phone: string): Promise<MockUser> {
     const response = await fetch(`${API_URL}/users/login-by-name`, {
+      ...COMMON_FETCH_OPTIONS,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, role, phone }),
@@ -422,15 +438,28 @@ export const usersApi = {
   // Get users by role (for login dropdown)
   async getByRole(role: string): Promise<{ id: string; name: string; email: string; phone?: string }[]> {
     const response = await fetch(`${API_URL}/users/by-role/${role}`, {
+      ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
 
     return handleResponse(response);
   },
 
+  // Update user role (admin only)
+  async assignRole(userId: string, role: string): Promise<MockUser> {
+    const response = await fetch(`${API_URL}/users/${userId}/role`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role }),
+    });
+    return handleResponse(response);
+  },
+
   // Get SSO token for handover
   async getSsoToken(): Promise<{ token: string }> {
     const response = await fetch(`${API_URL}/users/sso/token`, {
+      ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
     return handleResponse<{ token: string }>(response);
@@ -439,9 +468,68 @@ export const usersApi = {
     return handleResponse(response);
   },
   async verifyUser(phone: string) {
-    const response = await fetch(`${API_URL}/projects/verify-user/${phone}`);
+    const response = await fetch(`${API_URL}/projects/verify-user/${phone}`, COMMON_FETCH_OPTIONS);
     return handleResponse<any>(response);
   },
+};
+
+/* ----------------------------------
+   Real Authentication API
+-----------------------------------*/
+
+export const authApi = {
+  // Check if phone exists
+  async checkPhone(phone: string): Promise<{ exists: boolean; name?: string }> {
+    const response = await fetch(`${API_URL}/auth/check-phone`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    return handleResponse(response);
+  },
+
+  // Start Registration
+  async register(data: { name: string; phone: string; mpin: string; email?: string }): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/auth/register`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  // Verify OTP
+  async verifyOtp(phone: string, code: string): Promise<{ user: MockUser }> {
+    const response = await fetch(`${API_URL}/auth/verify-otp`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, code }),
+    });
+    return handleResponse(response);
+  },
+
+  // Login with Phone + MPIN
+  async login(phone: string, mpin: string): Promise<{ user: MockUser }> {
+    const response = await fetch(`${API_URL}/auth/login`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, mpin }),
+    });
+    return handleResponse(response);
+  },
+
+  // Logout
+  async logout(): Promise<void> {
+    const response = await fetch(`${API_URL}/auth/logout`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST"
+    });
+    await handleResponse(response);
+  }
 };
 
 
@@ -568,6 +656,7 @@ export const organizationsApi = {
     const query = type ? `?type=${type}` : '';
 
     const response = await fetch(`${API_URL}/organizations${query}`, {
+      ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
 
@@ -587,6 +676,7 @@ export const organizationsApi = {
   }): Promise<Organization> {
 
     const response = await fetch(`${API_URL}/organizations`, {
+      ...COMMON_FETCH_OPTIONS,
       method: "POST",
       headers: {
         ...getAuthHeaders(),
@@ -614,6 +704,7 @@ export const organizationsApi = {
   ): Promise<Organization> {
 
     const response = await fetch(`${API_URL}/organizations/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
       method: "PUT",
       headers: {
         ...getAuthHeaders(),
@@ -632,6 +723,7 @@ export const organizationsApi = {
   // =====================================
   async delete(id: string): Promise<void> {
     const response = await fetch(`${API_URL}/organizations/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
       method: "DELETE",
       headers: getAuthHeaders(),
     });
