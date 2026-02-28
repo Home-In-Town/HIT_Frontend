@@ -8,7 +8,8 @@ import { organizationsApi, Organization, usersApi } from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function AgentDashboardPage() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, status, logout } = useAuth();
+  const authLoading = status === 'loading';
   const router = useRouter();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +17,7 @@ export default function AgentDashboardPage() {
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'agent')) {
-      router.push('/dashboard');
+      router.push('/login');
       return;
     }
 
@@ -79,10 +80,10 @@ export default function AgentDashboardPage() {
               Generate Lead
             </button>
             <button
-              onClick={() => { logout(); router.push('/dashboard'); }}
+              onClick={async () => { await logout(); router.push('/login'); }}
               className="text-sm text-gray-500 hover:text-gray-900 underline"
             >
-              Switch Role
+              Sign Out
             </button>
           </div>
         </div>
