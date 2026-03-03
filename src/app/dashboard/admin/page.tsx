@@ -8,6 +8,8 @@ import { usersApi } from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 import UserApprovals from '@/components/dashboard/UserApprovals';
 
+import { getLeadGenUrl } from '@/lib/navigation';
+
 export default function AdminDashboardPage() {
   const { user, status, logout } = useAuth();
   const isLoading = status === 'loading';
@@ -22,7 +24,7 @@ export default function AdminDashboardPage() {
   async function handleGenerateLead() {
     try {
       const { token } = await usersApi.getSsoToken();
-      const leadGenUrl = "https://www.oneemployee.in"; 
+      const leadGenUrl = getLeadGenUrl(); 
       window.location.href = `${leadGenUrl}/sso?token=${token}`;
     } catch (error) {
       console.error('SSO Failed:', error);

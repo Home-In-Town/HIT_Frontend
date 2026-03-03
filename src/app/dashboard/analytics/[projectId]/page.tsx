@@ -10,10 +10,12 @@ import ProjectAnalytics, {
 
 } from '@/components/analytics/ProjectAnalytics';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/authContext';
 
 
 export default function ProjectAnalyticsPage() {
   const router = useRouter();
+  const { status } = useAuth();
   const { projectId } = useParams<{ projectId: string }>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,8 +32,15 @@ export default function ProjectAnalyticsPage() {
   } | null>(null);
 
   useEffect(() => {
+    if (status === 'loading') return;
+    if (status === 'unauthenticated') {
+      router.push("/login");
+      return;
+    }
+
     async function fetchAnalytics() {
       try {
+        setLoading(true);
         const data = await analyticsApi.getProjectAnalytics(projectId);
         const project = await projectsApi.getById(projectId);
 
@@ -39,7 +48,6 @@ export default function ProjectAnalyticsPage() {
         const totalCalls = data.ctaClicks.filter(c => c.ctaType === 'call').length;
         const whatsappClicks = data.ctaClicks.filter(c => c.ctaType === 'whatsapp').length;
         const formClicks = data.ctaClicks.filter(c => c.ctaType === 'form').length;
-
 
         // ---- Visit timeline ----
         const visitLogs: VisitLog[] = (data.recentVisits || []).map(v => ({
@@ -59,13 +67,15 @@ export default function ProjectAnalyticsPage() {
           formClicks,
           visitLogs,
         });
+        setError(null);
       } catch (err: any) {
-        if (err.message?.includes("401")) {
+        console.error("Project analytics fetch error:", err);
+        if (err.status === 401 || err.message?.includes("Authentication required") || err.message?.includes("401")) {
           router.push("/login");
           return;
         }
 
-        if (err.message?.includes("403")) {
+        if (err.status === 403 || err.message?.includes("403")) {
           setError("You do not have access to this project.");
           return;
         }
@@ -77,9 +87,9 @@ export default function ProjectAnalyticsPage() {
     }
 
     fetchAnalytics();
-  }, [projectId]);
+  }, [projectId, status, router]);
 
-  if (loading) {
+  if (status === 'loading' || (loading && !error)) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900" />
