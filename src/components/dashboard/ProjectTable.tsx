@@ -172,6 +172,21 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                           </button>
 
                           )}
+                          {(project.trackableLink || project.slug) && (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                const linkPage = project.trackableLink
+                                  ? `${project.trackableLink}/links`
+                                  : `/visit/${project.slug}/links`;
+
+                                window.open(linkPage, '_blank');
+                              }}
+                              className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-50 w-full text-left"
+                            >
+                              Links
+                            </button>
+                          )}
                           {project.isPublished && project.trackableLink && (
                             <button
                               onClick={() => {

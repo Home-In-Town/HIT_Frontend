@@ -160,7 +160,20 @@ useEffect(() => {
   }
 }, [project]);
 
-  
+useEffect(() => {
+  if (!project) return;
+
+  const hash = window.location.hash; // #amenities
+
+  if (hash) {
+    const el = document.querySelector(hash);
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 300); // wait for render
+    }
+  }
+}, [project]);
   // ⏳ Loading
   if (loading) {
     return (
@@ -524,24 +537,6 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
     sheetRef.current.style.transform = `translateY(${delta}px)`;
   }
 };
-
-const onDragEnd = () => {
-  if (!sheetRef.current) return;
-
-  const delta = currentY.current - startY.current;
-
-  sheetRef.current.style.transform = "";
-
-  // threshold
-  if (delta > 80) {
-    setOpen(false);
-  } else {
-    setOpen(true);
-  }
-
-  isDragging.current = false;
-};
-
 
 
   return (
@@ -1008,14 +1003,15 @@ const onDragEnd = () => {
 
 
       </div>
-    <MediaGallery items={mediaItems} project={project} variant="mobile" />
-
+      <div id="gallery">
+        <MediaGallery items={mediaItems} project={project} variant="mobile" />
+      </div>
     
   {/* ✅ CTA ALWAYS visible */}
           {CTAButtons}  
 
   
-            <div ref={sectionRefs.facilities}>
+            <div ref={sectionRefs.facilities} id="amenities">
           <AmenitiesSection          
             amenities={project.amenities}
             variant="mobile"
@@ -1024,7 +1020,8 @@ const onDragEnd = () => {
 
             {/* OTHER DETAILS —   CARPET + FLOORS */}
                   {(project.carpetAreaRange || project.floorRange) && (
-                    <div ref={sectionRefs.details} className="mt-4 rounded-xl p-4">
+                    <div ref={sectionRefs.details} className="mt-4 rounded-xl p-4"
+                     id="details">
 
                       {/* Heading */}
                       <p className="mb-2 text-sm font-semibold text-gray-900">
@@ -1065,7 +1062,7 @@ const onDragEnd = () => {
                     </div>
                   )}
                   {/* FLOOR PLANS & PRICING */}
-                  <div ref={sectionRefs.floor} className="mt-5">
+                  <div ref={sectionRefs.floor} className="mt-5" id="floor-plans">
                     <p className="mb-3 text-sm font-semibold text-gray-900">
                       Floor Plans & Pricing
                     </p>
@@ -1125,6 +1122,7 @@ const onDragEnd = () => {
                   <div
                     ref={sectionRefs.booking}
                     className="mt-5 rounded-xl bg-white p-4 shadow-sm"
+                    id="booking-status"
                   >
                     <p className="mb-3 text-sm font-semibold text-gray-900">
                       {isPlot ? "Plot Booking Status" : "Flat Booking Status"}
@@ -1188,7 +1186,7 @@ const onDragEnd = () => {
                   </div>
            
                   {/* PLOT DETAILS */}
-                  <div ref={sectionRefs.details}>
+                  <div ref={sectionRefs.details} id="details">
                   {project.type === 'plot' && (
                     <div className="mt-4  p-4">
                         <p className="mb-2 text-sm font-semibold">Plot Details</p>
@@ -1212,6 +1210,7 @@ const onDragEnd = () => {
                     {/* BUILDER ADDRESS */}
                   <div
                     ref={sectionRefs.sellers}
+                    id="builder-info"
                     className="mt-5 mb-10 rounded-xl p-4"
                     >
                     <p className="mb-2 text-sm font-semibold text-gray-900">
@@ -1238,7 +1237,7 @@ const onDragEnd = () => {
 
                     {/* ✅ BROCHURE SECTION */}
                     {project.brochureUrl && (
-                      <div ref={sectionRefs.brochure} className="mt-4">
+                      <div ref={sectionRefs.brochure} className="mt-4" id="brochure">
                         <BrochureSection 
                          pdfUrl={
                             project.brochureUrl

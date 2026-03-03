@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Phone, MessageCircle, Send, FileText, MapPin, Home, Banknote, Building2, Eye, Map, MapPinMinus, X, Ruler, CompassIcon, ShieldCheckIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import { Project } from "@/types/project";
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import ProjectMap from "@/components/public/ProjectMap";
 import {  MapPinAreaIcon } from "@phosphor-icons/react/dist/ssr";
 import AmenitiesSection from "@/components/public/AmenitiesSection";
@@ -111,6 +111,33 @@ export default function DesktopVisit({
   drawerSelected,
   drawerOpen,
 }: DesktopVisitProps) {
+  useEffect(() => {
+  const scrollToSection = () => {
+    const hash = window.location.hash;
+    if (!hash || !scrollContainerRef.current) return;
+
+    const el = document.querySelector(hash);
+    if (el) {
+      const container = scrollContainerRef.current;
+
+      const top =
+        (el as HTMLElement).offsetTop - 20; // adjust padding
+
+      container.scrollTo({
+        top,
+        behavior: "smooth",
+      });
+    }
+  };
+
+  setTimeout(scrollToSection, 400);
+
+  window.addEventListener("hashchange", scrollToSection);
+
+  return () => {
+    window.removeEventListener("hashchange", scrollToSection);
+  };
+}, []);
   // Support both API field names
  const mediaItems = buildMediaItems(project);
   const formatValue = (value: any) => {
@@ -136,6 +163,7 @@ const plotDetails = [
  
   const [showPriceBreakdown, setShowPriceBreakdown] = React.useState(false);
    const drawerCardRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+   const scrollContainerRef = useRef<HTMLDivElement>(null);
 const priceBreakdown =   [
   { label: "MRP (₹ / sq.ft)", value: "₹ 5,200" },
   { label: "GST", value: "₹ 3,25,000" },
@@ -179,7 +207,9 @@ const BrochureSection = dynamic(
         {/* Layout */}
         <div className="mt-2 grid grid-cols-2 gap-8 h-[calc(100vh-120px)]">
           {/* LEFT PANEL */}
-          <div className="mt-2 overflow-y-auto pr-4 scrollbar-hide">
+          <div 
+          ref={scrollContainerRef}
+          className="mt-2 overflow-y-auto pr-4 scrollbar-hide">
             {drawerOpen && drawerProjects.length > 0 ? (
               // SHOW DRAWER LIST
               <DrawerContent
@@ -315,14 +345,15 @@ const BrochureSection = dynamic(
 
 
             </div>
-                     
+                        <div id="gallery">
                         <MediaGallery
                           items={mediaItems}
                           variant="desktop"
                           project={project}
-                        />            
+                        />   
+                        </div>         
                         {/* Project Details */}
-                        <div className="mt-10">
+                        <div id="details" className="mt-10">
                           {/* Section Header */}
                           <div className="flex items-center justify-between mb-5">
                             <h3 className="text-lg font-semibold text-gray-900">
@@ -364,320 +395,325 @@ const BrochureSection = dynamic(
                             )}
                           </div>
                         </div>
-
+                        
+                        <div id="amenities">
                        <AmenitiesSection amenities={project.amenities} />
+                        </div>
+                          <div id="floor-plans" className="mt-6 md:mt-8">
+              <p className="mb-3 md:mb-5 text-sm md:text-lg font-semibold text-gray-900">
+                Floor Plans & Pricing
+              </p>
 
-                          <div className="mt-6 md:mt-8">
-  <p className="mb-3 md:mb-5 text-sm md:text-lg font-semibold text-gray-900">
-    Floor Plans & Pricing
-  </p>
+              <div className="flex gap-3 md:gap-5 overflow-x-auto pb-2 scrollbar-hide">
+                {floorPlans.map((plan, i) => (
+                  <div
+                    key={i}
+                    className="
+                      min-w-[210px] md:min-w-[280px] lg:min-w-[320px]
+                      rounded-xl md:rounded-2xl
+                      bg-white shadow-sm hover:shadow-md
+                      overflow-hidden flex flex-col transition
+                    "
+                  >
+                    {/* Image */}
+                    <div className="relative h-32 md:h-40 lg:h-48 w-full">
+                      <Image
+                        src={plan.image || "/placeholder.jpg"}
+                        alt="plan"
+                        fill
+                        className="object-cover"
+                      />
 
-  <div className="flex gap-3 md:gap-5 overflow-x-auto pb-2 scrollbar-hide">
-    {floorPlans.map((plan, i) => (
-      <div
-        key={i}
-        className="
-          min-w-[210px] md:min-w-[280px] lg:min-w-[320px]
-          rounded-xl md:rounded-2xl
-          bg-white shadow-sm hover:shadow-md
-          overflow-hidden flex flex-col transition
-        "
-      >
-        {/* Image */}
-        <div className="relative h-32 md:h-40 lg:h-48 w-full">
-          <Image
-            src={plan.image || "/placeholder.jpg"}
-            alt="plan"
-            fill
-            className="object-cover"
-          />
+                      <span className="absolute top-2 left-2 bg-[#3E5F16] text-white text-[9px] md:text-xs font-semibold px-2 py-0.5 md:px-3 md:py-1 rounded-full">
+                        {project.type === "plot" ? "Plot" : "New Launch"}
+                      </span>
+                    </div>
 
-          <span className="absolute top-2 left-2 bg-[#3E5F16] text-white text-[9px] md:text-xs font-semibold px-2 py-0.5 md:px-3 md:py-1 rounded-full">
-            {project.type === "plot" ? "Plot" : "New Launch"}
-          </span>
-        </div>
+                    {/* Content */}
+                    <div className="p-3 md:p-4 flex flex-col gap-1 md:gap-2">
+                      <p className="text-xs md:text-sm font-semibold text-gray-900">
+                        {plan.title} • {plan.area}
+                      </p>
 
-        {/* Content */}
-        <div className="p-3 md:p-4 flex flex-col gap-1 md:gap-2">
-          <p className="text-xs md:text-sm font-semibold text-gray-900">
-            {plan.title} • {plan.area}
-          </p>
+                      {plan.possession && (
+                        <p className="text-[11px] md:text-xs text-gray-500">
+                          Possession: {plan.possession}
+                        </p>
+                      )}
 
-          {plan.possession && (
-            <p className="text-[11px] md:text-xs text-gray-500">
-              Possession: {plan.possession}
-            </p>
-          )}
+                      <p className="text-sm md:text-lg font-bold text-[#3E5F16]">
+                        {plan.price}
+                      </p>
 
-          <p className="text-sm md:text-lg font-bold text-[#3E5F16]">
-            {plan.price}
-          </p>
-
-          <button
-            onClick={onCallClick}
-            className="
-              mt-2
-              rounded-md md:rounded-lg
-              border border-[#3E5F16]
-              py-1.5 md:py-2
-              text-[11px] md:text-sm
-              font-semibold text-[#3E5F16]
-              hover:bg-[#3E5F16]/10 transition
-            "
-          >
-            Call Now
-          </button>
-        </div>
-      </div>
-    ))}
-  </div>
-</div>
-                          {/* ----------------------------- */}
-{/* BOOKING STATUS */}
-{/* ----------------------------- */}
-<div
-  className="mt-5 rounded-xl bg-white p-4 shadow-sm"
->
-  <p className="mb-3 text-sm font-semibold text-gray-900">
-    {project.type === "plot" ? "Plot Booking Status" : "Flat Booking Status"}
-  </p>
-
-  <div className="space-y-3 text-xs">
-
-    {/* Availability */}
-    <div className="flex items-center justify-between">
-      <span className="text-gray-600">Availability</span>
-      <span className="flex items-center gap-2 font-medium text-green-600">
-        <span className="h-2 w-2 rounded-full bg-green-500" />
-        Available
-      </span>
-    </div>
-
-    {/* Units */}
-    <div className="flex items-center justify-between">
-      <span className="text-gray-600">
-        {project.type === "plot" ? "Plots" : "Units"}
-      </span>
-      <span className="font-medium text-gray-800">
-        {project.type === "plot" ? "8 vacant / 20 total" : "12 vacant / 30 total"}
-      </span>
-    </div>
-
-    {/* Progress */}
-    <div>
-      <div className="flex justify-between mb-1 text-gray-600">
-        <span>Booking Progress</span>
-        <span>{project.type === "plot" ? "60% Sold" : "60% Sold"}</span>
-      </div>
-      <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
-        <div
-          className="h-full bg-[#3E5F16]"
-          style={{ width: "60%" }}
-        />
-      </div>
-    </div>
-
-    {/* Note */}
-    <div className="rounded-md bg-gray-50 p-2 text-gray-600">
-      {project.type === "plot"
-        ? "Limited premium plots available. Early booking recommended."
-        : "Only a few premium flats remain. Price lock available."}
-    </div>
-
-    {/* CTA */}
-    <p className="text-gray-500">
-      Contact sales team to reserve this {project.type === "plot" ? "plot" : "flat"}.
-    </p>
-  </div>
-</div>
-
-<div className="mt-6 md:mt-8 mb-10 rounded-xl md:rounded-2xl bg-white p-4 md:p-6 shadow-sm">
-  <p className="mb-2 md:mb-3 text-sm md:text-lg font-semibold text-gray-900">
-    Builder Address
-  </p>
-
-  <div className="text-xs md:text-sm text-gray-700 space-y-1 md:space-y-2">
-    <p className="font-medium text-gray-800 md:text-base">
-      {project.builderName || "Builder Name"}
-    </p>
-
-    <p className="leading-relaxed">
-      Skyline Developers Pvt. Ltd.
-      4th Floor, Landmark Business Plaza
-      Ring Road, Civil Lines
-      Nagpur, Maharashtra – 440001
-    </p>
-  </div>
-</div>
-
-<BrochureSection
-  pdfUrl={
-    project.brochureUrl
-      ? `${process.env.NEXT_PUBLIC_API_URL}${project.brochureUrl}`
-      : ""
-  }
-/>                       
+                      <button
+                        onClick={onCallClick}
+                        className="
+                          mt-2
+                          rounded-md md:rounded-lg
+                          border border-[#3E5F16]
+                          py-1.5 md:py-2
+                          text-[11px] md:text-sm
+                          font-semibold text-[#3E5F16]
+                          hover:bg-[#3E5F16]/10 transition
+                        "
+                      >
+                        Call Now
+                      </button>
+                    </div>
                   </div>
-              </>
-            )}
-          </div>
-
-          {/* RIGHT */}
-          <div className="space-y-6 sticky top-6 self-start">
-            {/* Header */}
-        <div className="flex  justify-end mb-6">
-          
-          {/* CTA */}
-          <div className=" grid grid-cols-3 gap-2">
-            <button
-              onClick={onCallClick}
-              className="bg-[#3E5F16] text-white py-2 rounded-lg flex items-center justify-center gap-1 text-sm font-medium"
+                ))}
+              </div>
+            </div>
+                                      {/* ----------------------------- */}
+            {/* BOOKING STATUS */}
+            {/* ----------------------------- */}
+            <div
+            id="booking-status"
+              className="mt-5 rounded-xl bg-white p-4 shadow-sm"
             >
-              <Phone size={14} /> Call
-            </button>
+              <p className="mb-3 text-sm font-semibold text-gray-900">
+                {project.type === "plot" ? "Plot Booking Status" : "Flat Booking Status"}
+              </p>
 
-            <button
-              onClick={onWhatsAppClick}
-              className="bg-white hover:bg-gray-100 text-[#3E5F16] border boerder-[#3E5F16] py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
-            >
-              <MessageCircle size={14} /> WhatsApp
-            </button>
+              <div className="space-y-3 text-xs">
 
-            <button
-              onClick={onEnquireClick}
-              className="border border-[#3E5F16] text-[#3E5F16] py-2 px-5 rounded-lg flex items-center justify-center gap-1 text-sm font-medium hover:bg-green-50"
-            >
-              <Send size={14} /> Enquire Now
-            </button>
-          </div>
+                {/* Availability */}
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">Availability</span>
+                  <span className="flex items-center gap-2 font-medium text-green-600">
+                    <span className="h-2 w-2 rounded-full bg-green-500" />
+                    Available
+                  </span>
+                </div>
 
-        </div>
-            <div className=" border border-gray-200 overflow-hidden">
-              <div className="relative h-[calc(100vh-180px)] bg-gray-200 flex items-center justify-center text-sm text-gray-600">
-                {memoizedMap ? (
-                  memoizedMap
-                ) : (
-                  <div className="flex h-full items-center justify-center bg-gray-200 text-sm text-gray-600">
-                    Map location not available
+                {/* Units */}
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">
+                    {project.type === "plot" ? "Plots" : "Units"}
+                  </span>
+                  <span className="font-medium text-gray-800">
+                    {project.type === "plot" ? "8 vacant / 20 total" : "12 vacant / 30 total"}
+                  </span>
+                </div>
+
+                {/* Progress */}
+                <div>
+                  <div className="flex justify-between mb-1 text-gray-600">
+                    <span>Booking Progress</span>
+                    <span>{project.type === "plot" ? "60% Sold" : "60% Sold"}</span>
                   </div>
-                )}
+                  <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                    <div
+                      className="h-full bg-[#3E5F16]"
+                      style={{ width: "60%" }}
+                    />
+                  </div>
+                </div>
+
+                {/* Note */}
+                <div className="rounded-md bg-gray-50 p-2 text-gray-600">
+                  {project.type === "plot"
+                    ? "Limited premium plots available. Early booking recommended."
+                    : "Only a few premium flats remain. Price lock available."}
+                </div>
+
+                {/* CTA */}
+                <p className="text-gray-500">
+                  Contact sales team to reserve this {project.type === "plot" ? "plot" : "flat"}.
+                </p>
               </div>
             </div>
 
-           {/* MAP CONTROLS */}
-{/* MAP ACTION BAR */}
-<div className=" flex items-center gap-3 mt-1
-    overflow-x-auto whitespace-nowrap
-    scrollbar-hide
-    pb-1">
+            <div 
+            id="builder-info"
+            className="mt-6 md:mt-8 mb-10 rounded-xl md:rounded-2xl bg-white p-4 md:p-6 shadow-sm">
+              <p className="mb-2 md:mb-3 text-sm md:text-lg font-semibold text-gray-900">
+                Builder Address
+              </p>
 
-  <button
-    onClick={onDirections}
-    className="
-    flex shrink-0 items-center justify-center gap-1.5
-    rounded-full bg-[#3E5F16]
-    px-4 py-2
-    text-xs sm:text-sm
-    font-medium text-white
-    hover:bg-[#365312]
-    transition shadow-sm
-  "
+              <div className="text-xs md:text-sm text-gray-700 space-y-1 md:space-y-2">
+                <p className="font-medium text-gray-800 md:text-base">
+                  {project.builderName || "Builder Name"}
+                </p>
 
-  >
-    <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-    Directions
-  </button>
+                <p className="leading-relaxed">
+                  Skyline Developers Pvt. Ltd.
+                  4th Floor, Landmark Business Plaza
+                  Ring Road, Civil Lines
+                  Nagpur, Maharashtra – 440001
+                </p>
+              </div>
+            </div>
+            <div id="brochure">
+            <BrochureSection
+              pdfUrl={
+                project.brochureUrl
+                  ? `${process.env.NEXT_PUBLIC_API_URL}${project.brochureUrl}`
+                  : ""
+              }
+            /> 
+            </div>                      
+                              </div>
+                          </>
+                        )}
+                      </div>
 
-  <button
-    onClick={onMapView}
-    className="
-    flex shrink-0 items-center justify-center gap-1.5
-    rounded-full bg-[#3E5F16]
-    px-4 py-2
-    text-xs sm:text-sm
-    font-medium text-white
-    hover:bg-[#365312]
-    transition shadow-sm
-  "
+                      {/* RIGHT */}
+                      <div className="space-y-6 sticky top-6 self-start">
+                        {/* Header */}
+                    <div className="flex  justify-end mb-6">
+                      
+                      {/* CTA */}
+                      <div className=" grid grid-cols-3 gap-2">
+                        <button
+                          onClick={onCallClick}
+                          className="bg-[#3E5F16] text-white py-2 rounded-lg flex items-center justify-center gap-1 text-sm font-medium"
+                        >
+                          <Phone size={14} /> Call
+                        </button>
 
-  >
-    <MapPinAreaIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-    Map
-  </button>
+                        <button
+                          onClick={onWhatsAppClick}
+                          className="bg-white hover:bg-gray-100 text-[#3E5F16] border boerder-[#3E5F16] py-2 px-4 rounded-lg flex items-center justify-center gap-2 text-sm font-medium"
+                        >
+                          <MessageCircle size={14} /> WhatsApp
+                        </button>
 
-  <button
-    onClick={onSatelliteView}
-    className="
-    flex shrink-0 items-center justify-center gap-1.5
-    rounded-full bg-[#3E5F16]
-    px-4 py-2
-    text-xs sm:text-sm
-    font-medium text-white
-    hover:bg-[#365312]
-    transition shadow-sm
-  "
+                        <button
+                          onClick={onEnquireClick}
+                          className="border border-[#3E5F16] text-[#3E5F16] py-2 px-5 rounded-lg flex items-center justify-center gap-1 text-sm font-medium hover:bg-green-50"
+                        >
+                          <Send size={14} /> Enquire Now
+                        </button>
+                      </div>
 
-  >
-    <MapPinAreaIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-    Satellite
-  </button>
+                    </div>
+                        <div className=" border border-gray-200 overflow-hidden">
+                          <div className="relative h-[calc(100vh-180px)] bg-gray-200 flex items-center justify-center text-sm text-gray-600">
+                            {memoizedMap ? (
+                              memoizedMap
+                            ) : (
+                              <div className="flex h-full items-center justify-center bg-gray-200 text-sm text-gray-600">
+                                Map location not available
+                              </div>
+                            )}
+                          </div>
+                        </div>
 
-  <button
-    onClick={on3DView}
-   className="
-      flex shrink-0 items-center justify-center gap-1.5
-      rounded-full bg-[#3E5F16]
-      px-4 py-2
-      text-xs sm:text-sm
-      font-medium text-white
-      hover:bg-[#365312]
-      transition shadow-sm
-    "
+                      {/* MAP CONTROLS */}
+            {/* MAP ACTION BAR */}
+            <div className=" flex items-center gap-3 mt-1
+                overflow-x-auto whitespace-nowrap
+                scrollbar-hide
+                pb-1">
 
-  >
-    <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-    3D View
-  </button>
+              <button
+                onClick={onDirections}
+                className="
+                flex shrink-0 items-center justify-center gap-1.5
+                rounded-full bg-[#3E5F16]
+                px-4 py-2
+                text-xs sm:text-sm
+                font-medium text-white
+                hover:bg-[#365312]
+                transition shadow-sm
+              "
 
-  <button
-    onClick={onStreetView}
-      className="
-      flex shrink-0 items-center justify-center gap-1.5
-      rounded-full bg-[#3E5F16]
-      px-4 py-2
-      text-xs sm:text-sm
-      font-medium text-white
-      hover:bg-[#365312]
-      transition shadow-sm
-    "
+              >
+                <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Directions
+              </button>
 
-  >
-    <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-    Virtual View
-  </button>
-              {/* NEIGHBORHOOD BUTTON + DROPDOWN */}
-              <div ref={neighborhoodBtnRef} className="relative shrink-0">
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      onNeighborhoodToggle();
-    }}
-    className="
-      flex shrink-0 items-center gap-2
-      rounded-full
-      bg-[#3E5F16]
-      px-4 py-2
-      text-xs sm:text-sm
-      font-medium text-white
-      shadow-sm
-      hover:bg-[#365312]
-      transition
-    "
-  >
-    <MapPin className="h-4 w-4" />
-    Neighborhood
-  </button>
-</div>
+              <button
+                onClick={onMapView}
+                className="
+                flex shrink-0 items-center justify-center gap-1.5
+                rounded-full bg-[#3E5F16]
+                px-4 py-2
+                text-xs sm:text-sm
+                font-medium text-white
+                hover:bg-[#365312]
+                transition shadow-sm
+              "
+
+              >
+                <MapPinAreaIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Map
+              </button>
+
+              <button
+                onClick={onSatelliteView}
+                className="
+                flex shrink-0 items-center justify-center gap-1.5
+                rounded-full bg-[#3E5F16]
+                px-4 py-2
+                text-xs sm:text-sm
+                font-medium text-white
+                hover:bg-[#365312]
+                transition shadow-sm
+              "
+
+              >
+                <MapPinAreaIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Satellite
+              </button>
+
+              <button
+                onClick={on3DView}
+              className="
+                  flex shrink-0 items-center justify-center gap-1.5
+                  rounded-full bg-[#3E5F16]
+                  px-4 py-2
+                  text-xs sm:text-sm
+                  font-medium text-white
+                  hover:bg-[#365312]
+                  transition shadow-sm
+                "
+
+              >
+                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                3D View
+              </button>
+
+              <button
+                onClick={onStreetView}
+                  className="
+                  flex shrink-0 items-center justify-center gap-1.5
+                  rounded-full bg-[#3E5F16]
+                  px-4 py-2
+                  text-xs sm:text-sm
+                  font-medium text-white
+                  hover:bg-[#365312]
+                  transition shadow-sm
+                "
+
+              >
+                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                Virtual View
+              </button>
+                          {/* NEIGHBORHOOD BUTTON + DROPDOWN */}
+                          <div ref={neighborhoodBtnRef} className="relative shrink-0">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNeighborhoodToggle();
+                }}
+                className="
+                  flex shrink-0 items-center gap-2
+                  rounded-full
+                  bg-[#3E5F16]
+                  px-4 py-2
+                  text-xs sm:text-sm
+                  font-medium text-white
+                  shadow-sm
+                  hover:bg-[#365312]
+                  transition
+                "
+              >
+                <MapPin className="h-4 w-4" />
+                Neighborhood
+              </button>
+            </div>
 
             </div>
             {showNeighborhoodMenu && (
