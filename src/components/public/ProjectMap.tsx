@@ -18,7 +18,9 @@ import SearchFiltersPanel from "./SearchFiltersPanel";
 import { DrawingManager } from '@react-google-maps/api';
 import { useRouter } from 'next/navigation';
 import React from 'react';
-
+type CustomOverlay = google.maps.OverlayView & {
+  div?: HTMLDivElement;
+};
 type MapOverlay =
   | google.maps.Polygon
   | google.maps.Rectangle
@@ -43,6 +45,7 @@ type Props = {
   }) => void;
   onPlotSelect?: (id: string) => void;
   onOpenPlotPanel?: (id: string) => void;
+  onLandmarksChange?: (landmarks: Landmark[]) => void;
 };
 type MapEntityType = "project-boundary" | "subplot" | "road";
 
@@ -96,22 +99,6 @@ const ProjectMap = forwardRef(
   ) => {
   // 🔹 Always run hooks first
   const mapRef = useRef<google.maps.Map | null>(null);
-//   const getNeighborhoodIcon = (type: string) => {
-//   switch (type) {
-//     case 'hospital':
-//       return 'https://maps.google.com/mapfiles/ms/icons/hospitals.png';
-//     case 'school':
-//       return 'https://maps.google.com/mapfiles/ms/icons/schools.png';
-//     case 'supermarket':
-//       return 'https://maps.google.com/mapfiles/ms/icons/shopping.png';
-//     case 'park':
-//       return 'https://maps.google.com/mapfiles/ms/icons/parks.png';
-//     case 'restaurant':
-//       return 'https://maps.google.com/mapfiles/ms/icons/restaurant.png';
-//     default:
-//       return 'https://maps.google.com/mapfiles/ms/icons/blue-dot.png';
-//   }
-// };
 const getNeighborhoodIcon = (type: string): google.maps.Icon => {
   const iconPaths: Record<string, string> = {
     hospital: "M10 2h4v6h6v4h-6v6h-4v-6H4V8h6z",
@@ -171,7 +158,7 @@ const categoryMap: Record<string, string> = {
   metro: "subway_station",
   school: "school",
 };
-
+const [landmarkSearch, setLandmarkSearch] = useState("");
 const [history, setHistory] = useState<MapEntity[][]>([]);
 const [redoStack, setRedoStack] = useState<MapEntity[][]>([]);
 const [editingPlotId, setEditingPlotId] = useState<string | null>(null);
@@ -222,32 +209,8 @@ const selectedShapeRef = useRef<MapOverlay | null>(null);
     selectedShapeRef.current = null;
   }
 };
-
-const setSelection = (shape: any) => {
-  clearSelection();
-  selectedShapeRef.current = shape;
-  shape.setEditable(true);
-};
-const deleteSelectedShape = () => {
-  if (!selectedShapeRef.current) return;
-
-  selectedShapeRef.current.setMap(null);
-
-  drawingsRef.current = drawingsRef.current.filter(
-    s => s !== selectedShapeRef.current
-  );
-
-  selectedShapeRef.current = null;
-};
-const clearAllDrawings = () => {
-  drawingsRef.current.forEach(s => s.setMap(null));
-  drawingsRef.current = [];
-  selectedShapeRef.current = null;
-};
-
-const undoLastDrawing = () => {
-    updateEntities(mapEntities.slice(0, -1));
-};
+  const landmarkLinesRef = useRef<google.maps.Polyline[]>([]);
+const landmarkLabelsRef = useRef<google.maps.OverlayView[]>([]);
   const mapCenter = useMemo(() => ({ lat, lng }), [lat, lng]);
   const hasCenteredRef = useRef(false);
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
@@ -364,13 +327,9 @@ useEffect(() => {
 
       if (!project?.landmarks) return;
 
-      console.log("🔥 LOADED FROM DB:", project.landmarks);
-console.log("TYPE FROM DB:", typeof project.landmarks);
-console.log("IS ARRAY:", Array.isArray(project.landmarks));
-console.log("DATA:", project.landmarks);
       setSelectedLandmarksState(
         typeof project.landmarks === "string"
-          ? JSON.parse(project.landmarks)
+          ? JSON.parse(project.landmarks as unknown as string)
           : project.landmarks
       );
     } catch (err) {
@@ -380,30 +339,12 @@ console.log("DATA:", project.landmarks);
 
   loadSavedLandmarks();
 }, [projectId]);
-const isInitialLoad = useRef(true);
+useEffect(() => {
+  if (selectedLandmarks.length > 0) {
+    drawLandmarkConnections();
+  }
+}, [selectedLandmarks]);
 
-// useEffect(() => {
-//   if (!projectId) return;
-
-//   const save = async () => {
-//     if (isInitialLoad.current) {
-//       isInitialLoad.current = false;
-//       return; // 🚫 skip first run
-//     }
-
-//     try {
-//       console.log("💾 Saving landmarks:", selectedLandmarks);
-
-//       await saveProjectLandmarks(projectId, selectedLandmarks);
-//     } catch (err) {
-//       console.error("❌ Save failed", err);
-//     }
-//   };
-
-//   const debounce = setTimeout(save, 500);
-//   return () => clearTimeout(debounce);
-
-// }, [selectedLandmarks, projectId]);
  const clearNavigation = () => {
   clientMarkerRef.current?.setMap(null);
   projectMarkerRef.current?.setMap(null);
@@ -537,8 +478,166 @@ const loadNeighborhood = (category: string) => {
     });
   });
 };
+const filteredLandmarks = useMemo(() => {
+  if (!landmarkSearch.trim()) return availableLandmarks;
+
+  const query = landmarkSearch.toLowerCase();
+
+  return availableLandmarks.filter((l) =>
+    l.name.toLowerCase().includes(query) ||
+    l.type.toLowerCase().includes(query) ||
+    (l.address || "").toLowerCase().includes(query)
+  );
+}, [availableLandmarks, landmarkSearch]);
+const clearLandmarkConnections = () => {
+  landmarkLinesRef.current.forEach(l => l.setMap(null));
+  landmarkLabelsRef.current.forEach(l => l.setMap(null));
+   landmarkMarkersRef.current.forEach(m => m.setMap(null)); 
+  landmarkLinesRef.current = [];
+  landmarkLabelsRef.current = [];
+  landmarkMarkersRef.current = []; 
+};
+const directionsServiceRef = useRef<google.maps.DirectionsService | null>(null);
+
+const drawLandmarkConnections = () => {
+  if (!mapRef.current || !window.google) return;
+
+  clearLandmarkConnections();
+
+  const map = mapRef.current;
+
+  if (!directionsServiceRef.current) {
+    directionsServiceRef.current = new google.maps.DirectionsService();
+  }
+
+  const service = directionsServiceRef.current;
+
+  const projectLoc = new google.maps.LatLng(lat, lng);
+
+  selectedLandmarks.forEach((lm) => {
+    const landmarkLoc = new google.maps.LatLng(lm.lat, lm.lng);
+
+    const marker = new google.maps.Marker({
+      position: landmarkLoc,
+      map,
+      title: lm.name,
+      icon: {
+        url: "https://maps.google.com/mapfiles/ms/icons/green-dot.png", // 🟢 GREEN PIN
+        scaledSize: new google.maps.Size(40, 40),
+      },
+    });
+
+landmarkMarkersRef.current.push(marker);
+    service.route(
+      {
+        origin: projectLoc,
+        destination: landmarkLoc,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result, status) => {
+        if (status !== "OK" || !result) return;
+
+        const route = result.routes[0];
+        const path = route.overview_path;
+
+        // =========================
+        // 🔹 DRAW ROUTE LINE (WITH ARROW)
+        // =========================
+        const line = new google.maps.Polyline({
+          path,
+          strokeColor: "#10b981",
+          strokeOpacity: 1,
+          strokeWeight: 4,
+          icons: [
+            {
+              icon: {
+                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+                scale: 3,
+                strokeColor: "#059669",
+              },
+              repeat: "60px",
+            },
+          ],
+          map,
+        });
+
+        landmarkLinesRef.current.push(line);
+
+        // =========================
+        // 🔹 DISTANCE TEXT (REAL DISTANCE)
+        // =========================
+        const leg = route.legs[0];
+        const meters = leg.distance?.value || 0;
+
+        let distanceText = "";
+
+        if (meters < 1000) {
+          distanceText = `${meters} m`;
+        } else {
+          distanceText = `${(meters / 1000).toFixed(1)} km`;
+        }
+
+        const text = `${distanceText} • ${lm.name}`;
+
+        // =========================
+        // 🔹 MIDPOINT (better center)
+        // =========================
+        const midIndex = Math.floor(path.length / 2);
+        const midPoint = path[midIndex];
+
+        // =========================
+        // 🔹 LABEL
+        // =========================
+        const label = new google.maps.OverlayView() as CustomOverlay;
+
+        label.onAdd = function () {
+          const div = document.createElement("div");
+          div.innerText = text;
+
+          div.style.position = "absolute";
+          div.style.background = "#111827";
+          div.style.color = "white";
+          div.style.padding = "4px 10px";
+          div.style.borderRadius = "999px";
+          div.style.fontSize = "11px";
+          div.style.fontWeight = "500";
+          div.style.boxShadow = "0 4px 10px rgba(0,0,0,0.3)";
+          div.style.whiteSpace = "nowrap";
+          div.style.transform = "translate(-50%, -50%)";
+
+          this.div = div;
+
+          this.getPanes()?.overlayMouseTarget.appendChild(div);
+        };
+
+        label.draw = function () {
+          const projection = this.getProjection();
+          if (!projection || !this.div) return;
+
+          const pos = projection.fromLatLngToDivPixel(midPoint);
+
+          if (pos) {
+            this.div.style.left = pos.x + "px";
+            this.div.style.top = pos.y + "px";
+          }
+        };
+
+        label.onRemove = function () {
+          if (this.div) this.div.remove();
+        };
+
+        label.setMap(map);
+        landmarkLabelsRef.current.push(label);
+      }
+    );
+  });
+};
   // 🔹 Expose functions via ref
   useImperativeHandle(ref, () => ({
+    setLandmarkSearch: (value: string) => {
+  setLandmarkSearch(value);
+},
+    getFilteredLandmarks: () => filteredLandmarks,
     fetchLandmarks: () => {
       fetchNearbyLandmarks();
     },
@@ -546,13 +645,16 @@ const loadNeighborhood = (category: string) => {
     getAvailableLandmarks: () => availableLandmarks,
 
     toggleLandmarkSelection: (landmark: Landmark) => {
-      setSelectedLandmarksState((prev) => {
-        const exists = prev.find((l) => l.placeId === landmark.placeId);
-        if (exists) {
-          return prev.filter((l) => l.placeId !== landmark.placeId);
-        }
-        return [...prev, landmark];
-      });
+      const exists = selectedLandmarks.some(
+        (l) => l.placeId === landmark.placeId
+      );
+
+      const updated = exists
+        ? selectedLandmarks.filter((l) => l.placeId !== landmark.placeId)
+        : [...selectedLandmarks, landmark];
+
+      setSelectedLandmarksState(updated);
+      return updated; 
     },
     
 
@@ -1076,42 +1178,59 @@ const fetchNearbyLandmarks = async () => {
 
   const map = mapRef.current;
   const service = new google.maps.places.PlacesService(map);
-  console.log("RENDER LANDMARKS:", selectedLandmarks);
-  // Use project location for all searches
+
   const projectLoc = new google.maps.LatLng(lat, lng);
 
+  // 🔥 Expanded types (important)
   const types: string[] = [
     "school",
     "hospital",
     "shopping_mall",
+    "supermarket",
     "restaurant",
+    "cafe",
+    "pharmacy",
+    "bank",
+    "atm",
     "park",
+    "gym",
+    "movie_theater",
+    "bus_station",
+    "train_station",
+    "subway_station",
     "university",
+    "lodging",
+  ];
+
+  // 🔥 Keywords (for things NOT covered by types)
+  const keywords: string[] = [
+    "market",
+    "road",
+    "highway",
+    "street",
+    "mall",
+    "clinic",
+    "office",
+    "commercial",
   ];
 
   const results: Landmark[] = [];
 
+  // =========================
+  // 🔹 TYPE SEARCH
+  // =========================
   for (const type of types) {
     await new Promise<void>((resolve) => {
       service.nearbySearch(
         {
           location: projectLoc,
-          radius: 2500, // 2.5 km radius around project
+          radius: 2000,
           type: type as any,
         },
         (places, status) => {
           if (status === google.maps.places.PlacesServiceStatus.OK && places) {
             places.forEach((place) => {
-              if (
-                !place.geometry?.location ||
-                typeof place.geometry.location.lat !== "function" ||
-                typeof place.geometry.location.lng !== "function"
-              ) return;
-
-              const latVal = place.geometry.location.lat();
-              const lngVal = place.geometry.location.lng();
-
-              if (!latVal || !lngVal) return; // safety check
+              if (!place.geometry?.location) return;
 
               results.push({
                 placeId: place.place_id!,
@@ -1122,19 +1241,54 @@ const fetchNearbyLandmarks = async () => {
                 address: place.vicinity || "",
               });
             });
-           
           }
           resolve();
         }
-        
       );
-      
     });
   }
+
+  // =========================
+  // 🔹 KEYWORD SEARCH
+  // =========================
+  for (const keyword of keywords) {
+    await new Promise<void>((resolve) => {
+      service.textSearch(
+        {
+          location: projectLoc,
+          radius: 2000,
+          query: keyword,
+        },
+        (places, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && places) {
+            places.forEach((place) => {
+              if (!place.geometry?.location) return;
+
+              results.push({
+                placeId: place.place_id!,
+                name: place.name || "",
+                type: keyword,
+                lat: place.geometry.location.lat(),
+                lng: place.geometry.location.lng(),
+                address: place.formatted_address || "",
+              });
+            });
+          }
+          resolve();
+        }
+      );
+    });
+  }
+
+  // =========================
+  // 🔥 REMOVE DUPLICATES
+  // =========================
   const unique = Array.from(
-    new Map(results.map(l => [l.placeId, l])).values()
+    new Map(results.map((l) => [l.placeId, l])).values()
   );
-  // Update state with landmarks near the project
+
+  console.log("✅ TOTAL LANDMARKS:", unique.length);
+
   setAvailableLandmarks(unique);
 };
   
@@ -1281,18 +1435,7 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
   />
 </div>
 
- {/* DRAW MENU */}
-<div className="absolute bottom-35 left-4 z-20">
  
-  {/* Main Draw Button */}
-  <button
-  onClick={() => {
-    router.push(`/dashboard/projects/${projectId}/layout-editor`);
-  }}
->
-  ✏ Layout Editor
-</button>
-</div>
                   <GoogleMap
   mapContainerStyle={containerStyle}
   center={mapCenter}
@@ -1486,8 +1629,6 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
                       setSearchOpen(false);
                       setForceDrawerOpen(true);
 
-
-
                       mapRef.current?.panTo({
                         lat: project.latitude!,
                         lng: project.longitude!,
@@ -1516,29 +1657,11 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
 
                     {/* pointer */}
                     <div className="h-2 w-2 rotate-45 bg-white shadow -mt-1" />
-
-                    </div>
-
-                     
+                    </div>            
                   </div>
                 </OverlayView>
               );
             })}
-            {focusOnly &&
-              selectedLandmarks.map((landmark, index) => (
-                <OverlayView
-                  key={landmark.placeId || `${landmark.lat}-${landmark.lng}-${index}`}
-                  position={{ lat: landmark.lat, lng: landmark.lng }}
-                  mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
-                >
-                  <div className="-translate-x-1/2 -translate-y-full">
-                    <img
-                      src={getNeighborhoodIcon(landmark.type).url}
-                      style={{ width: 28, height: 40 }}
-                    />
-                  </div>
-                </OverlayView>
-              ))}
 
             </GoogleMap>
             
@@ -1559,10 +1682,6 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
               Return to Project
             </button>
           )}
-          {/* <ProjectsBottomDrawer
-            projects={showDrawer ? visibleProjects : []}
-            selectedProjectId={selectedProjectId}
-          /> */}
 
           </div>
         );

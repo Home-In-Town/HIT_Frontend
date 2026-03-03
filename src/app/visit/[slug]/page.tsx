@@ -2,7 +2,7 @@
 
 //sales-website-private-dev\frontend\src\app\visit\[slug]\page.tsx
 'use client';
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import DesktopVisit from './DesktopVisit';
 import { useParams, notFound } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -28,6 +28,9 @@ import ProjectsBottomDrawer from '@/components/public/ProjectBottomDrawer';
 import EnquiryModal from '@/components/public/EnquiryModal';
 import SubNavbar from "@/components/public/SubNavbar";
 import BrochureSection from "@/components/public/BrochureSection";
+import AmenitiesSection from "@/components/public/AmenitiesSection";
+import { buildMediaItems } from "@/utils/buildMediaItems";
+import MediaGallery from "@/components/public/MediaGallery";
 
 const getAmenityIcon = (amenity: string) => {
   const key = amenity.toLowerCase();
@@ -95,7 +98,7 @@ const sectionRefs = {
 const startY = useRef(0);
 const currentY = useRef(0);
 const isDragging = useRef(false);
-
+const mediaItems = buildMediaItems(project);
   const mapRef = useRef<any>(null); // Ref to ProjectMap
   useEffect(() => {
   function handleClickOutside(e: MouseEvent) {
@@ -143,52 +146,7 @@ useEffect(() => {
 
   return () => window.removeEventListener("resize", checkScreen);
 }, []);
-const mediaItems = [
-  ...(project?.coverImage
-    ? [{ type: "image", src: project.coverImage }]
-    : []),
 
-  ...(project?.galleryImages || []).map(src => ({
-    type: "image",
-    src,
-  })),
-
-  ...(project?.videos || []).map(src => ({
-    type: "video",
-    src,
-  })),
-
-  ...(project?.brochureUrl
-    ? [{ type: "brochure", src: project.brochureUrl }]
-    : []),
-];
-
-const goPrevMedia = () => {
-  setMediaIndex(prev =>
-    prev === 0 ? mediaItems.length - 1 : prev - 1
-  );
-};
-
-const goNextMedia = () => {
-  setMediaIndex(prev =>
-    (prev + 1) % mediaItems.length
-  );
-};
-
-useEffect(() => {
-  // 🚨 STOP slider if:
-  // - details panel closed
-  // - fullscreen viewer open
-  // - nothing to slide
-
-  if (!open || viewerOpen || mediaItems.length <= 1) return;
-
-  const timer = setInterval(() => {
-    setMediaIndex(prev => (prev + 1) % mediaItems.length);
-  }, 3500);
-
-  return () => clearInterval(timer);
-}, [open, viewerOpen, mediaItems.length]);
 
 
 
@@ -625,14 +583,10 @@ const onDragEnd = () => {
     >
       View Project Details
     </button>
-
-   
-
   </div>
 )}
 </div>    
       <div >
-
       {drawerOpen && (
         <ProjectsBottomDrawer
           projects={drawerProjects}
@@ -643,31 +597,23 @@ const onDragEnd = () => {
       {open && (
       <div
         ref={sheetRef}
-        className="
+        className={`
           fixed bottom-0 left-0 right-0 z-[60]
           bg-white shadow-2xl
           rounded-t-2xl
-          transition-transform
-          touch-pan-y
-        "
+          transition-transform duration-300
+          ${open ? "translate-y-0" : "translate-y-full"}
+        `}
       >
-      {/* DRAG HANDLE */}
-      <div
-        onTouchStart={onDragStart}
-        onTouchMove={onDragMove}
-        onTouchEnd={onDragEnd}
-        onMouseDown={onDragStart}
-        onMouseMove={onDragMove}
-        onMouseUp={onDragEnd}
-        className="flex justify-center py-3 cursor-grab active:cursor-grabbing"
-      >
-        <div className="w-10 h-1.5 bg-gray-300 rounded-full" />
-      </div>
-
-        
-
-        
-
+        <div className="flex items-center justify-between px-4 pt-3 pb-1 ">
+ 
+          <button
+            onClick={closeProjectDetails}
+            className="p-2 rounded-full hover:bg-gray-100 transition"
+          >
+            <ChevronDown className="w-5 h-5 text-gray-700" />
+          </button>
+        </div>
          <div
             ref={scrollRef}
             id="project-details-scroll"
@@ -892,12 +838,8 @@ const onDragEnd = () => {
           </div>
         
 
-    
-
-
             {/* MAP ACTION BUTTONS */}
-            {/* MAP ACTION BUTTONS */}
-            <div className="relative mt-4">
+            <div className="relative mt-4 mb-4">
              <div className="flex gap-2 overflow-x-auto overflow-y-visible pb-1 scrollbar-hide relative">
 
 
@@ -1066,138 +1008,19 @@ const onDragEnd = () => {
 
 
       </div>
-               
-{/* AUTO MEDIA VIEW */}
-{mediaItems.length > 0 && (
-  <div className="mt-4">
+    <MediaGallery items={mediaItems} project={project} variant="mobile" />
 
-    <div
-      className="relative w-full aspect-[16/10]
-                 rounded-xl overflow-hidden
-                 bg-gray-100 shadow-md"
-    >
-      {/* RERA BADGE */}
-<div
-  className="
-    absolute top-2 left-2 z-10
-    bg-black/70 text-white
-    text-[9px] font-semibold
-    px-2 py-1 rounded-md
-    backdrop-blur-sm
-  "
->
-  {formatRera(
-  
-  (project.reraApproved ? "RERA Approved" : undefined)
-)}
-
-</div>
-
-      {/* MEDIA CONTENT */}
-      {mediaItems[mediaIndex].type === "image" && (
-        <Image
-          src={mediaItems[mediaIndex].src}
-          alt="media"
-          fill
-          onClick={() => setViewerOpen(true)}
-          className="object-cover cursor-pointer"
-        />
-
-      )}
-
-      {mediaItems[mediaIndex].type === "video" && (
-       <video
-          src={mediaItems[mediaIndex].src}
-          autoPlay
-          muted
-          loop
-          onClick={() => setViewerOpen(true)}
-          className="w-full h-full object-cover cursor-pointer"
-        />
-
-      )}
-
-      {mediaItems[mediaIndex].type === "brochure" && (
-        <button
-          onClick={downloadBrochure}
-          className="w-full h-full flex flex-col
-                     items-center justify-center
-                     bg-green-50 text-green-700"
-        >
-          <span className="text-4xl">📄</span>
-          Download Brochure
-        </button>
-      )}
-
-      {/* LEFT ARROW */}
-      {mediaItems.length > 1 && (
-        <button
-          onClick={goPrevMedia}
-          className="absolute left-2 top-1/2 -translate-y-1/2
-                     bg-black/40 hover:bg-black/60
-                     text-white rounded-full p-2
-                     backdrop-blur-sm transition"
-        >
-          <ChevronLeft size={20} />
-        </button>
-      )}
-
-      {/* RIGHT ARROW */}
-      {mediaItems.length > 1 && (
-        <button
-          onClick={goNextMedia}
-          className="absolute right-2 top-1/2 -translate-y-1/2
-                     bg-black/40 hover:bg-black/60
-                     text-white rounded-full p-2
-                     backdrop-blur-sm transition"
-        >
-          <ChevronRight size={20} />
-        </button>
-      )}
-
-      {/* indicator dots */}
-      <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
-        {mediaItems.map((_, i) => (
-          <div
-            key={i}
-            className={`h-1.5 rounded-full transition-all ${
-              i === mediaIndex
-                ? "w-5 bg-white"
-                : "w-1.5 bg-white/50"
-            }`}
-          />
-        ))}
-      </div>
-    </div>
-
-  </div>
-)}
+    
   {/* ✅ CTA ALWAYS visible */}
           {CTAButtons}  
 
-            {/* AMENITIES */}
-            {project.amenities?.length > 0 && (
-              <div ref={sectionRefs.facilities} className="mt-4 rounded-xl  p-4">
-                <p className="mb-3 text-sm font-semibold text-gray-900">
-                  Top Facilities
-                </p>
-
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                  {project.amenities.map((amenity) => (
-                    <div
-                      key={amenity}
-                      className="flex items-center gap-2 text-xs text-gray-700"
-                    >
-                      <span className="flex h-6 w-6 items-center justify-center rounded-md bg-white shadow-sm">
-                        {getAmenityIcon(amenity)}
-                      </span>
-                      <span>{amenity}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
+  
+            <div ref={sectionRefs.facilities}>
+          <AmenitiesSection          
+            amenities={project.amenities}
+            variant="mobile"
+          />
+            </div>
 
             {/* OTHER DETAILS —   CARPET + FLOORS */}
                   {(project.carpetAreaRange || project.floorRange) && (
@@ -1299,74 +1122,73 @@ const onDragEnd = () => {
                     </div>
                   </div>
                   {/* BOOKING STATUS */}
-<div
-  ref={sectionRefs.booking}
-  className="mt-5 rounded-xl bg-white p-4 shadow-sm"
->
-  <p className="mb-3 text-sm font-semibold text-gray-900">
-    {isPlot ? "Plot Booking Status" : "Flat Booking Status"}
-  </p>
+                  <div
+                    ref={sectionRefs.booking}
+                    className="mt-5 rounded-xl bg-white p-4 shadow-sm"
+                  >
+                    <p className="mb-3 text-sm font-semibold text-gray-900">
+                      {isPlot ? "Plot Booking Status" : "Flat Booking Status"}
+                    </p>
 
-  <div className="space-y-3 text-xs">
+                    <div className="space-y-3 text-xs">
 
-    {/* Availability */}
-    <div className="flex items-center justify-between">
-      <span className="text-gray-600">Availability</span>
+                      {/* Availability */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">Availability</span>
 
-      <span className="flex items-center gap-2 font-medium text-green-600">
-        <span className="h-2 w-2 rounded-full bg-green-500" />
-        Available
-      </span>
-    </div>
+                        <span className="flex items-center gap-2 font-medium text-green-600">
+                          <span className="h-2 w-2 rounded-full bg-green-500" />
+                          Available
+                        </span>
+                      </div>
 
-    {/* Units */}
-    <div className="flex items-center justify-between">
-      <span className="text-gray-600">
-        {isPlot ? "Plots" : "Units"}
-      </span>
+                      {/* Units */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-600">
+                          {isPlot ? "Plots" : "Units"}
+                        </span>
 
-      <span className="font-medium text-gray-800">
-        {isPlot
-          ? "8 vacant / 20 total"
-          : "12 vacant / 30 total"}
-      </span>
-    </div>
+                        <span className="font-medium text-gray-800">
+                          {isPlot
+                            ? "8 vacant / 20 total"
+                            : "12 vacant / 30 total"}
+                        </span>
+                      </div>
 
-    {/* Progress */}
-    <div>
-      <div className="flex justify-between mb-1 text-gray-600">
-        <span>Booking Progress</span>
-        <span>
-          {isPlot ? "60% Sold" : "60% Sold"}
-        </span>
-      </div>
+                      {/* Progress */}
+                      <div>
+                        <div className="flex justify-between mb-1 text-gray-600">
+                          <span>Booking Progress</span>
+                          <span>
+                            {isPlot ? "60% Sold" : "60% Sold"}
+                          </span>
+                        </div>
 
-      <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
-        <div
-          className="h-full bg-[#3E5F16]"
-          style={{ width: "60%" }}
-        />
-      </div>
-    </div>
+                        <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
+                          <div
+                            className="h-full bg-[#3E5F16]"
+                            style={{ width: "60%" }}
+                          />
+                        </div>
+                      </div>
 
-    {/* Note */}
-    <div className="rounded-md bg-gray-50 p-2 text-gray-600">
-      {isPlot
-        ? "Limited premium plots available. Early booking recommended."
-        : "Only a few premium flats remain. Price lock available."}
-    </div>
+                      {/* Note */}
+                      <div className="rounded-md bg-gray-50 p-2 text-gray-600">
+                        {isPlot
+                          ? "Limited premium plots available. Early booking recommended."
+                          : "Only a few premium flats remain. Price lock available."}
+                      </div>
 
-    {/* CTA */}
-    <p className="text-gray-500">
-      Contact sales team to reserve this {isPlot ? "plot" : "flat"}.
-    </p>
+                      {/* CTA */}
+                      <p className="text-gray-500">
+                        Contact sales team to reserve this {isPlot ? "plot" : "flat"}.
+                      </p>
 
-  </div>
-</div>
-
-                  
-
+                    </div>
+                  </div>
+           
                   {/* PLOT DETAILS */}
+                  <div ref={sectionRefs.details}>
                   {project.type === 'plot' && (
                     <div className="mt-4  p-4">
                         <p className="mb-2 text-sm font-semibold">Plot Details</p>
@@ -1386,7 +1208,7 @@ const onDragEnd = () => {
                         </div>
                       </div>
                     )}
-
+                  </div>
                     {/* BUILDER ADDRESS */}
                   <div
                     ref={sectionRefs.sellers}
@@ -1417,7 +1239,12 @@ const onDragEnd = () => {
                     {/* ✅ BROCHURE SECTION */}
                     {project.brochureUrl && (
                       <div ref={sectionRefs.brochure} className="mt-4">
-                        <BrochureSection pdfUrl={project.brochureUrl} />
+                        <BrochureSection 
+                         pdfUrl={
+                            project.brochureUrl
+                              ? `${process.env.NEXT_PUBLIC_API_URL}${project.brochureUrl}`
+                              : ""
+                          } />
                       </div>
                     )}
 
@@ -1441,87 +1268,7 @@ const onDragEnd = () => {
           }}
         />
 
-        {viewerOpen && (
-      <div className="fixed inset-0 z-[9999] bg-black">
-
-        {/* CLOSE */}
-        <button
-          onClick={() => setViewerOpen(false)}
-          className="absolute top-4 right-4 text-white text-2xl z-50"
-        >
-          ✕
-        </button>
-
-        {/* MEDIA */}
-        <div className="w-full h-full flex items-center justify-center">
-
-          {mediaItems[mediaIndex].type === "image" && (
-            <Image
-              src={mediaItems[mediaIndex].src}
-              alt="fullscreen"
-              fill
-              className="object-contain"
-            />
-          )}
-
-          {mediaItems[mediaIndex].type === "video" && (
-            <video
-              src={mediaItems[mediaIndex].src}
-              controls
-              autoPlay
-              className="max-h-full max-w-full"
-            />
-          )}
-
-          {mediaItems[mediaIndex].type === "brochure" && (
-            <button
-              onClick={downloadBrochure}
-              className="text-white text-lg border px-6 py-3 rounded-xl"
-            >
-              Download Brochure
-            </button>
-          )}
-        </div>
-
-        {/* LEFT NAV */}
-        {mediaItems.length > 1 && (
-          <button
-            onClick={goPrevMedia}
-            className="absolute left-4 top-1/2 -translate-y-1/2
-                      bg-white/20 text-white p-3 rounded-full"
-          >
-            <ChevronLeft size={28} />
-          </button>
-        )}
-
-        {/* RIGHT NAV */}
-        {mediaItems.length > 1 && (
-          <button
-            onClick={goNextMedia}
-            className="absolute right-4 top-1/2 -translate-y-1/2
-                      bg-white/20 text-white p-3 rounded-full"
-          >
-            <ChevronRight size={28} />
-          </button>
-        )}
-
-        {/* indicator */}
-        <div className="absolute bottom-6 w-full flex justify-center gap-2">
-          {mediaItems.map((_, i) => (
-            <div
-              key={i}
-              className={`h-2 rounded-full transition-all ${
-                i === mediaIndex
-                  ? "w-6 bg-white"
-                  : "w-2 bg-white/40"
-              }`}
-            />
-          ))}
-        </div>
-
-      </div>
-    )}
-
+        
   
   </div>
 );
