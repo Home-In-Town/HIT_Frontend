@@ -9,14 +9,15 @@ import { Project } from '@/types/project';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function BuilderDashboardPage() {
-  const { user, isLoading: authLoading, logout } = useAuth();
+  const { user, status, logout } = useAuth();
+  const authLoading = status === 'loading';
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'builder')) {
-      router.push('/dashboard');
+      router.push('/login');
       return;
     }
 
@@ -94,10 +95,10 @@ export default function BuilderDashboardPage() {
               Generate Lead
             </button>
             <button
-              onClick={() => { logout(); router.push('/dashboard'); }}
+              onClick={async () => { await logout(); router.push('/login'); }}
               className="text-sm text-gray-500 hover:text-gray-900 underline"
             >
-              Switch Role
+              Sign Out
             </button>
           </div>
         </div>

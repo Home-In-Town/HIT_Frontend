@@ -1,84 +1,83 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authApi, usersApi } from './api';
 
-// User type matching backend
-export interface MockUser {
+// Realistic User type matching model
+export interface User {
   id: string;
   name: string;
-  email: string;
-  role: 'admin' | 'builder' | 'agent';
+  email?: string;
+  phone: string;
+  role: 'admin' | 'builder' | 'agent' | 'unassigned';
+  isVerified: boolean;
 }
 
 interface AuthContextType {
-  user: MockUser | null;
-  isLoading: boolean;
-  login: (userId: string) => Promise<void>;
-  logout: () => void;
-  getUserId: () => string | null;
+  user: User | null;
+  status: 'loading' | 'authenticated' | 'unauthenticated' | 'unassigned';
+  setUser: (user: User | null) => void;
+  logout: () => Promise<void>;
+  checkAuth: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = 'mock_user_id';
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<MockUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [user, setUserState] = useState<User | null>(null);
+  const [status, setStatus] = useState<'loading' | 'authenticated' | 'unauthenticated' | 'unassigned'>('loading');
 
-  // On mount, check if there's a stored user
+  // Check auth on mount
   useEffect(() => {
-    const storedUserId = localStorage.getItem(STORAGE_KEY);
-    if (storedUserId) {
-      fetchUser(storedUserId);
-    } else {
-      setIsLoading(false);
-    }
+    checkAuth();
   }, []);
 
-  async function fetchUser(userId: string) {
+  async function checkAuth() {
     try {
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-      const response = await fetch(`${API_URL}/users/me`, {
-        headers: {
-          'x-mock-user-id': userId,
-        },
-      });
-
-      if (response.ok) {
-        const userData = await response.json();
-        setUser(userData);
-        localStorage.setItem(STORAGE_KEY, userId);
+      setStatus('loading');
+      const userData = await usersApi.getMe();
+      
+      if (userData) {
+        setUserState(userData as any);
+        if (userData.role === 'unassigned') {
+          setStatus('unassigned');
+        } else {
+          setStatus('authenticated');
+        }
       } else {
-        // Invalid user, clear storage
-        localStorage.removeItem(STORAGE_KEY);
-        setUser(null);
+        setUserState(null);
+        setStatus('unauthenticated');
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error);
-      localStorage.removeItem(STORAGE_KEY);
-      setUser(null);
-    } finally {
-      setIsLoading(false);
+      console.error('Auth check failed:', error);
+      setUserState(null);
+      setStatus('unauthenticated');
     }
   }
 
-  async function login(userId: string) {
-    setIsLoading(true);
-    await fetchUser(userId);
+  function setUser(user: User | null) {
+    setUserState(user);
+    if (!user) {
+      setStatus('unauthenticated');
+    } else if (user.role === 'unassigned') {
+      setStatus('unassigned');
+    } else {
+      setStatus('authenticated');
+    }
   }
 
-  function logout() {
-    localStorage.removeItem(STORAGE_KEY);
-    setUser(null);
-  }
-
-  function getUserId(): string | null {
-    return user?.id || localStorage.getItem(STORAGE_KEY);
+  async function logout() {
+    try {
+        await authApi.logout();
+        setUserState(null);
+        setStatus('unauthenticated');
+    } catch (error) {
+        console.error('Logout failed:', error);
+    }
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout, getUserId }}>
+    <AuthContext.Provider value={{ user, status, setUser, logout, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );
@@ -90,10 +89,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-}
-
-// Helper to get the mock user ID for API calls
-export function getMockUserId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(STORAGE_KEY);
 }

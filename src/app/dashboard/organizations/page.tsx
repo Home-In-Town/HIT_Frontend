@@ -8,7 +8,8 @@ import { toast } from 'react-hot-toast';
 import ProjectGrid from '@/components/dashboard/ProjectGrid';
 
 export default function OrganizationsPage() {
-  const { user, isLoading: authLoading } = useAuth();
+  const { user, status } = useAuth();
+  const authLoading = status === 'loading';
   const router = useRouter();
   
   const [organizations, setOrganizations] = useState<Organization[]>([]);
