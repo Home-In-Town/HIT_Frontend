@@ -276,6 +276,32 @@ export const projectsApi = {
       trackableLink: result.publicUrl || `/visit/${result.slug}`,
     };
   },
+ async uploadBrochure(file: File): Promise<{ url: string }> {
+  const formData = new FormData();
+  formData.append("brochure", file);
+
+  const headers = getAuthHeaders ? getAuthHeaders() : {};
+
+  // ❌ REMOVE content-type if present
+  delete (headers as any)["Content-Type"];
+
+  const response = await fetch(`${API_URL}/upload/brochure`, {
+    method: "POST",
+    body: formData,
+    headers,
+  });
+
+  if (!response.ok) {
+    let errorMessage = "Upload failed";
+    try {
+      const err = await response.json();
+      errorMessage = err.message || errorMessage;
+    } catch {}
+    throw new Error(errorMessage);
+  }
+
+  return response.json();
+}
 };
 
 

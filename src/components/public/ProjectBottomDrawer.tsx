@@ -25,6 +25,36 @@ interface DrawerContentProps {
   selectedProjectId?: string | null;
   cardRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
 }
+const isMobile = () => {
+  if (typeof window === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+};
+
+const openWhatsApp = (phone?: string, projectName?: string) => {
+  if (!phone) return;
+
+  const clean = phone.replace(/\D/g, "");
+
+  const msg = encodeURIComponent(
+    `Hi, I'm interested in ${projectName || "this project"}`
+  );
+
+  // Universal solution (works everywhere)
+  const url = `https://wa.me/${clean}?text=${msg}`;
+
+  window.open(url, "_blank");
+};
+
+const makeCall = (phone?: string) => {
+  if (!phone) return;
+
+  if (isMobile()) {
+    window.location.href = `tel:${phone}`;
+  } else {
+    // Desktop fallback
+    window.open(`tel:${phone}`);
+  }
+};
 function ActionButton({
   icon: Icon,
   label,
@@ -71,16 +101,8 @@ function ProjectCardMobile({
 
   const cleanNumber = project.whatsappNumber?.replace(/\D/g, "");
 
-  const whatsapp = () => {
-    if (!cleanNumber) return;
-    const msg = encodeURIComponent(`Hi, I'm interested in ${project.name}`);
-    window.location.href = `whatsapp://send?phone=${cleanNumber}&text=${msg}`;
-  };
-
-  const call = () => {
-    if (!project.callNumber) return;
-    window.location.href = `tel:${project.callNumber}`;
-  };
+  const whatsapp = () => openWhatsApp(project.whatsappNumber, project.name);
+  const call = () => makeCall(project.callNumber);
 
   return (
     <div
@@ -94,7 +116,7 @@ function ProjectCardMobile({
     >
       <div className="grid grid-cols-[20%_80%] gap-3 p-3">
         {/* IMAGE */}
-        <div className="relative aspect-[17/16] overflow-hidden rounded-xl bg-gray-100">
+        <div className="relative aspect-[17/16] overflow-hidden rounded bg-gray-100">
           <img
             src={image || "/placeholder.jpg"}
             alt={project.name}
@@ -121,7 +143,7 @@ function ProjectCardMobile({
               <ActionButton
                 icon={Eye}
                 label="View"
-                className="w-full bg-gray-100 text-gray-800 hover:bg-gray-200"
+                className="w-full bg-[#5F7F33] text-white"
               />
             </Link>
 
@@ -129,14 +151,14 @@ function ProjectCardMobile({
               icon={Phone}
               label="Call"
               onClick={call}
-              className="w-full bg-blue-600 text-white hover:bg-blue-700"
+              className="w-full bg-white text-[#5F7F33] border border-[#5F7F33]"
             />
 
             <ActionButton
               icon={MessageCircle}
               label="WhatsApp"
               onClick={whatsapp}
-              className="w-full bg-green-600 text-white hover:bg-green-700"
+              className="w-full bg-white text-[#5F7F33] border border-[#5F7F33]"
             />
           </div>
         </div>
@@ -154,11 +176,11 @@ function ProjectCardDesktop({ project }: { project: Project }) {
   return (
     <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition text-sm">
       {/* Smaller card aspect ratio */}
-      <div className="relative w-full aspect-[3/2]">
+      <div className="relative p-2 rounded-xl w-full aspect-[3/2]">
         <img
           src={image || "/placeholder.jpg"}
           alt={project.name}
-          className="w-full h-full object-cover"
+          className="w-full h-full rounded object-cover"
         />
       </div>
 
@@ -172,20 +194,23 @@ function ProjectCardDesktop({ project }: { project: Project }) {
             <ActionButton
               icon={Eye}
               label="View"
-              className="w-full bg-[#5F7F33] text-white hover:bg-gray-200"
+              className="w-full bg-[#5F7F33] text-white"
               size="compact"
             />
           </Link>
-          <ActionButton
+         <ActionButton
             icon={Phone}
             label="Call"
+            onClick={() => makeCall(project.callNumber)}
             className="flex-1 bg-white text-[#5F7F33] border border-[#5F7F33]"
             size="compact"
           />
+
           <ActionButton
             icon={MessageCircle}
             label="WhatsApp"
-            className="flex-1 bg-white text-[#5F7F33] border border-[#5F7F33] "
+            onClick={() => openWhatsApp(project.whatsappNumber, project.name)}
+            className="flex-1 bg-white text-[#5F7F33] border border-[#5F7F33]"
             size="compact"
           />
         </div>
@@ -207,8 +232,7 @@ function DrawerContent({ projects, selectedProjectId, cardRefs }: DrawerContentP
 
   const visibleProjects = projects.slice(0, visibleCount);
   return (
-    <div className="h-full overflow-y-auto overscroll-contain px-4 pb-4 scrollbar-hide">
-      {/* MOBILE CARDS */}
+    <div className="flex-1 overflow-y-auto overscroll-contain px-4 pb-20 scrollbar-hide">
       <div className="flex flex-col gap-4 pt-4 lg:hidden">
         {projects.map((project: Project, i: number) => (
           <div key={project.id}>
@@ -274,10 +298,10 @@ export default function ProjectsBottomDrawer({
         initial={{ y: "70%" }}
         animate={{ y: open ? 0 : "75%" }}
         transition={{ type: "spring", stiffness: 120, damping: 18 }}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl lg:hidden"
+        className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl lg:hidden flex flex-col"
         style={{ height: "80vh" }}
       >
-        <div className="flex flex-col items-center py-2">
+        <div className="flex flex-col items-center py-2 shrink-0">
           <div className="w-12 h-1.5 bg-gray-300 rounded-full mb-2" />
           <button
             onClick={() => setOpen(!open)}

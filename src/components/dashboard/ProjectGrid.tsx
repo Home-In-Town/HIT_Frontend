@@ -76,13 +76,19 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
           </div>
 
           {/* Actions (Bottom) */}
-          <div className="p-3 border-t border-gray-100 flex gap-2">
+          <div className="p-3 border-t border-gray-100 flex gap-2 flex-wrap">
              <Link
                 href={`/dashboard/projects/${project.id}/edit`}
-                className="flex-1 py-1.5 flex items-center justify-center text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
+                className="py-1.5 flex items-center justify-center text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
               >
                 Edit
               </Link>
+              <button
+                onClick={() => router.push(`/dashboard/projects/${project.id}/layout-editor`)}
+                className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded"
+              >
+                Layout
+              </button>
              {project.isPublished && (
                <button
                 onClick={() => router.push(`/dashboard/analytics/${project.id}`)}
@@ -92,6 +98,18 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
               </button>
 
              )}
+             {project.trackableLink && (
+                <button
+                  onClick={() => {
+                    const linkPage = `${project.trackableLink}/links`;
+                    window.open(linkPage, '_blank');
+                  }}
+                  className="px-3 py-1.5 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded"
+                  title="Generate Share Links"
+                >
+                  Links
+                </button>
+              )}
              {project.isPublished && project.trackableLink && (
                 <button
                   onClick={() => onCopyLink(project.trackableLink!)}

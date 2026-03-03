@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { Toaster } from "react-hot-toast";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -35,6 +36,14 @@ export default function RootLayout({
         <Providers>
           {children}
         </Providers>
+          <Toaster
+          position="top-right"
+          toastOptions={{
+            style: {
+              zIndex: 9999,
+            },
+          }}
+        />
       </body>
     </html>
   );

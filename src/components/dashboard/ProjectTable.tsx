@@ -150,6 +150,16 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                           >
                             Edit Details
                           </Link>
+
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              router.push(`/dashboard/projects/${project.id}/layout-editor`);
+                            }}
+                            className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-50 w-full text-left flex items-center gap-2"
+                          >
+                            Layout Editor
+                          </button>
                           {project.isPublished && (
                             <button
                             onClick={() => {
@@ -161,6 +171,21 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                             View Analytics
                           </button>
 
+                          )}
+                          {(project.trackableLink || project.slug) && (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                const linkPage = project.trackableLink
+                                  ? `${project.trackableLink}/links`
+                                  : `/visit/${project.slug}/links`;
+
+                                window.open(linkPage, '_blank');
+                              }}
+                              className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-50 w-full text-left"
+                            >
+                              Links
+                            </button>
                           )}
                           {project.isPublished && project.trackableLink && (
                             <button
@@ -174,16 +199,16 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                             </button>
                           )}
                           <div className="border-t border-gray-100 my-1"></div>
-                          <button
-                            onClick={() => {
-                              onDelete(project);
-                              setOpenMenuId(null);
-                            }}
-                            className="text-red-600 block px-4 py-2 text-sm hover:bg-red-50 w-full text-left"
-                          >
-                            Delete Project
-                          </button>
-                        </div>
+                            <button
+                              onClick={() => {
+                                onDelete(project);
+                                setOpenMenuId(null);
+                              }}
+                              className="text-red-600 block px-4 py-2 text-sm hover:bg-red-50 w-full text-left"
+                            >
+                              Delete Project
+                            </button>
+                          </div>
                       </div>
                     )}
                   </div>

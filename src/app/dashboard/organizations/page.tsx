@@ -256,7 +256,9 @@ const openEditModal = (org: Organization) => {
   });
 
   setSelectedProjects(
-  (org.projects ?? []).map((p: any) => p.id ?? p._id).filter(Boolean)
+  (org.projects ?? [])
+    .map((p: any) => (p.id ?? p._id)?.toString())
+    .filter(Boolean)
 );
   setSelectedAgents(org.agents?.map(a => a._id) ?? []);
 
@@ -310,34 +312,58 @@ const handleRemoveAgent = (id: string) => {
   toggleAgent(id);
 };
 
-console.log("ORG PROJECTS 👉", selectedOrg?.projects);
 const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
   transformBackendToFrontend(p)
 );
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="h-screen overflow-hidden bg-gray-50 ">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">{user.name} Organizations</h1>
-              <p className="mt-1 text-sm text-gray-500">Manage your agency partners and teams</p>
-            </div>
-            
-            <button
-              onClick={openCreateModal}
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-black hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-all duration-200"
-            >
-              <svg className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create Organization
-            </button>
-          </div>
-        </div>
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-30 mb-4">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
+
+    <div className="flex items-center justify-between md:flex-row md:items-center md:justify-between gap-3">
+
+      {/* LEFT */}
+      <div className="min-w-0">
+        <h1 className="text-lg md:text-2xl font-bold text-gray-900 tracking-tight truncate">
+          {user.name} Organizations
+        </h1>
+
+        {/* Hide subtitle on mobile */}
+        <p className="hidden md:block mt-1 text-sm text-gray-500">
+          Manage your agency partners and teams
+        </p>
       </div>
-      <div className='mt-4 ml-25'>
+
+      {/* RIGHT BUTTON */}
+      <button
+        onClick={openCreateModal}
+        className="
+          flex items-center justify-center
+          px-3 py-2 md:px-4 md:py-2
+          rounded-lg shadow-sm
+          text-xs md:text-sm font-medium
+          text-white bg-black hover:bg-gray-800
+          transition-all duration-200
+        "
+      >
+        <svg
+          className="h-4 w-4 md:mr-2"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+        </svg>
+
+        {/* Hide text on mobile */}
+        <span className="hidden md:inline">Create Organization</span>
+      </button>
+
+    </div>
+  </div>
+</div>
+      <div className='<div className=" mt-4 px-4 sm:px-6 lg:px-8">'>
         {user.role === 'agent' && (
           <div className="flex gap-2 ">
             {[
@@ -361,7 +387,7 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
         )}
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4  h-[calc(100vh-140px)]">
         {/* Content */}
         {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -388,8 +414,8 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
             </button>
           </div>
         ) : (
-          <div className="flex h-[calc(100vh-140px)] bg-white shadow-2xl rounded-xl overflow-hidden">
-            <div className="w-1/3 border-r overflow-y-auto">
+          <div className="flex flex-col md:flex-row h-full bg-white shadow-2xl rounded-xl overflow-hidden">
+            <div className="w-full md:w-1/3 border-b md:border-b-0 md:border-r overflow-y-auto max-h-[40%] md:max-h-full">
               {organizations.map((org) => (
                 <div
                   key={org.id}
@@ -410,10 +436,12 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
                 </div>
               ))}
             </div>
-            <div className="flex-1 p-6 overflow-y-auto">
+           <div className="flex-1 p-4 md:p-6 overflow-y-auto">
               {!selectedOrg ? (
-                <p className="text-gray-500">Select an organization</p>
-              ) : (
+                  <div className="hidden md:block text-gray-500">
+                    Select an organization
+                  </div>
+                ) : (
                 <>
                   {/* Header */}
                   <div className="flex justify-between items-start">
@@ -423,26 +451,48 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
                         {selectedOrg.description || "No description"}
                       </p>
                     </div>
-                     <div className="flex items-center gap-2">
+                    <div className="flex flex-col md:flex-row gap-2 w-[90px] md:w-auto">
+  
+                      {/* DELETE BUTTON */}
                       <button
                         onClick={() =>
                           selectedOrg &&
                           setDeleteTarget({ id: selectedOrg.id, name: selectedOrg.name })
                         }
                         disabled={deletingId === selectedOrg?.id}
-                        className="text-sm px-3 py-1 border rounded-md hover:bg-red-50 text-red-600 disabled:opacity-50"
+                        className="
+                          text-xs md:text-sm
+                          px-1 py-1 md:px-3 md:py-1.5
+                          rounded-md 
+                          bg-red-50 text-red-800 
+                          hover:bg-red-100 
+                          border border-red-100
+                          transition-colors duration-150
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          whitespace-nowrap
+                          flex-1 md:flex-none
+                        "
                       >
-                        {deletingId === selectedOrg?.id ? "Deleting..." : "Delete"}
+                        {deletingId === selectedOrg?.id ? "..." : "Delete"}
                       </button>
 
+                      {/* MANAGE BUTTON */}
                       <button
                         onClick={() => openEditModal(selectedOrg)}
-                        className="text-sm px-3 py-1 border rounded-md hover:bg-gray-100"
+                        className="
+                          text-xs md:text-sm
+                          px-2 py-1 md:px-3 md:py-1.5
+                          rounded-md 
+                          bg-gray-900 text-white 
+                          hover:bg-gray-800 
+                          transition-colors duration-150
+                          whitespace-nowrap
+                          flex-1 md:flex-none
+                        "
                       >
-                        Manage &rarr;
+                        Manage →
                       </button>
-                    </div>
-                                    
+                    </div>         
                   </div>
 
                   {/* Projects */}
@@ -458,59 +508,71 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
                         No projects in this organization.
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        {(showAllProjects ? mappedProjects : mappedProjects.slice(0, 5)).map((project) => (
+                     <div className="rounded-xl overflow-hidden shadow-sm bg-white">
+                        {(showAllProjects ? mappedProjects : mappedProjects.slice(0, 5)).map((project, index) => (
+                          
                           <div
                             key={project.id}
-                            className="border rounded-xl p-4 bg-white hover:shadow-sm transition flex justify-between items-center"
+                              className={`
+                                p-4 grid grid-cols-2 grid-rows-2 md:grid-cols-[2fr_60px_120px_90px_80px] 
+                                gap-2 md:gap-4
+                               ${index !== 0 ? "relative before:content-[''] before:absolute before:top-0 before:left-4 before:right-4 before:h-px before:bg-gradient-to-r before:from-transparent before:via-gray-200 before:to-transparent" : ""}
+                                hover:bg-gray-50
+                              `}
                           >
-                            {/* LEFT SIDE */}
-                            <div className="space-y-1">
+                            {/* [0,0] → NAME + LOCATION */}
+                            <div className="col-start-1 row-start-1">
                               <h4 className="font-semibold text-gray-900 text-[15px]">
                                 {project.name}
                               </h4>
-
                               <p className="text-xs text-gray-500">
-                                {project.location && project.city ? `${project.location}, ${project.city}` : "No location"}
+                                {project.city}
                               </p>
-
-                              <div className="flex gap-3 text-xs text-gray-600 mt-1">
-                                <span className="px-2 py-0.5 bg-gray-100 rounded">
-                                  {project.type}
-                                </span>
-
-                                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded">
-                                  {project.projectStatus}
-                                </span>
-
-                                {project.startingPrice > 0 && (
-                                  <span className="px-2 py-0.5 bg-green-50 text-green-600 rounded">
-                                    ₹ {project.startingPrice.toLocaleString()}
-                                  </span>
-                                )}
-                              </div>
                             </div>
 
-                            {/* RIGHT SIDE ACTIONS */}
-                            <div className="flex items-center gap-3">
-                              {/* Copy Link */}
-                              <button
-                                onClick={() => {
-                                  if (!project.trackableLink) {
-                                    toast.error("No link available");
-                                    return;
-                                  }
+                            {/* [0,1] → TYPE */}
+                            <div className="col-start-2 row-start-1 text-xs bg-gray-100 px-2 py-1 rounded w-fit whitespace-nowrap h-fit justify-self-end md:justify-self-start">
+                              {project.type}
+                            </div>
 
-                                  navigator.clipboard.writeText(project.trackableLink);
-                                  toast.success("Link copied");
+                            {/* [1,0] → STATUS */}
+                            <div className="col-start-1 row-start-2 text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded w-fit whitespace-nowrap h-fit">
+                              {project.projectStatus}
+                            </div>
+
+                            {/* [1,1] → PRICE */}
+                            <div className="col-start-2 row-start-2 text-xs bg-green-50 text-green-600 px-2 py-1 rounded w-fit whitespace-nowrap h-fit justify-self-end md:justify-self-start">
+                              {project.startingPrice > 0
+                                ? `₹ ${project.startingPrice.toLocaleString()}`
+                                : "-"}
+                            </div>
+
+                            {/* BUTTON (full width on mobile, last column on desktop) */}
+                            <div className="col-span-2 md:col-span-1 md:col-start-auto md:row-start-auto md:mt-0">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    if (!project.trackableLink) {
+                                      toast.error("Link not available");
+                                      return;
+                                    }
+
+                                    const fullLink = `${process.env.NEXT_PUBLIC_API_BASE_URL}${project.trackableLink}`;
+
+                                    await navigator.clipboard.writeText(fullLink);
+                                    toast.success("Link copied");
+                                  } catch (err) {
+                                    console.error("Copy failed", err);
+                                    toast.error("Failed to copy link");
+                                  }
                                 }}
-                                className="text-xs px-3 py-1 border rounded-md hover:bg-gray-100"
+                                className="text-xs px-3 py-1 border rounded-md hover:bg-gray-100 w-full md:w-auto"
                               >
                                 Copy Link
                               </button>
-
                             </div>
                           </div>
+
                         ))}
                       </div>
                     )}
@@ -551,7 +613,7 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
 
       {/* Enhanced Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 z-[100] overflow-y-auto " aria-labelledby="modal-title" role="dialog" aria-modal="true">
           <div className="flex items-center justify-center min-h-screen px-4 py-6 text-center sm:block sm:p-0">
             {/* Backdrop */}
             <div 
@@ -638,16 +700,19 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
                         {/* Selected Projects Chips */}
                         {selectedProjects.map(id => {
                           
-                            const apiProject = availableProjects.find(p => p.id === id);
-                            const orgProject = editingOrg?.projects?.find(p => p._id === id);
+                            const apiProject = availableProjects.find(
+                              p => (p.id ?? (p as any)._id)?.toString() === id
+                            );
 
-                            let name = "Unknown";
+                            const orgProject = editingOrg?.projects?.find(
+                              (p: any) => (p.id ?? p._id)?.toString() === id
+                            );
 
-                            if (apiProject) {
-                              name = apiProject.name;
-                            } else if (orgProject) {
-                              name = orgProject.name || orgProject.projectName || "Unknown";
-                            }
+                           let name =
+                            apiProject?.name ||
+                            orgProject?.projectName ||
+                            (orgProject as any)?.name ||
+                            "Unknown";
 
 
                             return (
@@ -709,38 +774,38 @@ const mappedProjects: Project[] = (selectedOrg?.projects ?? []).map((p: any) =>
 
                          {/* Selected Agents Chips */}
                          {selectedAgents.length > 0 && (
-  <div className="flex flex-wrap gap-2 mb-2">
-    {selectedAgents.map(id => {
-      const apiAgent = availableAgents.find(a => a.id === id);
-      const orgAgent = editingOrg?.agents?.find(a => a._id === id);
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {selectedAgents.map(id => {
+                                const apiAgent = availableAgents.find(a => a.id === id);
+                                const orgAgent = editingOrg?.agents?.find(a => a._id === id);
 
-      const agentName = apiAgent?.name || orgAgent?.name || "Unknown";
+                                const agentName = apiAgent?.name || orgAgent?.name || "Unknown";
 
-      const isCurrentUser = user?.id === id;
+                                const isCurrentUser = user?.id === id;
 
-      return (
-        <span
-          key={`agent-${id}`}
-          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-            isCurrentUser
-              ? "bg-blue-100 text-blue-800"
-              : "bg-green-100 text-green-800"
-          }`}
-        >
-          {isCurrentUser ? "You" : agentName}
+                                return (
+                                  <span
+                                    key={`agent-${id}`}
+                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                      isCurrentUser
+                                        ? "bg-blue-100 text-blue-800"
+                                        : "bg-green-100 text-green-800"
+                                    }`}
+                                  >
+                                    {isCurrentUser ? "You" : agentName}
 
-          <button
-            type="button"
-            onClick={() => handleRemoveAgent(id)}
-            className="ml-1.5 inline-flex items-center justify-center hover:opacity-70"
-          >
-            ✕
-          </button>
-        </span>
-      );
-    })}
-  </div>
-)}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleRemoveAgent(id)}
+                                      className="ml-1.5 inline-flex items-center justify-center hover:opacity-70"
+                                    >
+                                      ✕
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                            </div>
+                          )}
 
                         {/* Agents Dropdown */}
                         {showAgentDropdown && (

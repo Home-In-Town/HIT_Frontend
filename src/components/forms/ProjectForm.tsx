@@ -1004,9 +1004,9 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
             try {
               setUploading(true);
-              const url = await uploadToCloudinary(file);
-              updateField('brochureUrl', url);
-            } catch {
+              const result = await projectsApi.uploadBrochure(file);
+              updateField('brochureUrl', result.url); 
+            } catch (error) {
               toast.error('Brochure upload failed');
             } finally {
               setUploading(false);
@@ -1018,7 +1018,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
       {formData.brochureUrl && (
         <p className="mt-2 text-sm text-green-700">
-          ✔ Brochure uploaded successfully
+            ✔ Uploaded: {formData.brochureUrl.split("/").pop()}
         </p>
       )}
     </div>
