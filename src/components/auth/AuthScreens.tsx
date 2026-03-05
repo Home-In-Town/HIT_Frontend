@@ -203,7 +203,7 @@ export default function AuthScreens() {
                                 placeholder="Enter MPIN"
                                 value={mpin}
                                 onChange={(e) => setMpin(e.target.value)}
-                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-4 text-[#2A2A2A] text-center text-2xl tracking-[1em] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                                className={`w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-12 text-[#2A2A2A] text-center text-2xl focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all placeholder:tracking-normal placeholder:text-base ${mpin ? 'tracking-[0.8em]' : 'tracking-normal'}`}
                             />
                         </div>
                         <div className="flex flex-col gap-4">
@@ -334,7 +334,7 @@ export default function AuthScreens() {
                             placeholder="000000"
                             value={otpCode}
                             onChange={(e) => setOtpCode(e.target.value)}
-                            className="w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-6 text-center text-4xl tracking-[0.5em] font-bold text-[#B45309] focus:outline-none focus:border-[#B45309] transition-colors"
+                            className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-6 text-center text-4xl font-bold text-[#B45309] focus:outline-none focus:border-[#B45309] transition-colors placeholder:tracking-normal placeholder:text-2xl ${otpCode ? 'tracking-[0.5em]' : 'tracking-normal'}`}
                         />
 
                         <div className="flex flex-col gap-6">
