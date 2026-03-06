@@ -97,7 +97,8 @@ function ProjectCardMobile({
   selected: boolean;
   cardRefs: any;
 }) {
-  const image = project.coverImage || project.galleryImages?.[0];
+  const imageObj = project.coverImage || project.galleryImages?.[0];
+  const image = typeof imageObj === 'object' && imageObj !== null ? (imageObj as any).url : imageObj;
 
   const cleanNumber = project.whatsappNumber?.replace(/\D/g, "");
 
@@ -171,7 +172,8 @@ function ProjectCardMobile({
 // Desktop card layout
 // =============================
 function ProjectCardDesktop({ project }: { project: Project }) {
-  const image = project.coverImage || project.galleryImages?.[0];
+  const imageObj = project.coverImage || project.galleryImages?.[0];
+  const image = typeof imageObj === 'object' && imageObj !== null ? (imageObj as any).url : imageObj;
 
   return (
     <div className="rounded-xl border border-gray-200 shadow-sm overflow-hidden hover:shadow-md transition text-sm">

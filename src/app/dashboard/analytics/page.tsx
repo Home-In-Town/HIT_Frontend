@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { analyticsApi, ProjectAnalyticsOverview } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/authContext';
 
 // ---------------- Helpers ----------------
 const formatDuration = (seconds?: number) => {
@@ -27,6 +28,7 @@ function MiniStat({ label, value }: { label: string; value: number }) {
 // ---------------- Page ----------------
 export default function AnalyticsPage() {
   const router = useRouter();
+  const { status } = useAuth();
 
   const [data, setData] = useState<ProjectAnalyticsOverview[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,26 +36,37 @@ export default function AnalyticsPage() {
 
   // ---------------- Initial fetch ----------------
   useEffect(() => {
+    if (status === 'loading') return;
+    if (status === 'unauthenticated') {
+      router.push("/login");
+      return;
+    }
+
     async function fetchData() {
       try {
+        setLoading(true);
         const result = await analyticsApi.getOverview();
         setData(result);
+        setError(null);
       } catch (err: any) {
-        if (err.message?.includes("401")) {
+        console.error("Analytics fetch error:", err);
+        // Handle 401 specifically using status or message
+        if (err.status === 401 || err.message?.includes("Authentication required")) {
           router.push("/login");
           return;
         }
 
         setError(err.message || "Failed to load analytics data");
-      }finally {
+      } finally {
         setLoading(false);
       }
     }
-    fetchData();
-  }, []);
 
-  // ---------------- Loading / Error ----------------
-  if (loading) {
+    fetchData();
+  }, [status, router]);
+
+  // ---------------- Loading / Auth Check ----------------
+  if (status === 'loading' || (loading && !error)) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900" />

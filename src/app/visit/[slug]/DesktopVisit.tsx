@@ -170,7 +170,7 @@ const memoizedMap = React.useMemo(() => {
       ref={mapRef}
       lat={project.latitude!}
       lng={project.longitude!}
-      logo={project.coverImage}
+      logo={typeof project.coverImage === 'object' && project.coverImage ? (project.coverImage as any).url : project.coverImage}
       focusOnly
       onMarkerClick={onMarkerClick}
       onDrawerData={onDrawerData}

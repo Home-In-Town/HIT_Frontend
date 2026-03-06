@@ -428,19 +428,21 @@ type FloorPlan = {
 };
 
 
+const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.url : val;
+
 const floorPlans: FloorPlan[] = isPlot
   ? [
       {
         title: "Residential Plot",
         area: project.plotSizeRange || "1200 – 2400 sq.ft",
         price: "₹ 25 L onwards",
-        image: project.coverImage,
+        image: getImageUrl(project.coverImage),
       },
       {
         title: "Corner Plot",
         area: "1800 sq.ft",
         price: "₹ 32 L onwards",
-        image: project.coverImage,
+        image: getImageUrl(project.coverImage),
       },
     ]
   : [
@@ -449,14 +451,14 @@ const floorPlans: FloorPlan[] = isPlot
         area: "1050 sq.ft",
         possession: "Dec 2027",
         price: "₹ 78 L onwards",
-        image: project.coverImage,
+        image: getImageUrl(project.coverImage),
       },
       {
         title: "3 BHK",
         area: "1350 sq.ft",
         possession: "Dec 2027",
         price: "₹ 98 L onwards",
-        image: project.coverImage,
+        image: getImageUrl(project.coverImage),
       },
     ];
 
@@ -545,7 +547,7 @@ const handleStreetView = () => {
     ref={mapRef}
       lat={project.latitude!}
       lng={project.longitude!}
-      logo={project.coverImage}
+      logo={getImageUrl(project.coverImage)}
       focusOnly
       onMarkerClick={openProjectDetails}
       onDrawerData={({ projects, selectedId, open }) => {
