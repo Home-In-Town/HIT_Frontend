@@ -25,6 +25,7 @@ export default function EnquiryModal({
     phone: "",
     description: "",
     interest: "",
+    visitDate: "",
   });
 
   const [submitted, setSubmitted] = useState(false);
@@ -39,6 +40,7 @@ export default function EnquiryModal({
       phone: "",
       description: "",
       interest: "",
+      visitDate: "",
     });
     setSubmitted(false);
     onClose();
@@ -202,7 +204,22 @@ export default function EnquiryModal({
                   <option>Buying Plot</option>
                   <option>Site Visit</option>
                 </select>
-
+                
+                {formData.interest === "Site Visit" && (
+                  <input
+                    required
+                    type="date"
+                    min={new Date().toISOString().split("T")[0]}
+                    value={formData.visitDate}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        visitDate: e.target.value,
+                      })
+                    }
+                    className="border rounded-md px-2 py-1.5 text-xs w-full"
+                  />
+                )}
                 <button
                   type="submit"
                   className="w-full bg-[#3E5F16] text-white py-2 rounded-md text-xs"

@@ -3,23 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project, ProjectFormData, AMENITIES, ProjectType, ProjectStatus } from '@/types/project';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, mediaApi} from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useRef } from 'react';
-import { uploadToCloudinary } from '@/lib/cloudinary';
-
 
 interface ProjectFormProps {
   initialData?: Partial<Project>;
   mode: 'create' | 'edit';
 }
 
-
-
 const validateFileSize = (file: File, maxKB: number) => {
   return file.size <= maxKB * 1024;
 };
-
 
 const DEFAULT_FORM_DATA: ProjectFormData = {
   name: '',
@@ -112,6 +107,10 @@ const InputField = ({
 
 
 export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [brochureFile, setBrochureFile] = useState<File | null>(null);
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
   const COVER_IMAGE_MAX_KB = 500;    // 500 KB
@@ -231,9 +230,74 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
     let project: Project;
 
-    if (mode === 'create') {
-      project = await projectsApi.create(formData);
-    } else {
+   if (mode === 'create') {
+    // Step 1: create project WITHOUT media
+    const tempData = {
+      ...formData,
+      slug,
+      coverImage: '',
+      galleryImages: [],
+      videos: [],
+      brochureUrl: '',
+    };
+
+    project = await projectsApi.create(tempData);
+
+    // Step 2: upload media AFTER project created
+    const projectId = project.id;
+
+    // COVER
+    let coverUrl = '';
+    if (coverImageFile) {
+      const { url } = await mediaApi.uploadAndSave({
+        file: coverImageFile,
+        projectId,
+        type: 'cover',
+      });
+      coverUrl = url;
+    }
+
+    // GALLERY
+    const galleryUrls: string[] = [];
+    for (const file of galleryFiles) {
+      const { url } = await mediaApi.uploadAndSave({
+        file,
+        projectId,
+        type: 'gallery',
+      });
+      galleryUrls.push(url);
+    }
+
+    // VIDEOS
+    const videoUrls: string[] = [];
+    for (const file of videoFiles) {
+      const { url } = await mediaApi.uploadAndSave({
+        file,
+        projectId,
+        type: 'video',
+      });
+      videoUrls.push(url);
+    }
+
+    // BROCHURE
+    let brochureUrl = '';
+    if (brochureFile) {
+      const { url } = await mediaApi.uploadAndSave({
+        file: brochureFile,
+        projectId,
+        type: 'brochure',
+      });
+      brochureUrl = url;
+    }
+
+    // Step 3: update project with media URLs
+    project = await projectsApi.update(projectId, {
+      coverImage: coverUrl,
+      galleryImages: galleryUrls,
+      videos: videoUrls,
+      brochureUrl,
+    });
+  } else {
       project = await projectsApi.update(initialData!.id!, formData);
     }
 
@@ -807,15 +871,8 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
               return;
             }
 
-            try {
-              setUploading(true);
-              const url = await uploadToCloudinary(file);
-              updateField('coverImage', url);
-            } catch {
-              toast.error('Cover image upload failed');
-            } finally {
-              setUploading(false);
-            }
+            setCoverImageFile(file); 
+            updateField('coverImage', URL.createObjectURL(file));
           }}
         />
         <span className="text-sm text-[#57534E]">
@@ -870,38 +927,32 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           multiple
           accept="image/png,image/jpeg"
           className="hidden"
-          onChange={async (e) => {
-            const files = e.target.files;
-            if (!files) return;
+          onChange={(e) => {
+          const files = e.target.files;
+          if (!files) return;
 
-            try {
-              setUploading(true);
+          const validFiles: File[] = [];
+          const previews: string[] = [];
 
-              const newImages: string[] = [];
-
-              for (const file of Array.from(files)) {
-                if (!validateFileSize(file, GALLERY_IMAGE_MAX_KB)) {
-                  toast.error(`${file.name} exceeds ${GALLERY_IMAGE_MAX_KB}KB`);
-                  continue;
-                }
-
-                const url = await uploadToCloudinary(file);
-                newImages.push(url);
-              }
-
-              if (newImages.length) {
-                updateField('galleryImages', [
-                  ...formData.galleryImages,
-                  ...newImages,
-                ]);
-              }
-            } catch {
-              toast.error('Gallery image upload failed');
-            } finally {
-              setUploading(false);
-              e.target.value = '';
+          for (const file of Array.from(files)) {
+            if (!validateFileSize(file, GALLERY_IMAGE_MAX_KB)) {
+              toast.error(`${file.name} exceeds ${GALLERY_IMAGE_MAX_KB}KB`);
+              continue;
             }
-          }}
+
+            validFiles.push(file);
+            previews.push(URL.createObjectURL(file));
+          }
+
+          setGalleryFiles((prev) => [...prev, ...validFiles]); 
+
+          updateField('galleryImages', [
+            ...formData.galleryImages,
+            ...previews, 
+          ]);
+
+          e.target.value = '';
+        }}
         />
       </label>
     </div>
@@ -944,38 +995,35 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             accept="video/mp4,video/webm"
             multiple
             className="hidden"
-            onChange={async (e) => {
-              const files = e.target.files;
-              if (!files) return;
+            onChange={(e) => {
+            const files = e.target.files;
+            if (!files) return;
 
-              const slots = MAX_VIDEOS - formData.videos.length;
-              const selected = Array.from(files).slice(0, slots);
+            const slots = MAX_VIDEOS - formData.videos.length;
+            const selected = Array.from(files).slice(0, slots);
 
-              try {
-                setUploading(true);
+            const validFiles: File[] = [];
+            const previews: string[] = [];
 
-                const newVideos: string[] = [];
-
-                for (const file of selected) {
-                  if (!validateFileSize(file, VIDEO_MAX_KB)) {
-                    toast.error(`${file.name} exceeds size limit`);
-                    continue;
-                  }
-
-                  const url = await uploadToCloudinary(file);
-                  newVideos.push(url);
-                }
-
-                if (newVideos.length) {
-                  updateField('videos', [...formData.videos, ...newVideos]);
-                }
-              } catch {
-                toast.error('Video upload failed');
-              } finally {
-                setUploading(false);
-                e.target.value = '';
+            for (const file of selected) {
+              if (!validateFileSize(file, VIDEO_MAX_KB)) {
+                toast.error(`${file.name} exceeds size limit`);
+                continue;
               }
-            }}
+
+              validFiles.push(file);
+              previews.push(URL.createObjectURL(file));
+            }
+
+            setVideoFiles((prev) => [...prev, ...validFiles]); // ✅ store files
+
+            updateField('videos', [
+              ...formData.videos,
+              ...previews, // ✅ preview only
+            ]);
+
+            e.target.value = '';
+          }}
           />
         </label>
       )}
@@ -993,26 +1041,18 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           type="file"
           accept="application/pdf"
           className="hidden"
-          onChange={async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
+          onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
 
-            if (!validateFileSize(file, BROCHURE_MAX_KB)) {
-              toast.error(`Brochure must be under ${BROCHURE_MAX_KB}KB`);
-              return;
-            }
+          if (!validateFileSize(file, BROCHURE_MAX_KB)) {
+            toast.error(`Brochure must be under ${BROCHURE_MAX_KB}KB`);
+            return;
+          }
 
-            try {
-              setUploading(true);
-              const result = await projectsApi.uploadBrochure(file);
-              updateField('brochureUrl', result.url); 
-            } catch (error) {
-              toast.error('Brochure upload failed');
-            } finally {
-              setUploading(false);
-              e.target.value = '';
-            }
-          }}
+          setBrochureFile(file); 
+          updateField('brochureUrl', file.name); 
+        }}
         />
       </label>
 
