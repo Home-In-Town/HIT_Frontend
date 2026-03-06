@@ -1582,7 +1582,7 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
                     ">
                       {project.coverImage && (
                         <img
-                          src={project.coverImage}
+                          src={typeof project.coverImage === 'object' ? (project.coverImage as any).url : project.coverImage}
                           className="h-full w-full object-cover"
                         />
                       )}

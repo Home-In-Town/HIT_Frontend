@@ -171,7 +171,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   }
 
   // Section 6
-  if (!formData.coverImage?.trim()) { errors.coverImage = 'Cover image is required'; }
+  if (!formData.coverImage && !coverImageFile) { errors.coverImage = 'Cover image is required'; }
 
 
   // Section 7
@@ -298,7 +298,74 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       brochureUrl,
     });
   } else {
-      project = await projectsApi.update(initialData!.id!, formData);
+      const projectId = initialData!.id!;
+      const updateData = { ...formData };
+      
+      setUploading(true);
+
+      if (coverImageFile) {
+        const oldKey = (initialData?.coverImage as any)?.key;
+        let fileData;
+        if (oldKey) {
+          fileData = await mediaApi.replaceFile({
+            file: coverImageFile,
+            projectId,
+            type: 'cover',
+            oldKey,
+          });
+        } else {
+          fileData = await mediaApi.uploadAndSave({
+            file: coverImageFile,
+            projectId,
+            type: 'cover',
+          });
+        }
+        updateData.coverImage = fileData as any;
+      }
+
+      const validGalleryImages = updateData.galleryImages.filter(
+        img => typeof img === 'object' && (img as any).url
+      );
+      
+      for (const file of galleryFiles) {
+        const fileData = await mediaApi.uploadAndSave({ file, projectId, type: 'gallery' });
+        validGalleryImages.push(fileData as any);
+      }
+      updateData.galleryImages = validGalleryImages;
+
+      const validVideos = updateData.videos.filter(
+        vid => typeof vid === 'object' && (vid as any).url
+      );
+      
+      for (const file of videoFiles) {
+        const fileData = await mediaApi.uploadAndSave({ file, projectId, type: 'video' });
+        validVideos.push(fileData as any);
+      }
+      updateData.videos = validVideos;
+
+      if (brochureFile) {
+        const oldKey = (initialData?.brochureUrl as any)?.key;
+        let fileData;
+        if (oldKey) {
+          fileData = await mediaApi.replaceFile({
+            file: brochureFile,
+            projectId,
+            type: 'brochure',
+            oldKey,
+          });
+        } else {
+          fileData = await mediaApi.uploadAndSave({
+            file: brochureFile,
+            projectId,
+            type: 'brochure',
+          });
+        }
+        updateData.brochureUrl = fileData as any;
+      }
+
+      setUploading(false);
+
+      project = await projectsApi.update(projectId, updateData);
     }
 
     if (publish) {
@@ -883,7 +950,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       {formData.coverImage && (
         <div className="mt-4 w-56 h-36 rounded-lg overflow-hidden border">
           <img
-            src={formData.coverImage}
+            src={typeof formData.coverImage === 'object' ? (formData.coverImage as any).url : formData.coverImage}
             alt="Cover Preview"
             className="w-full h-full object-cover"
           />
@@ -906,7 +973,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
         {formData.galleryImages.map((img, index) => (
           <div key={index} className="relative group">
             <img
-              src={img}
+              src={typeof img === 'object' ? (img as any).url : img}
               className="w-full h-24 object-cover rounded-lg border"
             />
             <button
@@ -972,7 +1039,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
         {formData.videos.map((video, index) => (
           <div key={index} className="relative border rounded-lg overflow-hidden">
             <video
-              src={video}
+              src={typeof video === 'object' ? (video as any).url : video}
               controls
               className="w-full h-44 object-cover bg-black"
             />

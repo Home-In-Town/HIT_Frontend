@@ -154,10 +154,11 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
     amenities: project.amenities,
 
     media: {
-      ...(project.coverImage && { coverImage: project.coverImage }),
-      ...(project.galleryImages?.length && { galleryImages: project.galleryImages }),
-      ...(project.videos?.length && { videos: project.videos }),
-      ...(project.brochureUrl && { brochurePdf: project.brochureUrl })
+      // Only include media if it's a valid {url, key} object (not a blob:/data: string)
+      ...(project.coverImage && typeof project.coverImage === 'object' && { coverImage: project.coverImage }),
+      ...(project.galleryImages?.length && { galleryImages: project.galleryImages.filter((img: any) => typeof img === 'object' && img?.url) }),
+      ...(project.videos?.length && { videos: project.videos.filter((vid: any) => typeof vid === 'object' && vid?.url) }),
+      ...(project.brochureUrl && typeof project.brochureUrl === 'object' && { brochurePdf: project.brochureUrl })
     },
 
     cta: {
@@ -382,7 +383,7 @@ export const mediaApi = {
     return handleResponse(res);
   },
 
-  // ================= 4. MAIN FUNCTION (USE THIS EVERYWHERE) =================
+  // ================= 4. PROXY UPLOAD (NO CORS — USE THIS EVERYWHERE) =================
   async uploadAndSave(params: {
     file: File;
     projectId: string;
@@ -390,28 +391,22 @@ export const mediaApi = {
   }): Promise<FileData> {
     const { file, projectId, type } = params;
 
-    // Step 1: signed URL
-    const { uploadUrl, key, url } = await this.getUploadUrl({
-      fileName: file.name,
-      fileType: file.type,
-      projectId,
-      type,
+    // Single request: browser → backend → R2 (no CORS issue)
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("projectId", projectId);
+    formData.append("type", type);
+
+    const res = await fetch(`${API_URL}/files/proxy-upload`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      body: formData,
+      // Do NOT set Content-Type — browser sets multipart boundary automatically
     });
 
-    // Step 2: upload
-    await this.uploadToR2(uploadUrl, file);
+    const data = await handleResponse<{ fileUrl: string; fileKey: string }>(res);
 
-    // Step 3: save in DB
-    const fileData: FileData = { url, key };
-
-    await this.saveFile({
-      projectId,
-      type,
-      file: fileData,
-      fileSize: file.size,
-    });
-
-    return fileData;
+    return { url: data.fileUrl, key: data.fileKey };
   },
 
   // ================= 5. DELETE =================
@@ -430,7 +425,7 @@ export const mediaApi = {
     return handleResponse(res);
   },
 
-  // ================= 6. REPLACE =================
+  // ================= 6. REPLACE (proxy-based) =================
   async replaceFile(params: {
     projectId: string;
     type: "cover" | "brochure";
@@ -439,32 +434,24 @@ export const mediaApi = {
   }): Promise<FileData> {
     const { projectId, type, oldKey, file } = params;
 
-    // upload new file
-    const { uploadUrl, key, url } = await this.getUploadUrl({
-      fileName: file.name,
-      fileType: file.type,
-      projectId,
-      type,
-    });
+    // Step 1: Upload the new file via proxy
+    const newFile = await this.uploadAndSave({ file, projectId, type });
 
-    await this.uploadToR2(uploadUrl, file);
-
-    const newFile: FileData = { url, key };
-
-    // tell backend to replace
-    const res = await fetch(`${API_URL}/files/replace-file`, {
-      ...COMMON_FETCH_OPTIONS,
-      method: "PUT",
-      headers: getAuthHeaders(),
-      body: JSON.stringify({
-        projectId,
-        type,
-        oldKey,
-        newFile,
-      }),
-    });
-
-    await handleResponse(res);
+    // Step 2: Delete the old file from R2 + DB
+    if (oldKey) {
+      const res = await fetch(`${API_URL}/files/replace-file`, {
+        ...COMMON_FETCH_OPTIONS,
+        method: "PUT",
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          projectId,
+          type,
+          oldKey,
+          newFile,
+        }),
+      });
+      await handleResponse(res);
+    }
 
     return newFile;
   },
