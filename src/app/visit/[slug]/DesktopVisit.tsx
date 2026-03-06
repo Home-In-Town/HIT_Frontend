@@ -38,12 +38,7 @@ type DesktopVisitProps = {
   onSatelliteView: () => void;
   on3DView: () => void;
   onStreetView: () => void;
-  //  Neighborhood
-  neighborhoodBtnRef: React.RefObject<HTMLDivElement | null>;
-  showNeighborhoodMenu: boolean;
-  dropdownPos: { top: number; left: number };
-  onNeighborhoodToggle: () => void;
-  onNeighborhoodSelect: (key: string) => void;
+
   //  map props
   mapRef: React.RefObject<any>;
   hasCoordinates: boolean;
@@ -95,12 +90,6 @@ export default function DesktopVisit({
   onStreetView,
   onMapView,
   onSatelliteView,
-  
-  neighborhoodBtnRef,
-  showNeighborhoodMenu,
-  dropdownPos,
-  onNeighborhoodToggle,
-  onNeighborhoodSelect,
 
   mapRef,
   hasCoordinates,
@@ -691,79 +680,9 @@ const BrochureSection = dynamic(
                 <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Virtual View
               </button>
-                          {/* NEIGHBORHOOD BUTTON + DROPDOWN */}
-                          <div ref={neighborhoodBtnRef} className="relative shrink-0">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onNeighborhoodToggle();
-                }}
-                className="
-                  flex shrink-0 items-center gap-2
-                  rounded-full
-                  bg-[#3E5F16]
-                  px-4 py-2
-                  text-xs sm:text-sm
-                  font-medium text-white
-                  shadow-sm
-                  hover:bg-[#365312]
-                  transition
-                "
-              >
-                <MapPin className="h-4 w-4" />
-                Neighborhood
-              </button>
+                       
             </div>
-
-            </div>
-            {showNeighborhoodMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="
-                  fixed z-[9999]
-                  w-40
-                  bg-white
-                  rounded-xl
-                  shadow-2xl
-                  border border-gray-200
-                  p-2
-                  flex flex-col gap-1
-                "
-                style={{
-                  top: dropdownPos.top,
-                  left: dropdownPos.left,
-                }}
-              >
-                {[
-                  { label: "Hospitals", key: "hospital" },
-                  { label: "Market", key: "market" },
-                  { label: "Restaurants", key: "restaurant" },
-                  { label: "Metro", key: "metro" },
-                  { label: "Schools", key: "school" },
-                ].map((item) => (
-                  <button
-                    key={item.key}
-                    onClick={() => onNeighborhoodSelect(item.key)}
-                    className="
-                      flex items-center justify-between
-                      px-3 py-2
-                      rounded-lg
-                      text-sm
-                      font-medium
-                      text-gray-700
-                      hover:bg-[#3E5F16]
-                      hover:text-white
-                      transition
-                    "
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </motion.div>
-            )}
+            
    
             
       

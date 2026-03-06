@@ -87,9 +87,6 @@ const ProjectMap = forwardRef(
       focusOnly,
       drawingMode,
       drawingType,
-      logo,
-      sqft,
-      bhk,
       onMarkerClick,
       onDrawerData,
       onPlotSelect,
@@ -105,9 +102,12 @@ const getNeighborhoodIcon = (type: string): google.maps.Icon => {
     school: "M12 2L2 7l10 5 10-5-10-5zm0 7L2 4v10l10 5 10-5V4l-10 5z",
     university: "M2 10l10-5 10 5-10 5-10-5zm0 4l10 5 10-5",
     shopping_mall: "M4 6h16l-2 12H6L4 6zm4-3h8v3H8V3z",
-    restaurant: "M6 2v8M10 2v8M6 6h4M14 2v16",
+    restaurant: "M3 2h2v10H3zM7 2h2v10H7zM11 2h2v10h-2zM15 2h2v16h-2z",
     park: "M12 2C8 2 6 6 6 8c0 2 2 4 6 4s6-2 6-4c0-2-2-6-6-6zm0 10v10",
     subway_station: "M6 2h12v12H6zM8 16l-2 4m10-4l2 4",
+    gas_station: "M6 2h10v14H6zM16 6h4v10h-4",
+    bus_station: "M4 4h16v10H4zM6 14l-2 4m12-4l2 4",
+    train_station: "M6 2h12v12H6zM8 16l-2 4m10-4l2 4",
   };
 
   const path = iconPaths[type] || iconPaths.park;
@@ -157,7 +157,20 @@ const categoryMap: Record<string, string> = {
   restaurant: "restaurant",
   metro: "subway_station",
   school: "school",
+  petrol: "gas_station",
+  bus: "bus_station",
+  railway: "train_station",
 };
+const neighborhoodFilters = [
+  { key: "school", label: "Schools" },
+  { key: "hospital", label: "Hospitals" },
+  { key: "market", label: "Malls" },
+  { key: "restaurant", label: "Restaurants" },
+  { key: "metro", label: "Metro" },
+  { key: "petrol", label: "Petrol Pumps" },
+  { key: "bus", label: "Bus Stand" },
+  { key: "railway", label: "Railway" },
+]
 const [landmarkSearch, setLandmarkSearch] = useState("");
 const [history, setHistory] = useState<MapEntity[][]>([]);
 const [redoStack, setRedoStack] = useState<MapEntity[][]>([]);
@@ -199,16 +212,6 @@ const clientMarkerRef = useRef<google.maps.Marker | null>(null);
 const projectMarkerRef = useRef<google.maps.Marker | null>(null);
 const routePolylineRef = useRef<google.maps.Polyline | null>(null);
 const [drawMenuOpen, setDrawMenuOpen] = useState(false);
-
-  const drawingsRef = useRef<MapOverlay[]>([]);
-const selectedShapeRef = useRef<MapOverlay | null>(null);
-
-  const clearSelection = () => {
-  if (selectedShapeRef.current) {
-    selectedShapeRef.current.setEditable(false);
-    selectedShapeRef.current = null;
-  }
-};
   const landmarkLinesRef = useRef<google.maps.Polyline[]>([]);
 const landmarkLabelsRef = useRef<google.maps.OverlayView[]>([]);
   const mapCenter = useMemo(() => ({ lat, lng }), [lat, lng]);
@@ -355,6 +358,7 @@ useEffect(() => {
   routePolylineRef.current = null;
 };
 
+
 const loadNeighborhood = (category: string) => {
   clearNavigation();
 
@@ -370,114 +374,84 @@ const loadNeighborhood = (category: string) => {
     focusedProject.longitude!
   );
 
-  // 👉 Get user location
-  navigator.geolocation.getCurrentPosition((pos) => {
-    const clientLoc = new google.maps.LatLng(
-      pos.coords.latitude,
-      pos.coords.longitude
-    );
+  // center map on project
+  map.panTo(projectLoc);
+  map.setZoom(14);
 
-    // =========================
-    // BIG CLIENT PIN
-    // =========================
-    clientMarkerRef.current = new google.maps.Marker({
-      position: clientLoc,
-      map,
-      title: "Your Location",
-      icon: {
-    url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-    scaledSize: new google.maps.Size(40, 40),
-  },
-    });
+  // =========================
+  // NEIGHBORHOOD PLACES ONLY
+  // =========================
+  const service = new google.maps.places.PlacesService(map);
 
-    // =========================
-    // PROJECT FLAG
-    // =========================
-    projectMarkerRef.current = new google.maps.Marker({
-      position: projectLoc,
-      map,
-      title: "Project",
-      icon: destinationIcon,
-    });
+  const request: google.maps.places.PlaceSearchRequest = {
+    location: projectLoc,
+    radius: 2500,
+    type: categoryMap[category] as any,
+  };
 
-    // =========================
-    // ROUTE LINE
-    // =========================
-    const directionsService = new google.maps.DirectionsService();
+  service.nearbySearch(request, (results, status) => {
+    if (status !== google.maps.places.PlacesServiceStatus.OK || !results)
+      return;
 
-    directionsService.route(
-      {
-        origin: clientLoc,
-        destination: projectLoc,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status !== "OK" || !result) return;
-
-        const path = result.routes[0].overview_path;
-
-        routePolylineRef.current = new google.maps.Polyline({
-          path,
-          strokeColor: "#2563eb",
-          strokeWeight: 6,
-          icons: [
-            {
-              icon: {
-                path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-                scale: 4,
-                strokeColor: "#1d4ed8",
-              },
-              repeat: "50px",
-            },
-          ],
-          map,
-        });
-
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(clientLoc);
-        bounds.extend(projectLoc);
-        map.fitBounds(bounds);
-      }
-    );
-
-    // =========================
-    // NEIGHBORHOOD PLACES
-    // =========================
-    const service = new google.maps.places.PlacesService(map);
-
-    const request: google.maps.places.PlaceSearchRequest = {
-      location: projectLoc,
-      radius: 2500,
-      type: categoryMap[category] as any,
-    };
-
-    service.nearbySearch(request, (results, status) => {
-      if (status !== google.maps.places.PlacesServiceStatus.OK || !results)
-        return;
-
-      results.forEach(place => {
-        const marker = new google.maps.Marker({
-          map,
-          position: place.geometry!.location!,
-          title: place.name,
-          icon: getNeighborhoodIcon(category),
-        });
-
-         const info = new google.maps.InfoWindow({
-          content: `
-            <strong>${place.name}</strong><br/>
-            ${category}
-          `,
-        });
-
-        marker.addListener("click", () => {
-          info.open(map, marker);
-        });
-        neighborhoodMarkersRef.current.push(marker);
+    results.forEach((place) => {
+      const marker = new google.maps.Marker({
+        map,
+        position: place.geometry!.location!,
+        title: place.name,
+        icon: getNeighborhoodIcon(category),
       });
+
+      const info = new google.maps.InfoWindow({
+        content: `
+          <strong>${place.name}</strong><br/>
+          ${category}
+        `,
+      });
+
+      marker.addListener("click", () => {
+        info.open(map, marker);
+      });
+
+      neighborhoodMarkersRef.current.push(marker);
     });
   });
 };
+useEffect(() => {
+  if (!isLoaded || !focusedProject) return;
+
+  const handleHash = () => {
+    const hash = window.location.hash.replace("#", "");
+
+    if (!hash) return;
+
+    const allowed = [
+      "hospital",
+      "school",
+      "restaurant",
+      "metro",
+      "market",
+      "petrol",
+      "bus",
+      "railway",
+    ];
+
+    if (allowed.includes(hash)) {
+      setTimeout(() => {
+        loadNeighborhood(hash);
+      }, 200);
+    }
+  };
+
+  // run once when map + project ready
+  handleHash();
+
+  window.addEventListener("hashchange", handleHash);
+
+  return () => {
+    window.removeEventListener("hashchange", handleHash);
+  };
+}, [isLoaded, focusedProject]);
+
 const filteredLandmarks = useMemo(() => {
   if (!landmarkSearch.trim()) return availableLandmarks;
 
@@ -961,89 +935,11 @@ editBoundary: () => {
       focusedProject.longitude!
     );
 
-    // =============================
-    // CLIENT BIG PIN
-    // =============================
-    const clientMarker = new google.maps.Marker({
-  position: clientLoc,
-  map,
-  title: "Your Location",
-   icon: {
-    url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png",
-    scaledSize: new google.maps.Size(40, 40),
-  },
-});
+    map.panTo(projectLoc);
+    map.setZoom(14);
 
-clientMarkerRef.current = clientMarker;
-
-
-    // =============================
-    // DESTINATION FLAG
-    // =============================
-    // =============================
-
-    projectMarkerRef.current = new google.maps.Marker({
-      position: projectLoc,
-      map,
-      title: "Project",
-      icon: destinationIcon,
-    });
-
-    (window as any).neighborhoodMarkers.push(clientMarker, projectMarkerRef.current);
-
-
-    // =============================
-    // DIRECTIONS ROUTE + ARROWS
-    // =============================
-    const directionsService = new google.maps.DirectionsService();
-
-    directionsService.route(
-      {
-        origin: clientLoc,
-        destination: projectLoc,
-        travelMode: google.maps.TravelMode.DRIVING,
-      },
-      (result, status) => {
-        if (status !== "OK" || !result) return;
-
-        const path = result.routes[0].overview_path;
-
-        const arrowSymbol = {
-          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          scale: 4,
-          strokeColor: "#1d4ed8",
-        };
-
-        const routeLine = new google.maps.Polyline({
-          path,
-          strokeColor: "#2563eb",
-          strokeOpacity: 1,
-          strokeWeight: 6,
-          icons: [
-            {
-              icon: arrowSymbol,
-              offset: "0%",
-              repeat: "50px",
-            },
-          ],
-          map,
-        });
-
-        routePolylineRef.current = routeLine;
-
-        (window as any).neighborhoodMarkers.push(routeLine);
-
-        // Fit bounds
-        const bounds = new google.maps.LatLngBounds();
-        bounds.extend(clientLoc);
-        bounds.extend(projectLoc);
-        map.fitBounds(bounds);
-      }
-    );
-
-    // =============================
+   
     // NEIGHBORHOOD HIGHLIGHTS
-    // =============================
     const service = new google.maps.places.PlacesService(map);
 
     const placeTypes = [
@@ -1297,24 +1193,6 @@ const fetchNearbyLandmarks = async () => {
   if (!isLoaded) return <div>Loading map…</div>;
 
 
-const getPolygonBounds = (
-  paths: google.maps.LatLngLiteral[]
-): google.maps.LatLngBoundsLiteral => {
-
-  const bounds = new google.maps.LatLngBounds();
-
-  paths.forEach(p => bounds.extend(p));
-
-  const ne = bounds.getNorthEast();
-  const sw = bounds.getSouthWest();
-
-  return {
-    north: ne.lat(),
-    east: ne.lng(),
-    south: sw.lat(),
-    west: sw.lng(),
-  };
-};
 const updateEntities = (newState: MapEntity[]) => {
   setHistory(prev => [...prev, mapEntities]);
   setRedoStack([]);
@@ -1433,6 +1311,61 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
     onSearch={applySearch}
     noResults={searchAttempted && visibleProjects.length === 0}
   />
+ {/* Neighborhood Filters */}
+<div className="absolute top-[60px] left-0 right-0 z-30 px-3">
+  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
+
+    {/* Clear button */}
+    <button
+      onClick={() => {
+        clearNeighborhoodMarkers();
+        setNeighborhoodType(null);
+      }}
+      className="
+        flex items-center gap-1
+        px-4 py-1.5
+        rounded-full
+        text-sm font-medium
+        bg-white text-gray-700
+        border border-gray-200
+        shadow-sm
+        hover:bg-gray-100
+        active:scale-95
+        transition
+        whitespace-nowrap
+      "
+    >
+      Clear
+    </button>
+
+    {neighborhoodFilters.map((f) => (
+      <button
+        key={f.key}
+        onClick={() => loadNeighborhood(f.key)}
+        className={`
+          flex items-center gap-1
+          px-4 py-1.5
+          rounded-full
+          text-sm font-medium
+          border
+          shadow-sm
+          whitespace-nowrap
+          transition
+          active:scale-95
+          
+          ${
+            neighborhoodType === f.key
+              ? "bg-black text-white border-black"
+              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
+          }
+        `}
+      >
+        {f.label}
+      </button>
+    ))}
+
+  </div>
+</div>
 </div>
 
  

@@ -104,10 +104,10 @@ export function transformBackendToFrontend(backendProject: any): Project {
     facingOptions: backendProject.configuration?.facingOptions ?? backendProject.facingOptions ?? [],
     gatedCommunity: backendProject.configuration?.gatedCommunity ?? backendProject.gatedCommunity ?? false,
     amenities: backendProject.amenities || [],
-    coverImage: backendProject.media?.coverImage ?? backendProject.coverImage ?? '',
-    galleryImages: backendProject.media?.galleryImages ?? backendProject.galleryImages ?? [],
-    videos: backendProject.media?.videos ?? backendProject.videos ?? [],
-    brochureUrl: backendProject.media?.brochurePdf ?? backendProject.brochureUrl ?? '',
+    coverImage: backendProject.media?.coverImage ?? null,
+    galleryImages: backendProject.media?.galleryImages ?? [],
+    videos: backendProject.media?.videos ?? [],
+    brochureUrl: backendProject.media?.brochurePdf ?? null,
     ctaButtonText: backendProject.cta?.buttonText ?? backendProject.ctaButtonText ?? 'Contact Us',
     whatsappNumber: backendProject.cta?.whatsappNumber ?? backendProject.whatsappNumber ?? '',
     callNumber: backendProject.cta?.callNumber ?? backendProject.callNumber ?? '',
@@ -154,10 +154,10 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
     amenities: project.amenities,
 
     media: {
-      coverImage: project.coverImage,
-      galleryImages: project.galleryImages,
-      videos: project.videos,
-      brochurePdf: project.brochureUrl,
+      ...(project.coverImage && { coverImage: project.coverImage }),
+      ...(project.galleryImages?.length && { galleryImages: project.galleryImages }),
+      ...(project.videos?.length && { videos: project.videos }),
+      ...(project.brochureUrl && { brochurePdf: project.brochureUrl })
     },
 
     cta: {
@@ -282,6 +282,7 @@ export const projectsApi = {
       trackableLink: result.publicUrl || `/visit/${result.slug}`,
     };
   },
+
   async uploadBrochure(file: File): Promise<{ url: string }> {
     const formData = new FormData();
     formData.append("brochure", file);
@@ -310,6 +311,164 @@ export const projectsApi = {
   }
 };
 
+type MediaType = "cover" | "gallery" | "video" | "brochure";
+
+export type FileData = {
+  url: string;
+  key: string;
+};
+
+export const mediaApi = {
+  // ================= 1. GET SIGNED URL =================
+  async getUploadUrl(params: {
+    fileName: string;
+    fileType: string;
+    projectId: string;
+    type: MediaType;
+  }): Promise<{
+    uploadUrl: string;
+    key: string;
+    url: string;
+  }> {
+    const res = await fetch(`${API_URL}/files/get-upload-url`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params),
+    });
+
+    const data = await handleResponse<{
+      uploadUrl: string;
+      fileKey: string;
+      fileUrl: string;
+    }>(res);
+
+    return {
+      uploadUrl: data.uploadUrl,
+      key: data.fileKey,
+      url: data.fileUrl,
+    };
+  },
+
+  // ================= 2. DIRECT UPLOAD =================
+  async uploadToR2(uploadUrl: string, file: File) {
+    const res = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type,
+      },
+      body: file,
+    });
+
+    if (!res.ok) {
+      throw new Error("R2 upload failed");
+    }
+  },
+
+  // ================= 3. SAVE FILE =================
+  async saveFile(params: {
+    projectId: string;
+    type: MediaType;
+    file: FileData;
+    fileSize: number;
+  }) {
+    const res = await fetch(`${API_URL}/files/save-file`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params),
+    });
+
+    return handleResponse(res);
+  },
+
+  // ================= 4. MAIN FUNCTION (USE THIS EVERYWHERE) =================
+  async uploadAndSave(params: {
+    file: File;
+    projectId: string;
+    type: MediaType;
+  }): Promise<FileData> {
+    const { file, projectId, type } = params;
+
+    // Step 1: signed URL
+    const { uploadUrl, key, url } = await this.getUploadUrl({
+      fileName: file.name,
+      fileType: file.type,
+      projectId,
+      type,
+    });
+
+    // Step 2: upload
+    await this.uploadToR2(uploadUrl, file);
+
+    // Step 3: save in DB
+    const fileData: FileData = { url, key };
+
+    await this.saveFile({
+      projectId,
+      type,
+      file: fileData,
+      fileSize: file.size,
+    });
+
+    return fileData;
+  },
+
+  // ================= 5. DELETE =================
+  async deleteFile(params: {
+    projectId: string;
+    type: MediaType;
+    key: string;
+  }) {
+    const res = await fetch(`${API_URL}/files/delete-file`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "DELETE",
+      headers: getAuthHeaders(),
+      body: JSON.stringify(params),
+    });
+
+    return handleResponse(res);
+  },
+
+  // ================= 6. REPLACE =================
+  async replaceFile(params: {
+    projectId: string;
+    type: "cover" | "brochure";
+    oldKey: string;
+    file: File;
+  }): Promise<FileData> {
+    const { projectId, type, oldKey, file } = params;
+
+    // upload new file
+    const { uploadUrl, key, url } = await this.getUploadUrl({
+      fileName: file.name,
+      fileType: file.type,
+      projectId,
+      type,
+    });
+
+    await this.uploadToR2(uploadUrl, file);
+
+    const newFile: FileData = { url, key };
+
+    // tell backend to replace
+    const res = await fetch(`${API_URL}/files/replace-file`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "PUT",
+      headers: getAuthHeaders(),
+      body: JSON.stringify({
+        projectId,
+        type,
+        oldKey,
+        newFile,
+      }),
+    });
+
+    await handleResponse(res);
+
+    return newFile;
+  },
+};
 
 export interface Landmark {
   placeId: string;
@@ -340,6 +499,7 @@ export async function saveProjectLandmarks(projectId: string, landmarks: Landmar
   const data = await res.json();
   return data.landmarks as Landmark[];
 }
+
 // ==============================
 // Types
 // ==============================

@@ -32,19 +32,6 @@ import AmenitiesSection from "@/components/public/AmenitiesSection";
 import { buildMediaItems } from "@/utils/buildMediaItems";
 import MediaGallery from "@/components/public/MediaGallery";
 
-const getAmenityIcon = (amenity: string) => {
-  const key = amenity.toLowerCase();
-
-  if (key.includes('gym')) return <Dumbbell size={14} />;
-  if (key.includes('pool')) return <Waves size={14} />;
-  if (key.includes('garden') || key.includes('park')) return <Trees size={14} />;
-  if (key.includes('security')) return <ShieldCheck size={14} />;
-  if (key.includes('parking')) return <Car size={14} />;
-  if (key.includes('power') || key.includes('backup')) return <Zap size={14} />;
-  if (key.includes('kids')) return <Baby size={14} />;
-
-  return <Home size={14} />; // fallback
-};
 
 export default function VisitProjectPage() {
   const params = useParams();
@@ -68,7 +55,7 @@ const sectionRefs = {
     ? decodeURIComponent(rawSlug).toLowerCase().trim()
     : null;
 
-  
+  const [pendingHash, setPendingHash] = useState<string | null>(null);
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -154,26 +141,107 @@ useEffect(() => {
 const { handleCallClick, handleWhatsAppClick, handleFormSubmit } = useTracking({
   projectId: project?.id || '', // empty string until project loads
 });
-useEffect(() => {
-  if (project) {
-    setOpen(true);
-  }
-}, [project]);
-
+const mapHashes = [
+  "direction",
+  "map",
+  "satellite",
+  "threeD",
+  "street",
+  "hospital",
+  "market",
+  "restaurant",
+  "metro",
+  "school",
+  "petrol",
+  "bus",
+  "railway",
+];
 useEffect(() => {
   if (!project) return;
 
-  const hash = window.location.hash; // #amenities
+  const hash = window.location.hash.replace("#", "");
 
-  if (hash) {
-    const el = document.querySelector(hash);
-    if (el) {
-      setTimeout(() => {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 300); // wait for render
-    }
+  const isMapAction = mapHashes.includes(hash);
+
+  if (!isMapAction) {
+    setOpen(true); // normal behaviour
+  } else {
+    setOpen(false); // map link → keep closed
   }
 }, [project]);
+useEffect(() => {
+  const scrollToHash = () => {
+    const hash = window.location.hash.replace("#", "");
+    if (!hash) return;
+
+    const container = scrollRef.current;
+    if (!container) return;
+
+    const el = container.querySelector(`#${hash}`) as HTMLElement;
+    if (!el) return;
+
+    container.scrollTo({
+      top: el.offsetTop - 60, // offset for navbar
+      behavior: "smooth",
+    });
+  };
+
+  // wait until drawer opens
+  if (open) {
+    setTimeout(scrollToHash, 300);
+  }
+
+  window.addEventListener("hashchange", scrollToHash);
+
+  return () => {
+    window.removeEventListener("hashchange", scrollToHash);
+  };
+}, [project, open]);
+const handleMapHash = () => {
+  if (!mapRef.current) return;
+
+  const hash = window.location.hash.replace("#", "");
+
+  switch (hash) {
+    case "direction":
+      mapRef.current?.getDirections();
+      break;
+
+    case "map":
+      mapRef.current?.setMapView();
+      break;
+
+    case "satellite":
+      mapRef.current?.setSatelliteView();
+      break;
+
+    case "threeD":
+      mapRef.current?.set3DView();
+      break;
+
+    case "street":
+      mapRef.current?.toggleStreetView();
+      break;
+
+    case "hospital":
+    case "market":
+    case "restaurant":
+    case "metro":
+    case "school":
+    case "petrol":
+    case "bus":
+    case "railway":
+      mapRef.current?.setNeighborhoodFilter(hash);
+      break;
+  }
+};
+useEffect(() => {
+  if (!project) return;
+
+  setTimeout(() => {
+    handleMapHash();
+  }, 600); // wait for map to mount
+}, [project, mapDrawerOpen]);
   // ⏳ Loading
   if (loading) {
     return (
@@ -440,28 +508,6 @@ const handleStreetView = () => {
   mapRef.current?.toggleStreetView();
 };
 
-const handleNeighborhoodView = () => {
-  mapRef.current?.setNeighborhoodView();
-};
-
-
-const handleNeighborhoodToggle = () => {
-  const rect = neighborhoodBtnRef.current?.getBoundingClientRect();
-
-  const DROPDOWN_HEIGHT = 220; // slightly larger for safety
-  if(!rect) return;
-  setDropdownPos({
-    top: rect.top - DROPDOWN_HEIGHT - 8,
-    left: rect.left,
-  });
-  setShowNeighborhoodMenu(prev => !prev);
-};
-
-const handleNeighborhoodSelect = (key: string) => {
-  mapRef.current?.setNeighborhoodFilter(key);
-  setShowNeighborhoodMenu(false);
-};
-
 
   return (
     <>
@@ -484,11 +530,6 @@ const handleNeighborhoodSelect = (key: string) => {
         onSatelliteView={handleSatelliteView}
         onStreetView={handleStreetView}
         
-        neighborhoodBtnRef={neighborhoodBtnRef}
-        showNeighborhoodMenu={showNeighborhoodMenu}
-        dropdownPos={dropdownPos}
-        onNeighborhoodToggle={handleNeighborhoodToggle}
-        onNeighborhoodSelect={handleNeighborhoodSelect}
 
       // 🔥 DRAWER SYNC
       drawerProjects={drawerProjects}
@@ -915,99 +956,19 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 Virtual View
               </button>
-              {/* NEIGHBORHOOD BUTTON + DROPDOWN */}
-              <div ref={neighborhoodBtnRef} className="relative shrink-0">
-
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-
-                    const rect = neighborhoodBtnRef.current?.getBoundingClientRect();
-
-                    if (rect) {
-                      setDropdownPos({
-                        top: rect.bottom + 6,
-                        left: rect.left,
-                      });
-                    }
-
-                    setShowNeighborhoodMenu(prev => !prev);
-                  }}
-
-
-                  className="flex items-center justify-center gap-1
-                            rounded-full bg-[#3E5F16] px-3 py-1.5
-                            text-[10px] sm:text-[11px]
-                            font-medium text-white shadow-sm"
-                >
-                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                  Neighborhood
-                </button>
-
-                
-              </div>
+              
 
             </div>
 
-            {showNeighborhoodMenu && (
-              <div
-                className="
-                  fixed z-[9999]
-                  w-25
-                  bg-white
-                  rounded-xl
-                  shadow-xl border border-gray-200
-                  p-1.5
-                  flex flex-col gap-1
-                  max-h-56 overflow-y-auto
-                "
-                style={{
-                  top: dropdownPos.top,
-                  left: dropdownPos.left,
-                }}
-              >
-                {[
-                  { label: "Hospitals", key: "hospital" },
-                  { label: "Market", key: "market" },
-                  { label: "Restaurant", key: "restaurant" },
-                  { label: "Metro", key: "metro" },
-                  { label: "Schools", key: "school" },
-                ].map(item => (
-                  <button
-                    key={item.key}
-                    onClick={(e) => {
-                      e.stopPropagation();
-
-                      closeProjectDetails();          // ⭐ close panel first
-                      mapRef.current?.setNeighborhoodFilter(item.key);
-
-                      setShowNeighborhoodMenu(false);
-                    }}
-
-                    className="
-                      w-[50px] text-left
-                      px-3 py-2
-                      rounded-lg
-                      text-[11px]
-                      font-medium
-                      text-gray-700
-                      hover:bg-[#3E5F16] hover:text-white
-                      transition
-                    "
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            )}
+            
 
 
-      </div>
-      <div id="gallery">
-        <MediaGallery items={mediaItems} project={project} variant="mobile" />
-      </div>
+        </div>
+        <div id="gallery">
+          <MediaGallery items={mediaItems} project={project} variant="mobile" />
+        </div>
     
-  {/* ✅ CTA ALWAYS visible */}
+       {/* ✅ CTA ALWAYS visible */}
           {CTAButtons}  
 
   
