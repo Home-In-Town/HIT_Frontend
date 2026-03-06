@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { organizationsApi, Organization, usersApi } from '@/lib/api';
+import { organizationsApi, Organization, usersApi, getLeadGenUrl } from '@/lib/api';
 import toast, { Toaster } from 'react-hot-toast';
 
 export default function AgentDashboardPage() {
@@ -29,7 +29,7 @@ export default function AgentDashboardPage() {
   async function handleGenerateLead() {
     try {
       const { token } = await usersApi.getSsoToken();
-      const leadGenUrl = "https://www.oneemployee.in"; 
+      const leadGenUrl = getLeadGenUrl();
       window.location.href = `${leadGenUrl}/sso?token=${token}`;
     } catch (error) {
       console.error('SSO Failed:', error);

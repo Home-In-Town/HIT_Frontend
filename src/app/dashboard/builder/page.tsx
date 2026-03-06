@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { usersApi, projectsApi } from '@/lib/api';
+import { usersApi, projectsApi, getLeadGenUrl } from '@/lib/api';
 import { Project } from '@/types/project';
 import toast, { Toaster } from 'react-hot-toast';
 
@@ -29,9 +29,8 @@ export default function BuilderDashboardPage() {
   async function handleGenerateLead() {
     try {
       const { token } = await usersApi.getSsoToken();
-      // Use window.location.href for external redirect
-      // In production you might want to use an env variable for the leadgen URL
-      const leadGenUrl = "https://www.oneemployee.in"; 
+      // Use centralized utility for environment-aware redirect
+      const leadGenUrl = getLeadGenUrl();
       window.location.href = `${leadGenUrl}/sso?token=${token}`;
     } catch (error) {
       console.error('SSO Failed:', error);

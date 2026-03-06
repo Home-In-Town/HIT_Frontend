@@ -1,5 +1,11 @@
 // API Service for Dynamic Sales Website
 
+export function getLeadGenUrl() {
+  if (typeof window === 'undefined') return "https://www.oneemployee.in";
+  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
+}
+
 import { Project, ProjectFormData } from '@/types/project';
 
 //const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
@@ -277,7 +283,32 @@ export const projectsApi = {
     };
   },
 
+  async uploadBrochure(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append("brochure", file);
 
+    const headers = getAuthHeaders ? getAuthHeaders() : {};
+
+    // ❌ REMOVE content-type if present
+    delete (headers as any)["Content-Type"];
+
+    const response = await fetch(`${API_URL}/upload/brochure`, {
+      method: "POST",
+      body: formData,
+      headers,
+    });
+
+    if (!response.ok) {
+      let errorMessage = "Upload failed";
+      try {
+        const err = await response.json();
+        errorMessage = err.message || errorMessage;
+      } catch { }
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  }
 };
 
 type MediaType = "cover" | "gallery" | "video" | "brochure";
@@ -679,6 +710,28 @@ export const authApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone, mpin }),
+    });
+    return handleResponse(response);
+  },
+
+  // Forgot MPIN
+  async forgotMpin(phone: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/auth/forgot-mpin`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    return handleResponse(response);
+  },
+
+  // Reset MPIN
+  async resetMpin(phone: string, code: string, newMpin: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/auth/reset-mpin`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, code, newMpin }),
     });
     return handleResponse(response);
   },
