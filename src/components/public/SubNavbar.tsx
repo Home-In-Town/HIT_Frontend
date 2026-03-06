@@ -71,7 +71,7 @@ export default function SubNavbar({
   };
 
   return (
-    <div className="sticky top-0 z-20 bg-white mb-1 relative">
+    <div className="flex items-center relative">
 
       {showLeft && (
         <button
@@ -96,16 +96,24 @@ export default function SubNavbar({
       <div
         ref={navRef}
         onScroll={updateArrows}
-        className="flex gap-3 overflow-x-auto py-2
-                   text-[11px] font-medium scrollbar-hide scroll-smooth"
+        className="flex items-center gap-2 overflow-x-auto
+           h-7
+           text-[10px] font-medium
+           scrollbar-hide scroll-smooth"
       >
         {navItems.map(({ label, key }) => (
           <button
             key={key}
             onClick={() => scrollToSection(key)}
-            className="shrink-0 px-3 py-1
-                       hover:bg-[#3E5F16]
-                       hover:text-white transition"
+            className="shrink-0 flex items-center
+           rounded-full border border-[#3E5F16]
+           px-2.5 h-5
+           text-[10px] font-medium
+           text-white
+           bg-[#3E5F16]
+           hover:bg-[#3E5F16]
+           hover:text-white
+           transition"
           >
             {label}
           </button>

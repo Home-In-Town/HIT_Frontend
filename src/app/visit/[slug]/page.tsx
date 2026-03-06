@@ -2,7 +2,7 @@
 
 //sales-website-private-dev\frontend\src\app\visit\[slug]\page.tsx
 'use client';
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import DesktopVisit from './DesktopVisit';
 import { useParams, notFound } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -377,71 +377,46 @@ const CTAButtons = (
                shadow-[0_-4px_12px_rgba(0,0,0,0.06)]
                pb-[env(safe-area-inset-bottom)]"
   >
-    <div className="grid gap-1.5">
+    <div className="grid grid-cols-3 gap-1.5">
 
-      {/* ROW 1 — CALL + WHATSAPP */}
-      <div className={`grid gap-1.5 ${
-        project.brochureUrl ? "grid-cols-3" : "grid-cols-2"
-      }`}>
+      {/* CALL */}
+      <button
+        onClick={handleCall}
+        disabled={isCalling}
+        className="rounded-md border border-[#3E5F16] py-1.5
+                   text-[10px] font-semibold text-[#3E5F16]
+                   transition disabled:opacity-60"
+      >
+        {isCalling ? "Calling…" : "Call"}
+      </button>
 
-        {/* CALL */}
-        <button
-          onClick={handleCall}
-          disabled={isCalling}
-          className="rounded-md border border-[#3E5F16] py-1.5
-                    text-[10px] font-semibold text-[#3E5F16]
-                    transition disabled:opacity-60"
-        >
-          {isCalling ? 'Calling…' : 'Call'}
-        </button>
+      {/* WHATSAPP */}
+      <button
+        onClick={handleWhatsApp}
+        className="flex items-center justify-center gap-1
+                   rounded-md border border-[#3E5F16]
+                   bg-white py-1.5 px-2
+                   text-[10px] font-semibold text-[#3E5F16]
+                   hover:bg-[#25D366]/10
+                   transition"
+      >
+        <FaWhatsapp className="text-sm" />
+        WhatsApp
+      </button>
 
-        {/* WHATSAPP */}
-        <button
-          onClick={handleWhatsApp}
-          className="flex items-center justify-center gap-1
-                     rounded-md border border-[#3E5F16]
-                     bg-white py-1.5 px-2
-                     text-[10px] font-semibold text-[#3E5F16]
-                     hover:bg-[#25D366]/10
-                     transition"
-        >
-          <FaWhatsapp className="text-sm" />
-          WhatsApp
-        </button>
-
-        {/* BROCHURE */}
-        {project.brochureUrl && (
-          <button
-            onClick={downloadBrochure}
-            className="
-              rounded-md border border-[#3E5F16]
-              py-1.5 text-[10px] font-semibold
-              text-[#3E5F16]
-              hover:bg-[#3E5F16]/10
-              transition
-            "
-          >
-            Brochure
-          </button>
-        )}
-
-      </div>
-     
-
-      {/* ROW 2 — BOOK SITE VISIT */}
+      {/* BOOK SITE VISIT */}
       <button
         onClick={handleFormOpen}
-        className="w-full rounded-md bg-[#3E5F16] py-1.5
+        className="rounded-md bg-[#3E5F16] py-1.5
                    text-[10px] font-semibold text-white
                    transition"
       >
-        {project.ctaButtonText || 'Book Site Visit'}
+        {project.ctaButtonText || "Book Visit"}
       </button>
 
     </div>
   </div>
 );
-
 
 const isPlot = project.type === "plot";
 type FloorPlan = {
@@ -555,29 +530,6 @@ const handleStreetView = () => {
     </>
   );
 }
-const onDragStart = (e: React.TouchEvent | React.MouseEvent) => {
-  isDragging.current = true;
-
-  startY.current =
-    "touches" in e
-      ? e.touches[0].clientY
-      : e.clientY;
-};
-
-const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-  if (!isDragging.current || !sheetRef.current) return;
-
-  currentY.current =
-    "touches" in e
-      ? e.touches[0].clientY
-      : e.clientY;
-
-  const delta = currentY.current - startY.current;
-
-  if (delta > 0) {
-    sheetRef.current.style.transform = `translateY(${delta}px)`;
-  }
-};
 
 
   return (
@@ -641,26 +593,26 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
           ${open ? "translate-y-0" : "translate-y-full"}
         `}
       >
-        <div className="flex items-center justify-between px-4 pt-3 pb-1 ">
- 
-          <button
-            onClick={closeProjectDetails}
-            className="p-2 rounded-full hover:bg-gray-100 transition"
-          >
-            <ChevronDown className="w-5 h-5 text-gray-700" />
-          </button>
-        </div>
+     
          <div
             ref={scrollRef}
             id="project-details-scroll"
-            className="overflow-y-auto overflow-x-visible  max-h-[80vh] "
+            className="overflow-y-auto overflow-x-visible  max-h-[90vh] "
 
           >
-            <div className="px-4">
-          {/* TOP SECTION: DETAILS */}
-          <div className="flex justify-center">
-            
-            <div className="w-full max-w-md mr-3 text-center">
+           <div className="px-4">
+            {/* TOP SECTION: DETAILS */}
+            <div className="relative pl-4 mt-3 flex justify-start">
+
+              {/* CLOSE BUTTON */}
+              <button
+                onClick={closeProjectDetails}
+                className="absolute right-2 top-2 p-1.5 rounded-full hover:bg-gray-100 transition"
+              >
+                <X className="w-4 h-4 text-gray-700" />
+              </button>
+
+              <div className="w-full max-w-md mr-3 text-left">
               <p className="mt-1 text-[11px] sm:text-[12px] font-medium text-gray-700">
                   {formatStatus(project.projectStatus)}
                 </p> 
@@ -668,7 +620,7 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 {project.name}
               </h1>
 
-             <p className="mt-0.5 text-[11px] sm:text-[12px] text-center">
+             <p className="mt-0.5 text-[11px] sm:text-[12px] ">
               <MapPin className="inline h-3.5 w-3.5 mr-1 -mt-0.5 text-gray-600" />
               {project.location}, {project.city}
             </p>
@@ -695,12 +647,7 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
             
           </div>
           </div>
-          <div className="px-4 mt-3">
-          <SubNavbar
-            scrollContainerRef={scrollRef}
-            sectionRefs={sectionRefs}
-          />
-          </div>
+         
           <div className="px-4">
           {/* PRICE CARD */}
           <div ref={priceRef} className="mt-0.5 relative">
@@ -876,21 +823,21 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
 
             {/* MAP ACTION BUTTONS */}
             <div className="relative mt-4 mb-4">
-             <div className="flex gap-2 overflow-x-auto overflow-y-visible pb-1 scrollbar-hide relative">
-
-
+             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
               {/* DIRECTIONS */}
               <button
                 onClick={() =>  {
                 closeProjectDetails();
                 mapRef.current?.getDirections();}}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <MapPinIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <MapPinIcon className="h-3 w-3" /> */}
                 Directions
               </button>
 
@@ -900,13 +847,15 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                   closeProjectDetails();
                   mapRef.current?.setMapView();
                 }}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Map className="h-3 w-3" /> */}
                 Geographic
               </button>
 
@@ -916,13 +865,15 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                   closeProjectDetails();
                   mapRef.current?.setSatelliteView();
                 }}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Map className="h-3 w-3" /> */}
                 Satellite
               </button>
 
@@ -932,13 +883,15 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 onClick={() => {
                   closeProjectDetails()
                   mapRef.current?.set3DView()}}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Map className="h-3 w-3" /> */}
                 3D View
               </button>
 
@@ -947,16 +900,23 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 onClick={() => {
                   closeProjectDetails()
                   mapRef.current?.toggleStreetView()}}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Eye className="h-3 w-3 " /> */}
                 Virtual View
               </button>
               
+                {/* SUB NAVBAR BUTTONS */}
+                <SubNavbar
+                  scrollContainerRef={scrollRef}
+                  sectionRefs={sectionRefs}
+                />
 
             </div>
 

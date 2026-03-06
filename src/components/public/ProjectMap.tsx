@@ -49,9 +49,10 @@ type Props = {
 };
 type MapEntityType = "project-boundary" | "subplot" | "road";
 
-type PlotStatus = "available" | "sold" | "reserved";
+type PlotStatus = "available" | "booked" | "sold" | "on-hold";
 
 type Facing = "north" | "south" | "east" | "west";
+type RoadType = "lane" | "internal" | "main";
 
 type MapEntity = {
   id: string;
@@ -59,6 +60,7 @@ type MapEntity = {
   geometryType: "polygon" | "polyline";
   path: google.maps.LatLngLiteral[];
 
+  roadType?: RoadType; 
   // plot specific
   status?: PlotStatus;
   plotNumber?: string;
@@ -76,7 +78,18 @@ const containerStyle = {
   width: '100%',
   height: '100%',
 };
-
+const getPlotColor = (status?: PlotStatus) => {
+  switch (status) {
+    case "sold":
+      return "#22c55e"; // green
+    case "booked":
+      return "#ef4444"; // red
+    case "on-hold":
+      return "#eab308"; // yellow
+    default:
+      return "#3b82f6"; // blue (available)
+  }
+};
 
 const ProjectMap = forwardRef(
   (
@@ -198,12 +211,7 @@ const updatePlotStatus = (status: PlotStatus) => {
 const router = useRouter();
 const [availableLandmarks, setAvailableLandmarks] = useState<Landmark[]>([]);
 const [selectedLandmarks, setSelectedLandmarksState] = useState<Landmark[]>([]);
-useEffect(() => {
-  console.log("🎯 SELECTED LANDMARKS STATE UPDATED:", selectedLandmarks);
-}, [selectedLandmarks]);
 const landmarkMarkersRef = useRef<google.maps.Marker[]>([]);
-const [layoutBounds, setLayoutBounds] = useState<any>(null);
-const sourceIcon = 'https://maps.google.com/mapfiles/ms/icons/green-dot.png'; // big map pin
 const destinationIcon = 'https://maps.google.com/mapfiles/ms/icons/red-flag.png'; // flag
 
   const [neighborhoodType, setNeighborhoodType] = useState<string | null>(null);
@@ -358,6 +366,21 @@ useEffect(() => {
   routePolylineRef.current = null;
 };
 
+const getRoadStyle = (type?: RoadType) => {
+  switch (type) {
+    case "lane":
+      return { color: "#9ca3af", width: 2 };
+
+    case "internal":
+      return { color: "#6b7280", width: 3 };
+
+    case "main":
+      return { color: "#374151", width: 4 };
+
+    default:
+      return { color: "#6b7280", width: 3 };
+  }
+};
 
 const loadNeighborhood = (category: string) => {
   clearNavigation();
@@ -1390,6 +1413,7 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
   }}
 >
   {mapEntities.map((entity) => {
+    const style = getRoadStyle(entity.roadType);
 
   if (entity.geometryType === "polygon") {
     return (
@@ -1398,17 +1422,12 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
           paths={entity.path}
           editable={!entity.saved}
           draggable={!entity.saved}
-          options={{
-            fillColor:
-              entity.type === "project-boundary"
-                ? "#111827"
-                : entity.status === "sold"
-                ? "#dc2626"
-                : entity.status === "reserved"
-                ? "#f59e0b"
-                : "#16a34a",
-            fillOpacity: 0.4,
-            strokeWeight: 2,
+            options={{
+            fillColor: getPlotColor(entity.status),
+            fillOpacity: 1,
+            strokeColor: "#111827",
+            strokeWeight: 1,
+            clickable: true,
           }}
           onClick={() => {
             if (entity.type === "subplot") {
@@ -1437,6 +1456,22 @@ const onOverlayComplete = (e: google.maps.drawing.OverlayCompleteEvent) => {
     );
   }
 
+   // ✅ ROAD DRAWING
+  if (entity.geometryType === "polyline") {
+    return (
+      <Polyline
+        key={entity.id}
+        path={entity.path}
+        options={{
+          strokeColor: style.color,
+          strokeOpacity: 1,
+          strokeWeight: style.width,
+          clickable: true,
+          editable: !entity.saved,
+        }}
+      />
+    );
+  }
   if (entity.geometryType === "polyline") {
     return (
       <Polyline

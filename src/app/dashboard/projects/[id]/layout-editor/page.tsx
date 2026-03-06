@@ -1,3 +1,4 @@
+//layout-editor page for project
 'use client';
 
 import { useParams } from 'next/navigation';
@@ -89,7 +90,10 @@ function ToolButton({
         {icon}
       </button>
 
-      <span className="absolute left-full ml-3 top-1/2 -translate-y-1/2 bg-black text-white text-xs px-3 py-1 rounded-md opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-50 pointer-events-none">
+      <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2
+      bg-black text-white text-xs px-3 py-1 rounded-md
+      opacity-0 group-hover:opacity-100 transition
+      whitespace-nowrap z-50 pointer-events-none">
         {label}
       </span>
     </div>
@@ -190,7 +194,7 @@ function ToolButton({
       DRAW TOOLS
     </h2>
 
-    <div className="grid grid-cols-2 gap-3">
+    <div className="grid grid-cols-4 gap-2">
 
       <ToolButton
         icon="🧱"
@@ -312,15 +316,6 @@ function ToolButton({
              onOpenPlotPanel={(id) => setPanelPlotId(id)} 
         />
 
-        {/* Top Header */}
-        <div className="absolute top-4 right-24 z-20 bg-white shadow-xl rounded-xl px-6 py-3">
-          <h1 className="font-semibold text-lg">
-            Plot Layout Editor
-          </h1>
-          <p className="text-xs text-gray-500">
-            Project ID: {projectId}
-          </p>
-        </div>
 
       </div>
       {panelPlotId && (
@@ -371,10 +366,11 @@ function ToolButton({
                     }
                     className="border p-2 w-full rounded text-xs"
                   >
-                    <option value="">Select</option>
-                    <option value="available">Available</option>
-                    <option value="reserved">Reserved</option>
-                    <option value="sold">Sold</option>
+                     <option value="">Select</option>
+                      <option value="available">Available</option>
+                      <option value="booked">Booked</option>
+                      <option value="sold">Sold</option>
+                      <option value="on-hold">On Hold</option>
                   </select>
                 </div>
 
