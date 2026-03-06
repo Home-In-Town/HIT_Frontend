@@ -554,6 +554,28 @@ export const authApi = {
     return handleResponse(response);
   },
 
+  // Forgot MPIN
+  async forgotMpin(phone: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/auth/forgot-mpin`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    return handleResponse(response);
+  },
+
+  // Reset MPIN
+  async resetMpin(phone: string, code: string, newMpin: string): Promise<{ message: string }> {
+    const response = await fetch(`${API_URL}/auth/reset-mpin`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, code, newMpin }),
+    });
+    return handleResponse(response);
+  },
+
   // Logout
   async logout(): Promise<void> {
     const response = await fetch(`${API_URL}/auth/logout`, {

@@ -8,10 +8,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
 import { Phone, Lock, User, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
 
-type Screen = 'phone' | 'mpin' | 'register' | 'otp';
+type Screen = 'phone' | 'mpin' | 'register' | 'otp' | 'reset-mpin';
 
 export default function AuthScreens() {
     const [screen, setScreen] = useState<Screen>('phone');
+    const [isReset, setIsReset] = useState(false);
     const [loading, setLoading] = useState(false);
     
     // Form fields
@@ -91,12 +92,43 @@ export default function AuthScreens() {
         e.preventDefault();
         try {
             setLoading(true);
-            await authApi.verifyOtp(phone, otpCode);
-            toast.success("Verification successful!");
-            await checkAuth();
-            router.push('/dashboard');
+            if (isReset) {
+                if (otpCode.length < 6) return toast.error("Please enter a valid 6-digit OTP");
+                // Do not hit the API yet! Move to the new MPIN screen.
+                setScreen('reset-mpin');
+            } else {
+                await authApi.verifyOtp(phone, otpCode);
+                toast.success("Verification successful!");
+                await checkAuth();
+                router.push('/dashboard');
+            }
         } catch (error: any) {
             toast.error(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const onResetMpinSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            setLoading(true);
+            if (mpin.length < 4) return toast.error("MPIN should be at least 4 digits");
+            if (mpin !== confirmMpin) return toast.error("MPINs do not match");
+
+            await authApi.resetMpin(phone, otpCode, mpin);
+            toast.success("MPIN reset successful! Please login.");
+            setIsReset(false);
+            setMpin('');
+            setConfirmMpin('');
+            setOtpCode('');
+            setScreen('mpin');
+        } catch (error: any) {
+            toast.error(error.message);
+            // If it's an OTP error, let's send them back to the OTP screen
+            if (error.message.toLowerCase().includes('otp')) {
+                setScreen('otp');
+            }
         } finally {
             setLoading(false);
         }
@@ -105,9 +137,9 @@ export default function AuthScreens() {
     const onForgotMpin = async () => {
         try {
             setLoading(true);
-            await authApi.register({ name: userName, phone, mpin: '0000', email }); // Re-triggering register sends OTP for reset too if handled correctly in backend
-            // Or use direct forgot-mpin endpoint
-            // await authApi.forgotMpin(phone);
+            await authApi.forgotMpin(phone);
+            setIsReset(true);
+            setMpin('');
             setScreen('otp');
             toast.success("OTP sent for verification");
         } catch (error: any) {
@@ -322,24 +354,37 @@ export default function AuthScreens() {
                     >
                         <div className="text-center space-y-3">
                             <div className="mx-auto w-20 h-20 bg-[#B45309]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#B45309]/20 shadow-inner">
-                                <ShieldCheck className="w-10 h-10 text-[#B45309]" />
+                                {isReset ? <Lock className="w-10 h-10 text-[#B45309]" /> : <ShieldCheck className="w-10 h-10 text-[#B45309]" />}
                             </div>
-                            <h2 className="text-4xl font-bold text-[#2A2A2A] font-serif tracking-tight">Verify Phone</h2>
-                            <p className="text-[#57534E]">Sent to <span className="text-[#2A2A2A] font-mono font-bold">{phone}</span></p>
+                            <h2 className="text-4xl font-bold text-[#2A2A2A] font-serif tracking-tight">
+                                {isReset ? "Reset MPIN" : "Verify Phone"}
+                            </h2>
+                            <p className="text-[#57534E]">
+                                {isReset ? "Enter OTP sent to" : "Sent to"} <span className="text-[#2A2A2A] font-mono font-bold">{phone}</span>
+                            </p>
                         </div>
 
-                        <input 
-                            type="text"
-                            maxLength={6}
-                            placeholder="000000"
-                            value={otpCode}
-                            onChange={(e) => setOtpCode(e.target.value)}
-                            className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-6 text-center text-4xl font-bold text-[#B45309] focus:outline-none focus:border-[#B45309] transition-colors placeholder:tracking-normal placeholder:text-2xl ${otpCode ? 'tracking-[0.5em]' : 'tracking-normal'}`}
-                        />
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-[#57534E] mb-2 pl-1">
+                                    6-Digit OTP Code
+                                </label>
+                                <input 
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={6}
+                                    placeholder="000000"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                                    className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-5 text-center text-4xl font-bold text-[#B45309] focus:outline-none focus:border-[#B45309] transition-colors placeholder:tracking-normal placeholder:text-2xl ${otpCode ? 'tracking-[0.5em]' : 'tracking-normal'}`}
+                                />
+                            </div>
+                        </div>
 
                         <div className="flex flex-col gap-6">
                             <button className="w-full bg-[#B45309] hover:bg-[#92400E] py-4 rounded-2xl text-white font-bold text-lg shadow-xl shadow-[#B45309]/20 transition-all">
-                                Verify & Sign Up
+                                {isReset ? "Next" : "Verify & Sign Up"}
                             </button>
                             <div className="flex justify-between items-center text-sm px-2">
                                 <button 
@@ -351,10 +396,84 @@ export default function AuthScreens() {
                                 </button>
                                 <button 
                                     type="button"
-                                    onClick={() => setScreen('phone')} 
+                                    onClick={() => {
+                                        setIsReset(false);
+                                        setScreen('phone');
+                                    }} 
                                     className="text-[#B45309] font-bold hover:text-[#92400E] transition-colors"
                                 >
                                     Change Number
+                                </button>
+                            </div>
+                        </div>
+                    </motion.form>
+                )}
+
+                {/* 5. RESET MPIN SCREEN */}
+                {screen === 'reset-mpin' && (
+                    <motion.form 
+                        key="reset-mpin"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        onSubmit={onResetMpinSubmit}
+                        className="space-y-10 relative z-10"
+                    >
+                        <div className="text-center space-y-3">
+                            <div className="mx-auto w-20 h-20 bg-[#B45309]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#B45309]/20 shadow-inner">
+                                <Lock className="w-10 h-10 text-[#B45309]" />
+                            </div>
+                            <h2 className="text-4xl font-bold text-[#2A2A2A] font-serif tracking-tight">
+                                New MPIN
+                            </h2>
+                            <p className="text-[#57534E]">
+                                Create a new 6-digit MPIN for <span className="text-[#2A2A2A] font-mono font-bold">{phone}</span>
+                            </p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-[#57534E] mb-2 pl-1">
+                                    Set New 6-Digit MPIN
+                                </label>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                                    <input 
+                                        type="password"
+                                        maxLength={6}
+                                        placeholder="Enter New MPIN"
+                                        value={mpin}
+                                        onChange={(e) => setMpin(e.target.value)}
+                                        className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-12 text-[#2A2A2A] text-center text-2xl focus:outline-none focus:border-[#B45309] transition-all placeholder:tracking-normal placeholder:text-base ${mpin ? 'tracking-[0.8em]' : 'tracking-normal'}`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                                    <input 
+                                        type="password"
+                                        maxLength={6}
+                                        placeholder="Confirm New MPIN"
+                                        value={confirmMpin}
+                                        onChange={(e) => setConfirmMpin(e.target.value)}
+                                        className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-12 text-[#2A2A2A] text-center text-2xl focus:outline-none focus:border-[#B45309] transition-all placeholder:tracking-normal placeholder:text-base ${confirmMpin ? 'tracking-[0.8em]' : 'tracking-normal'}`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-6">
+                            <button className="w-full bg-[#B45309] hover:bg-[#92400E] py-4 rounded-2xl text-white font-bold text-lg shadow-xl shadow-[#B45309]/20 transition-all">
+                                {loading ? "Saving..." : "Save New MPIN"}
+                            </button>
+                            <div className="flex justify-center items-center text-sm px-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setScreen('otp')} 
+                                    className="text-[#A8A29E] hover:text-[#2A2A2A] transition-colors"
+                                >
+                                    Back to OTP
                                 </button>
                             </div>
                         </div>
