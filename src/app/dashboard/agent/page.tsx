@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { organizationsApi, Organization, usersApi, getLeadGenUrl } from '@/lib/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 export default function AgentDashboardPage() {
   const { user, status, logout } = useAuth();
@@ -61,7 +61,7 @@ export default function AgentDashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Toaster position="top-right" />
+
 
       {/* Header */}
       <div className="bg-white border-b border-gray-200 px-8 py-6">

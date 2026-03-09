@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { usersApi, getLeadGenUrl } from '@/lib/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import UserApprovals from '@/components/dashboard/UserApprovals';
 
 export default function AdminDashboardPage() {
@@ -40,7 +40,7 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Toaster position="top-right" />
+
       {/* Header Section */}
       <div className="border-b border-gray-100 bg-white px-8 py-8">
         <div className="max-w-6xl flex flex-col md:flex-row md:items-center justify-between gap-6 md:gap-0">

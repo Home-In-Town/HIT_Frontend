@@ -657,16 +657,6 @@ export const usersApi = {
 -----------------------------------*/
 
 export const authApi = {
-  // Check if phone exists
-  async checkPhone(phone: string): Promise<{ exists: boolean; name?: string }> {
-    const response = await fetch(`${API_URL}/auth/check-phone`, {
-      ...COMMON_FETCH_OPTIONS,
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone }),
-    });
-    return handleResponse(response);
-  },
 
   // Start Registration
   async register(data: { name: string; phone: string; mpin: string; email?: string }): Promise<{ message: string }> {
