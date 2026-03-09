@@ -264,7 +264,10 @@ useEffect(() => {
   const downloadBrochure = async () => {
   if (!project?.brochureUrl) return;
 
-  const res = await fetch(project.brochureUrl);
+  const brochureUrl = typeof project.brochureUrl === 'string' ? project.brochureUrl : project.brochureUrl?.url;
+  if (!brochureUrl) return;
+
+  const res = await fetch(brochureUrl);
   const blob = await res.blob();
 
   const url = window.URL.createObjectURL(blob);
