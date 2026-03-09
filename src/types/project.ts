@@ -11,6 +11,11 @@ export interface Landmark {
   address: string;
   placeId: string;
 }
+export type FileData = {
+  url: string;
+  key: string;
+};
+
 export interface Project {
   id: string;
   name: string;
@@ -47,11 +52,12 @@ export interface Project {
   // Amenities
   amenities: string[];
   landmarks?: Landmark[];
+
   // Media
-  coverImage: string;
-  galleryImages: string[];
-  videos: string[];
-  brochureUrl?: string;
+  coverImage: string | FileData;
+  galleryImages: (string | FileData)[];
+  videos: (string | FileData)[];
+  brochureUrl?: string | FileData;
 
   // Sales CTA
   ctaButtonText: string;

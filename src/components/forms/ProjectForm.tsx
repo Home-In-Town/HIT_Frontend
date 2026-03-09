@@ -1125,7 +1125,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
       {formData.brochureUrl && (
         <p className="mt-2 text-sm text-green-700">
-            ✔ Uploaded: {formData.brochureUrl.split("/").pop()}
+            ✔ Uploaded: {(typeof formData.brochureUrl === 'string' ? formData.brochureUrl : formData.brochureUrl.url).split("/").pop()}
         </p>
       )}
     </div>
@@ -1191,18 +1191,18 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       </section>
 
       {/* Actions */}
-      <div className="sticky bottom-0 bg-[#FAF7F2]/80 backdrop-blur-md border-t border-[#E7E5E4] p-4 -mx-4 sm:mx-0 flex flex-col-reverse sm:flex-row gap-4 sm:justify-end z-30">
+      <div className="sticky bottom-6 bg-white/60 backdrop-blur-xl border border-[#E7E5E4] p-6 rounded-[2rem] flex flex-col-reverse sm:flex-row gap-4 sm:justify-end z-30 shadow-2xl shadow-[#B45309]/10">
         <button
           type="button"
           onClick={() => router.push('/dashboard')}
-          className="w-full sm:w-auto px-6 py-3 bg-white border border-[#D6D3D1] text-[#57534E] font-medium rounded-lg hover:bg-[#F5F5F4] transition-colors shadow-sm"
+          className="w-full sm:w-auto px-8 py-4 bg-white border border-[#E7E5E4] text-[#57534E] font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-[#FAF7F2] hover:border-[#B45309] hover:text-[#B45309] transition-all"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={loading || uploading}
-          className="w-full sm:w-auto px-6 py-3 bg-[#57534E] text-white font-medium rounded-lg hover:bg-[#2A2A2A] transition-colors disabled:opacity-50 shadow-sm"
+          className="w-full sm:w-auto px-8 py-4 bg-[#57534E] text-white font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-[#2A2A2A] transition-all disabled:opacity-50"
         >
            {uploading ? 'Uploading...' : loading ? 'Saving...' : 'Save Draft'}
         </button>
@@ -1210,7 +1210,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           type="button"
           onClick={(e) => handleSubmit(e, true)}
           disabled={loading || uploading}
-          className="w-full sm:w-auto px-6 py-3 bg-[#B45309] text-white font-medium rounded-lg hover:bg-[#92400E] transition-colors disabled:opacity-50 shadow-md"
+          className="w-full sm:w-auto px-10 py-4 bg-[#B45309] text-white font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-[#92400E] transition-all disabled:opacity-50 shadow-lg shadow-[#B45309]/20"
         >
            {uploading ? 'Uploading...' : loading ? 'Publishing...' : 'Publish'}
         </button>

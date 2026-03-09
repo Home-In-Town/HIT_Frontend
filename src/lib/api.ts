@@ -6,11 +6,11 @@ export function getLeadGenUrl() {
   return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
 }
 
-import { Project, ProjectFormData } from '@/types/project';
+import { Project, ProjectFormData, FileData } from '@/types/project';
+export type { Project, ProjectFormData, FileData };
 
-//const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001/api';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-export type { Project, ProjectFormData };
+type MediaType = "cover" | "gallery" | "video" | "brochure";
 
 
 // Get mock user ID from localStorage (for RBAC)
@@ -312,13 +312,6 @@ export const projectsApi = {
   }
 };
 
-type MediaType = "cover" | "gallery" | "video" | "brochure";
-
-export type FileData = {
-  url: string;
-  key: string;
-};
-
 export const mediaApi = {
   // ================= 1. GET SIGNED URL =================
   async getUploadUrl(params: {
@@ -524,6 +517,12 @@ export interface ProjectAnalyticsOverview {
   forms: number;
 }
 
+export interface GlobalAnalytics {
+  activeProjects: number;
+  totalLeads: number;
+  totalViews: number;
+}
+
 // ==============================
 // Analytics API
 // ==============================
@@ -552,6 +551,18 @@ export const analyticsApi = {
 
     return handleResponse<ProjectAnalyticsOverview[]>(response);
   },
+
+  // 🌍 Get global overview (Admin only)
+  async getGlobalOverview(): Promise<GlobalAnalytics> {
+    const response = await fetch(
+      `${API_URL}/analytics/global-overview`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    }
+    );
+
+    return handleResponse<GlobalAnalytics>(response);
+  },
 };
 
 
@@ -565,7 +576,7 @@ export interface MockUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned';
+  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user';
   companyName?: string;
   phone?: string;
 }

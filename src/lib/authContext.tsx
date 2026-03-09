@@ -9,7 +9,7 @@ export interface User {
   name: string;
   email?: string;
   phone: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned';
+  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user';
   isVerified: boolean;
 }
 

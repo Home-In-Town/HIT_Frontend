@@ -36,15 +36,15 @@ const orgPath = user
 
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans text-gray-900">
+    <div className="min-h-screen bg-[#FAF7F2] font-sans text-[#2A2A2A]">
 
       {/* Mobile Header */}
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200 px-4 py-3">
+      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-[#E7E5E4] px-4 py-3 shadow-sm shadow-[#B45309]/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-8 h-8 bg-gray-900 rounded flex items-center justify-center text-white font-bold">H</div>
-            <span className="text-lg font-bold text-gray-900">HomeInTown</span>
+            <div className="w-8 h-8 bg-[#B45309] rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-[#B45309]/20">H</div>
+            <span className="text-lg font-bold text-[#2A2A2A] font-serif tracking-tight">HomeInTown</span>
             </Link>
           </div>
           <button
@@ -75,7 +75,7 @@ const orgPath = user
 
       {/* Sidebar */}
       <aside className={`
-        fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 p-4 z-50
+        fixed left-0 top-0 h-full w-60 bg-white border-r border-[#E7E5E4] p-3 z-50 shadow-2xl shadow-[#B45309]/5
         transform transition-transform duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
@@ -86,10 +86,10 @@ const orgPath = user
             href="/"
             className="flex items-center gap-3 group cursor-pointer"
           >
-            <div className="w-8 h-8 bg-gray-900 rounded flex items-center justify-center text-white font-bold text-lg">
+            <div className="w-8 h-8 bg-[#B45309] rounded-lg flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-[#B45309]/20">
               H
             </div>
-            <span className="text-xl font-bold text-gray-900 tracking-tight group-hover:opacity-80">
+            <span className="text-xl font-bold text-[#2A2A2A] font-serif tracking-tight group-hover:opacity-80">
               HomeInTown
             </span>
           </Link>
@@ -102,10 +102,10 @@ const orgPath = user
           <Link
             href="/dashboard"
             onClick={() => setSidebarOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl transition-all ${
               isActive('/dashboard') 
-                ? 'bg-gray-100 text-gray-900' 
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm' 
+                : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
             }`}
           >
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,10 +117,10 @@ const orgPath = user
           <Link
             href="/dashboard/projects"
             onClick={() => setSidebarOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl transition-all ${
               isActive('/dashboard/projects') 
-                ? 'bg-gray-100 text-gray-900' 
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm' 
+                : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
             }`}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -133,10 +133,10 @@ const orgPath = user
           <Link 
             href="/dashboard/analytics"
             onClick={() => setSidebarOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl transition-all ${
               isActive('/dashboard/analytics')
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
             }`}
           >
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,10 +148,10 @@ const orgPath = user
           <Link
             href={orgPath}
             onClick={() => setSidebarOpen(false)}
-            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+            className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-xl transition-all ${
               isActive('/dashboard/organizations')
-                ? 'bg-gray-100 text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
             }`}
           >
              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -173,7 +173,7 @@ const orgPath = user
       </aside>
 
       {/* Main Content */}
-      <main className="lg:ml-64 px-0 pb-0 pt-16 lg:pt-0">
+      <main className="lg:ml-60 px-0 pb-0 pt-16 lg:pt-0">
         {/* We generally want the dashboard page to handle its own padding/containers to allow full width headers */}
         {children}
       </main>
