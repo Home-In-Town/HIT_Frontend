@@ -22,7 +22,7 @@ const [filteredLandmarks, setFilteredLandmarks] = useState<Landmark[]>([]);
     useState<google.maps.drawing.OverlayType | null>(null);
 
   const [drawingType, setDrawingType] =
-    useState<"project-boundary" | "subplot" | "road">("project-boundary");
+    useState<"project-boundary" | "subplot" | "road" | "ai-boundary" | undefined>("project-boundary");
     const [selectedPlotId, setSelectedPlotId] = useState<string | null>(null);
  useEffect(() => {
   if (!projectId) return;
@@ -53,7 +53,14 @@ useEffect(() => {
 
   setFilteredLandmarks(filtered);
 }, [search, landmarks]);
+const [plotNumberInput, setPlotNumberInput] = useState("");
 
+useEffect(() => {
+  if (panelPlotId) {
+    const plot = mapRef.current?.getPlot(panelPlotId);
+    setPlotNumberInput(plot?.plotNumber || "");
+  }
+}, [panelPlotId]);
   if (!project) return <div>Loading...</div>;
  
 function ToolButton({
@@ -70,13 +77,13 @@ function ToolButton({
   color?: string;
 }) {
   const colorStyles: Record<string, string> = {
-    gray: "bg-gray-100 hover:bg-gray-600",
-    red: "bg-red-100 hover:bg-red-600",
-    yellow: "bg-yellow-100 hover:bg-yellow-500",
-    blue: "bg-blue-100 hover:bg-blue-600",
-    green: "bg-green-100 hover:bg-green-600",
-    indigo: "bg-indigo-100 hover:bg-indigo-600",
-    purple: "bg-purple-100 hover:bg-purple-600",
+    gray: "bg-gray-100 hover:bg-gray-200",
+    red: "bg-red-100 hover:bg-red-200",
+    yellow: "bg-yellow-100 hover:bg-yellow-200",
+    blue: "bg-blue-100 hover:bg-blue-200",
+    green: "bg-green-100 hover:bg-green-200",
+    indigo: "bg-indigo-100 hover:bg-indigo-200",
+    purple: "bg-purple-100 hover:bg-purple-200",
   };
 
   return (
@@ -187,115 +194,243 @@ function ToolButton({
   </div>
 
   {/* ========================= */}
-  {/* 🧱 DRAW TOOLS SECTION */}
+  {/* 🧱 LAYOUT DRAW TOOLS */}
   {/* ========================= */}
-  <div>
-    <h2 className="text-xs font-bold text-gray-500 mb-4 text-center">
-      DRAW TOOLS
+  <div className="space-y-5">
+
+    <h2 className="text-sm font-bold text-gray-600 text-center">
+      LAYOUT EDITOR
     </h2>
 
-    <div className="grid grid-cols-4 gap-2">
+    {/* ----------------- */}
+    {/* PROJECT BOUNDARY */}
+    {/* ----------------- */}
+    <div>
+      <h3 className="text-xs font-semibold text-gray-400 mb-2">
+        Project Boundary
+      </h3>
 
-      <ToolButton
-        icon="🧱"
-        label="Draw Boundary"
-        onClick={() => {
-          setDrawingType("project-boundary");
-          setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-        }}
-      />
+      <div className="grid grid-cols-3 gap-2">
+        <ToolButton
+          icon="🧱"
+          label="Draw Boundary"
+          onClick={() => {
+            setDrawingType("project-boundary");
+            setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+          }}
+          color="indigo"
+        />
 
-      <ToolButton
-        icon="💾"
-        label="Save Boundary"
-        onClick={() => mapRef.current?.saveBoundary(projectId)}
-      />
+        <ToolButton
+          icon="💾"
+          label="Save Boundary"
+          onClick={() => mapRef.current?.saveBoundary(projectId)}
+          color="green"
+        />
 
-      <ToolButton
-        icon="📐"
-        label="Draw Subplot"
-        onClick={() => {
-          setDrawingType("subplot");
-          setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
-        }}
-      />
-
-      <ToolButton
-        icon="🛣"
-        label="Draw Road"
-        onClick={() => {
-          setDrawingType("road");
-          setDrawingMode(google.maps.drawing.OverlayType.POLYLINE);
-        }}
-      />
-
-      <ToolButton
-        icon="✖"
-        label="Exit Drawing"
-        onClick={() => setDrawingMode(null)}
-        color="red"
-      />
-
-      <ToolButton
-        icon="↩"
-        label="Undo"
-        onClick={() => mapRef.current?.undoLastDrawing()}
-        color="yellow"
-      />
-
-      <ToolButton
-        icon="🔁"
-        label="Redo"
-        onClick={() => mapRef.current?.redo()}
-        color="yellow"
-      />
-
-      <ToolButton
-        icon="✏"
-        label="Edit Plot"
-        disabled={!panelPlotId}
-        onClick={() =>
-          panelPlotId &&
-          mapRef.current?.editPlot(panelPlotId)
-        }
-        color="blue"
-      />
-
-      <ToolButton
-        icon="💾"
-        label="Save Plot"
-        onClick={() => mapRef.current?.openLastUnsavedPlot()}
-        color="green"
-      />
-
-      <ToolButton
-        icon="🧩"
-        label="Edit Boundary"
-        onClick={() => mapRef.current?.editBoundary()}
-        color="indigo"
-      />
-
-      <ToolButton
-        icon="📦"
-        label="Save Boundary"
-        onClick={() => mapRef.current?.saveBoundary()}
-        color="purple"
-      />
-
-      <ToolButton
-        icon="🧭"
-        label="Lock To Boundary"
-        onClick={() => mapRef.current?.lockToBoundary()}
-        color="blue"
-      />
-
-      <ToolButton
-        icon="🔓"
-        label="Unlock Map"
-        onClick={() => mapRef.current?.unlockCanvas()}
-        color="gray"
-      />
+        <ToolButton
+          icon="🧩"
+          label="Edit Boundary"
+          onClick={() => mapRef.current?.editBoundary()}
+          color="blue"
+        />
+      </div>
     </div>
+
+    {/* ----------------- */}
+    {/* ROAD TOOLS */}
+    {/* ----------------- */}
+    <div>
+      <h3 className="text-xs font-semibold text-gray-400 mb-2">
+        Roads
+      </h3>
+
+      <div className="grid grid-cols-3 gap-2">
+        <ToolButton
+          icon="🛣"
+          label="Draw Road"
+          onClick={() => {
+            setDrawingType("road");
+            setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+          }}
+          color="gray"
+        />
+    
+        <ToolButton
+          icon="⬛"
+          label="Rectangle Road"
+          onClick={() => {
+            setDrawingType("road");
+            setDrawingMode(google.maps.drawing.OverlayType.RECTANGLE);
+          }}
+          color="gray"
+        />
+
+      </div>
+    </div>
+
+    {/* ----------------- */}
+    {/* PLOT TOOLS */}
+    {/* ----------------- */}
+    <div>
+      <h3 className="text-xs font-semibold text-gray-400 mb-2">
+        Plots
+      </h3>
+
+      <div className="grid grid-cols-3 gap-2">
+        <ToolButton
+          icon="📐"
+          label="Draw Plot"
+          onClick={() => {
+            setDrawingType("subplot");
+            setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+          }}
+          color="purple"
+        />
+        <ToolButton
+          icon="⬛"
+          label="Rectangle Plot"
+          onClick={() => {
+            setDrawingType("subplot");
+            setDrawingMode(google.maps.drawing.OverlayType.RECTANGLE);
+          }}
+          color="purple"
+        />
+        <ToolButton
+          icon="✏"
+          label="Edit Plot"
+          disabled={!panelPlotId}
+          onClick={() =>
+            panelPlotId &&
+            mapRef.current?.editPlot(panelPlotId)
+          }
+          color="blue"
+        />
+
+        <ToolButton
+          icon="💾"
+          label="Save Plot"
+          onClick={() => mapRef.current?.openLastUnsavedPlot()}
+          color="green"
+        />
+        <ToolButton
+          icon="🗑"
+          label="Delete Plot"
+        
+          onClick={() => mapRef.current?.deleteSelectedPlot()}
+          color="red"
+        />
+      </div>
+      
+    </div>
+     <div>
+      <h3 className="text-xs font-semibold text-gray-400 mb-2">
+        AI Generated Plots
+      </h3>
+
+      <div className="grid grid-cols-3 gap-2">
+
+        {/* Draw AI Boundary */}
+       <ToolButton
+          icon="🟣"
+          label="Draw AI Boundary"
+          onClick={() => {
+            mapRef.current?.toggleAiEditMode(false);
+            setDrawingType("ai-boundary");
+            setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+
+          }}
+          color="purple"
+        />
+        {/* Generate AI Layout */}
+        <ToolButton
+          icon="⚡"
+          label="Generate AI Layout"
+          onClick={() => mapRef.current?.generateAILayout()}
+          color="green"
+        />
+        
+        <ToolButton
+          icon="✏️"
+          label="Edit AI Layout"
+          onClick={() => {
+            mapRef.current?.toggleAiEditMode(true);
+          }}
+          color="blue"
+        />
+        <ToolButton
+          icon="💾"
+          label="Save AI Layout"
+          onClick={() => {
+            mapRef.current?.saveAiLayout();
+
+            // ✅ stop drawing mode
+            setDrawingMode(null);
+            setDrawingType(undefined);
+          }}
+          color="green"
+        />
+      </div>
+    </div>
+
+    {/* ----------------- */}
+    {/* HISTORY */}
+    {/* ----------------- */}
+    <div>
+      <h3 className="text-xs font-semibold text-gray-400 mb-2">
+        History
+      </h3>
+
+      <div className="grid grid-cols-3 gap-2">
+        <ToolButton
+          icon="↩"
+          label="Undo"
+          onClick={() => mapRef.current?.undo()}
+          color="yellow"
+        />
+
+        <ToolButton
+          icon="🔁"
+          label="Redo"
+          onClick={() => mapRef.current?.redo()}
+          color="yellow"
+        />
+       
+      </div>
+    </div>
+
+    {/* ----------------- */}
+    {/* CANVAS */}
+    {/* ----------------- */}
+    <div>
+      <h3 className="text-xs font-semibold text-gray-400 mb-2">
+        Canvas
+      </h3>
+
+      <div className="grid grid-cols-3 gap-2">
+        <ToolButton
+          icon="🧭"
+          label="Lock To Boundary"
+          onClick={() => mapRef.current?.lockToBoundary()}
+          color="blue"
+        />
+
+        <ToolButton
+          icon="🔓"
+          label="Unlock Map"
+          onClick={() => mapRef.current?.unlockCanvas()}
+          color="gray"
+        />
+
+        <ToolButton
+          icon="✖"
+          label="Exit Drawing"
+          onClick={() => setDrawingMode(null)}
+          color="red"
+        />
+      </div>
+    </div>
+
   </div>
 
 </div>
@@ -334,15 +469,12 @@ function ToolButton({
                 {/* Plot Number */}
                 <div>
                   <label className="text-xs text-gray-500">Plot Number</label>
-                  <input
-                    value={plot.plotNumber || ""}
-                    onChange={(e) =>
-                      mapRef.current?.updatePlotField(
-                        panelPlotId,
-                        "plotNumber",
-                        e.target.value
-                      )
-                    }
+                 <input
+                    value={plotNumberInput}
+                    onChange={(e) => setPlotNumberInput(e.target.value)}
+                    onBlur={() => {
+                      mapRef.current?.updatePlotField(panelPlotId, "plotNumber", plotNumberInput);
+                    }}
                     className="border p-2 w-full rounded text-xs"
                   />
                 </div>
@@ -421,59 +553,7 @@ function ToolButton({
 
         </div>
       )}
-      {/* {landmarks.length > 0 && (
-        <div className="absolute right-4 bottom-6 w-80 bg-white shadow-2xl rounded-2xl p-4 z-40 max-h-[400px] overflow-y-auto">
-
-          <h3 className="font-semibold text-sm mb-3">
-            Select Nearby Landmarks
-          </h3>
-
-          <input
-            type="text"
-            placeholder="Search (school, cafe, road...)"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full mb-2 px-3 py-2 border rounded-lg text-xs outline-none"
-          />
-          {(filteredLandmarks.length ? filteredLandmarks : landmarks).map((lm) => (
-            <div
-              key={lm.placeId}
-              className="flex items-center justify-between text-xs py-1 border-b"
-            >
-              <span>{lm.name}</span>
-
-              <input
-                  type="checkbox"
-                  checked={!!selectedLandmarks?.some(
-                    (l) => l.placeId === lm.placeId
-                  )}
-                  onChange={() => {
-                    const updated =
-                      mapRef.current?.toggleLandmarkSelection(lm) || [];
-
-                    setSelectedLandmarks(updated);
-                  }}
-                />
-            </div>
-          ))}
-
-          <button
-            onClick={async () => {
-              try {
-                // Read fresh selected landmarks directly from map (avoids stale state)
-                const toSave = mapRef.current?.getSelectedLandmarks() || selectedLandmarks;
-                await saveProjectLandmarks(projectId, toSave); 
-                alert("Saved successfully");
-              } catch (err: any) {
-                alert(err.message || 'Failed to save landmarks');
-              }
-            }}
-            className="mt-3 w-full bg-emerald-600 text-white py-2 rounded text-xs"
-          >
-            Save Selected Landmarks
-          </button>
-        </div>
-      )} */}
+    
     </div>
   );
 }
