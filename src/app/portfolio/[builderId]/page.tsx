@@ -217,7 +217,7 @@ function ProjectCard({ project, leadId }: { project: Project; leadId: string | n
       <div className="relative h-64 w-full overflow-hidden bg-gray-200">
         {project.coverImage ? (
           <Image
-            src={project.coverImage}
+            src={typeof project.coverImage === 'string' ? project.coverImage : project.coverImage?.url || ''}
             alt={project.name}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"

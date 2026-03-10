@@ -197,14 +197,14 @@ export default function ProjectsPage() {
 
   if (loading) {
     return (
-        <div className="flex items-center justify-center h-screen bg-gray-50">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900"></div>
+        <div className="flex items-center justify-center h-screen bg-[#FAF7F2]">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#B45309]"></div>
         </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-[#FAF7F2] pb-20">
       <DashboardHeader projects={projects} />
       
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -223,10 +223,12 @@ export default function ProjectsPage() {
         )}
 
         {filteredProjects.length === 0 ? (
-            <div className="text-center py-20 bg-white rounded-lg border border-gray-200 border-dashed">
-                <div className="text-4xl mb-3 grayscale opacity-30">🔍</div>
-                <h3 className="text-lg font-medium text-gray-900">No projects found</h3>
-                <p className="text-gray-500 text-sm">Try adjusting your filters</p>
+            <div className="text-center py-32 bg-white rounded-[2rem] border border-[#E7E5E4] shadow-sm shadow-[#B45309]/5">
+                <div className="w-20 h-20 bg-[#FAF7F2] rounded-3xl flex items-center justify-center mx-auto mb-6 border border-[#E7E5E4]">
+                  <span className="text-4xl grayscale opacity-30">🔍</span>
+                </div>
+                <h3 className="text-2xl font-bold text-[#2A2A2A] font-serif tracking-tight">No projects found</h3>
+                <p className="text-[#57534E] mt-2 font-medium">Try adjusting your filters to find what you're looking for</p>
             </div>
         ) : (
             <>

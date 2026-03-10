@@ -46,24 +46,24 @@ export default function ConfirmationModal({
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg shadow-xl transform transition-all p-6">
-        <div className="mb-6">
-          <h3 className="text-xl font-bold text-white mb-2">{title}</h3>
-          <p className="text-slate-400">{message}</p>
+      <div className="relative w-full max-w-md bg-white border border-[#E7E5E4] rounded-[2.5rem] shadow-2xl transform transition-all p-10 animate-in fade-in zoom-in duration-300">
+        <div className="mb-8">
+          <h3 className="text-2xl font-bold text-[#2A2A2A] font-serif mb-4 tracking-tight">{title}</h3>
+          <p className="text-[#57534E] leading-relaxed">{message}</p>
         </div>
 
-        <div className="flex gap-3 justify-end">
+        <div className="flex flex-col sm:flex-row gap-3 justify-end items-stretch sm:items-center">
           <button
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+            className="px-6 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[#57534E] bg-white border border-[#E7E5E4] rounded-2xl hover:bg-[#FAF7F2] transition-all disabled:opacity-50"
           >
             {cancelText}
           </button>
           <button
             onClick={onConfirm}
             disabled={isLoading}
-            className="px-4 py-2 text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+            className="px-8 py-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white bg-[#B45309] rounded-2xl hover:bg-[#92400E] shadow-lg shadow-[#B45309]/20 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             {isLoading && (
               <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />

@@ -15,7 +15,7 @@ export default function LoginPage() {
 
       {/* Logo/Header */}
       <div className="mb-12 relative z-10">
-        <Link href="/" className="flex items-center gap-3 group">
+        <Link href="/" className="flex items-center gap-3 group cursor-pointer">
           <div className="w-12 h-12 bg-[#B45309] rounded-2xl flex items-center justify-center text-white font-serif font-bold text-3xl shadow-xl shadow-[#B45309]/20 transform group-hover:rotate-6 transition-transform">
             H
           </div>

@@ -26,31 +26,31 @@ export default function DashboardHeader({ projects }: DashboardHeaderProps) {
       });
 
   return (
-    <div className="bg-white border-b border-gray-200 px-6 py-5 mb-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="bg-white border-b border-[#E7E5E4] px-6 py-5 mb-6 shadow-sm shadow-[#B45309]/5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Projects</h1>
-          <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
-            <span>Total: <strong className="text-gray-900">{totalProjects}</strong></span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-            <span>Published: <strong className="text-emerald-700">{publishedCount}</strong></span>
-            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
-            <span>Draft: <strong className="text-amber-700">{draftCount}</strong></span>
+          <h1 className="text-2xl font-bold text-[#2A2A2A] font-serif tracking-tight">Projects</h1>
+          <div className="flex items-center gap-4 mt-1.5 text-xs font-medium">
+            <span className="text-[#57534E]">Total: <strong className="text-[#2A2A2A]">{totalProjects}</strong></span>
+            <span className="w-1.5 h-1.5 bg-[#E7E5E4] rounded-full"></span>
+            <span className="text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5]">Published: <strong>{publishedCount}</strong></span>
+            <span className="w-1.5 h-1.5 bg-[#E7E5E4] rounded-full"></span>
+            <span className="text-[#92400E] bg-[#FFFBEB] px-2 py-0.5 rounded border border-[#FEF3C7]">Draft: <strong>{draftCount}</strong></span>
           </div>
         </div>
         
-        <div className="flex items-center gap-4">
-          <div className="text-right hidden sm:block">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium">Last Updated</p>
-            <p className="text-sm font-medium text-gray-900">{lastUpdated}</p>
+        <div className="flex items-center gap-5">
+          <div className="text-right hidden sm:block border-r border-[#E7E5E4] pr-5">
+            <p className="text-[10px] text-[#A8A29E] uppercase tracking-widest font-bold">Last Updated</p>
+            <p className="text-sm font-bold text-[#2A2A2A] font-mono mt-0.5">{lastUpdated}</p>
           </div>
-          <div className="h-8 w-px bg-gray-200 hidden sm:block"></div>
+          
           <a
             href="/dashboard/projects/new"
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded hover:bg-black transition-colors shadow-sm"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-[#B45309]/20 group active:scale-95"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <svg className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
             New Project
           </a>
