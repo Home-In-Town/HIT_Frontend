@@ -10,7 +10,7 @@ import { Project, ProjectFormData, FileData } from '@/types/project';
 export type { Project, ProjectFormData, FileData };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-type MediaType = "cover" | "gallery" | "video" | "brochure";
+type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
 
 
 // Get mock user ID from localStorage (for RBAC)
@@ -108,6 +108,7 @@ export function transformBackendToFrontend(backendProject: any): Project {
     galleryImages: backendProject.media?.galleryImages ?? [],
     videos: backendProject.media?.videos ?? [],
     brochureUrl: backendProject.media?.brochurePdf ?? null,
+    layoutImage: backendProject.media?.layoutImage ?? null,
     ctaButtonText: backendProject.cta?.buttonText ?? backendProject.ctaButtonText ?? 'Contact Us',
     whatsappNumber: backendProject.cta?.whatsappNumber ?? backendProject.whatsappNumber ?? '',
     callNumber: backendProject.cta?.callNumber ?? backendProject.callNumber ?? '',
@@ -158,7 +159,8 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
       ...(project.coverImage && typeof project.coverImage === 'object' && { coverImage: project.coverImage }),
       ...(project.galleryImages?.length && { galleryImages: project.galleryImages.filter((img: any) => typeof img === 'object' && img?.url) }),
       ...(project.videos?.length && { videos: project.videos.filter((vid: any) => typeof vid === 'object' && vid?.url) }),
-      ...(project.brochureUrl && typeof project.brochureUrl === 'object' && { brochurePdf: project.brochureUrl })
+      ...(project.brochureUrl && typeof project.brochureUrl === 'object' && { brochurePdf: project.brochureUrl }),
+      ...(project.layoutImage && typeof project.layoutImage === 'object' && { layoutImage: project.layoutImage })
     },
 
     cta: {

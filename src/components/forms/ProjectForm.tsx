@@ -368,18 +368,35 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       project = await projectsApi.update(projectId, updateData);
     }
 
+    // if (publish) {
+    //   const result = await projectsApi.publish(project.id);
+    //   setPublishedLink(result.trackableLink);
+    //   const fullLink = window.location.origin + result.trackableLink;
+    //   try {
+    //     await navigator.clipboard.writeText(fullLink);
+    //     toast.success('Project Created & Link Copied!');
+    //   } catch (err) {
+    //     console.error('Failed to copy link:', err);
+    //     toast.success('Project Created! (Copy link manually)');
+    //   }
+    // }
     if (publish) {
-      const result = await projectsApi.publish(project.id);
-      setPublishedLink(result.trackableLink);
-      const fullLink = window.location.origin + result.trackableLink;
+    const result = await projectsApi.publish(project.id);
+    setPublishedLink(result.trackableLink);
+
+    const fullLink = window.location.origin + result.trackableLink;
+
+    if (navigator.clipboard && window.isSecureContext) {
       try {
         await navigator.clipboard.writeText(fullLink);
-        toast.success('Project Created & Link Copied!');
-      } catch (err) {
-        console.error('Failed to copy link:', err);
-        toast.success('Project Created! (Copy link manually)');
+        toast.success("Project Published & Link Copied!");
+      } catch {
+        toast.success("Project Published! Copy link manually.");
       }
+    } else {
+      toast.success("Project Published! Copy link manually.");
     }
+  }
 
     router.push('/dashboard/projects');
   } catch (err: any) {
