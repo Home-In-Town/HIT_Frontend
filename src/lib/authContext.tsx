@@ -9,8 +9,14 @@ export interface User {
   name: string;
   email?: string;
   phone: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user';
+  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee';
   isVerified: boolean;
+  employerId?: {
+    id: string;
+    name: string;
+    role: string;
+  };
+  isEmployerConfirmed?: boolean;
 }
 
 interface AuthContextType {
@@ -19,6 +25,7 @@ interface AuthContextType {
   setUser: (user: User | null) => void;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
+  skipAuthCheck: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -26,20 +33,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUserState] = useState<User | null>(null);
   const [status, setStatus] = useState<'loading' | 'authenticated' | 'unauthenticated' | 'unassigned'>('loading');
+  const [skipAuth, setSkipAuth] = useState(false);
 
-  // Check auth on mount
-  useEffect(() => {
-    checkAuth();
-  }, []);
+  function skipAuthCheck() {
+    setSkipAuth(true);
+    setStatus('unauthenticated');
+  }
 
   async function checkAuth() {
     try {
       setStatus('loading');
-      const userData = await usersApi.getMe();
       
-      if (userData) {
-        setUserState(userData as any);
-        if (userData.role === 'unassigned') {
+      const session = await authApi.getSession();
+      
+      if (session.authenticated && session.user) {
+        setUserState(session.user as User);
+        if (session.user.role === 'unassigned') {
           setStatus('unassigned');
         } else {
           setStatus('authenticated');
@@ -54,6 +63,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setStatus('unauthenticated');
     }
   }
+
+  // Check auth on mount (unless skipped)
+  useEffect(() => {
+    if (skipAuth) return;
+    const timer = setTimeout(() => {
+      checkAuth();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [skipAuth]);
 
   function setUser(user: User | null) {
     setUserState(user);
@@ -77,7 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, status, setUser, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, status, setUser, logout, checkAuth, skipAuthCheck }}>
       {children}
     </AuthContext.Provider>
   );

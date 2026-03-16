@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { authApi } from '@/lib/api';
+import { authApi, employeeApi } from '@/lib/api';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
@@ -21,6 +21,7 @@ export default function AuthScreens() {
     const [mpin, setMpin] = useState('');
     const [confirmMpin, setConfirmMpin] = useState('');
     const [otpCode, setOtpCode] = useState('');
+    const [role, setRole] = useState<'user' | 'employee'>('user');
     
     // Flow tracking
     const [isResetFlow, setIsResetFlow] = useState(false);
@@ -52,13 +53,49 @@ export default function AuthScreens() {
         try {
             setLoading(true);
             const formattedPhone = formatPhone(phone);
-            await authApi.login(formattedPhone, mpin);
-            toast.success("Welcome back!");
-            await checkAuth();
-            router.push('/dashboard');
+            
+            // 1. Perform Login first to identify the user role
+            const { user } = await authApi.login(formattedPhone, mpin);
+            
+            // 2. Conditional Location Logic
+            if (user.role === 'employee') {
+                if (!navigator.geolocation) {
+                    toast.error("Your device doesn't support geolocation, which is required for field workforce login.");
+                    setLoading(false);
+                    return;
+                }
+
+                const toastId = toast.loading("Verifying your location...");
+                
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        try {
+                            // Report captured location to server
+                            await employeeApi.submitLocation(pos.coords.latitude, pos.coords.longitude);
+                            toast.success("Welcome back!", { id: toastId });
+                            await checkAuth();
+                            router.push('/dashboard');
+                        } catch (locErr) {
+                            console.error('Failed to report employee location:', locErr);
+                            toast.error("Failed to verify location. Field workforce tracking is mandatory.", { id: toastId });
+                            setLoading(false);
+                        }
+                    },
+                    (err) => {
+                        console.error('Location error:', err);
+                        toast.error("Location permission is mandatory for field workforce. Please enable GPS.", { id: toastId });
+                        setLoading(false);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            } else {
+                // Non-employees (Admin, Builder, Agent, etc.) proceed directly
+                toast.success("Welcome back!");
+                await checkAuth();
+                router.push('/dashboard');
+            }
         } catch (error: any) {
             toast.error(error.message || "Invalid phone or MPIN");
-        } finally {
             setLoading(false);
         }
     };
@@ -77,7 +114,7 @@ export default function AuthScreens() {
             setLoading(true);
             const formattedPhone = formatPhone(phone);
             setPhone(formattedPhone);
-            await authApi.register({ name, phone: formattedPhone, mpin, email });
+            await authApi.register({ name, phone: formattedPhone, mpin, email, role });
             toast.success("OTP sent successfully");
             setIsResetFlow(false);
             setScreen('otp');
@@ -305,6 +342,24 @@ export default function AuthScreens() {
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-12 pr-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
                             />
+                        </div>
+
+                        {/* Role Selection */}
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setRole('user')}
+                                className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'user' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
+                            >
+                                Investor / User
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRole('employee')}
+                                className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'employee' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
+                            >
+                                Field Workforce
+                            </button>
                         </div>
 
                         {/* MPIN / Confirm */}

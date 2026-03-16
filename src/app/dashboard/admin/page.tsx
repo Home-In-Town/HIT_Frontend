@@ -3,16 +3,18 @@
 import Link from 'next/link';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usersApi, getLeadGenUrl, analyticsApi, GlobalAnalytics } from '@/lib/api';
 import toast from 'react-hot-toast';
 import UserApprovals from '@/components/dashboard/UserApprovals';
-import { useState } from 'react';
+import EmployeeTrackingTab from '@/components/employees/EmployeeTrackingTab';
+import { UserPlus, PlusCircle, Activity, Settings, LayoutGrid, Users } from 'lucide-react';
 
 export default function AdminDashboardPage() {
   const { user, status, logout } = useAuth();
   const [stats, setStats] = useState<GlobalAnalytics | null>(null);
   const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'overview' | 'employees'>('overview');
   const isLoading = status === 'loading';
   const router = useRouter();
 
@@ -30,7 +32,6 @@ export default function AdminDashboardPage() {
           setStats(data);
         } catch (error) {
           console.error('Failed to fetch stats:', error);
-          // Don't toast error to avoid annoying user if it fails silently
         } finally {
           setIsStatsLoading(false);
         }
@@ -66,7 +67,6 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF7F2]">
-
       {/* Header Section */}
       <div className="border-b border-[#E7E5E4] bg-white px-6 py-6 shadow-sm shadow-[#B45309]/5">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
@@ -95,105 +95,141 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-8">
-        {/* New User Approvals Section */}
-         <div>
-            <div className="flex items-center justify-between mb-4">
-               <h2 className="text-lg font-bold text-[#2A2A2A] font-serif tracking-tight">
-                 New User <span className="text-[#B45309]">Approvals</span>
-               </h2>
-            </div>
-            <UserApprovals />
-         </div>
-
-        {/* Metrics Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Card 1 */}
-          <div className="group relative p-6 bg-white border border-[#E7E5E4] rounded-3xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
-            </div>
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Active Projects</p>
-            {isStatsLoading ? (
-              <div className="h-10 w-16 bg-gray-100 animate-pulse mt-2 rounded-lg" />
-            ) : (
-              <p className="mt-2 text-4xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{stats?.activeProjects ?? 0}</p>
-            )}
-            <div className="mt-3 flex items-center text-[10px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-              <span>Real-time</span>
-            </div>
-          </div>
- 
-          {/* Card 2 */}
-          <div className="group relative p-6 bg-white border border-[#E7E5E4] rounded-3xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
-            </div>
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Leads</p>
-            {isStatsLoading ? (
-              <div className="h-10 w-24 bg-gray-100 animate-pulse mt-2 rounded-lg" />
-            ) : (
-              <p className="mt-2 text-4xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{stats?.totalLeads.toLocaleString() ?? 0}</p>
-            )}
-            <div className="mt-3 flex items-center text-[10px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-              <span>System Total</span>
-            </div>
-          </div>
- 
-          {/* Card 3 */}
-          <div className="group relative p-6 bg-white border border-[#E7E5E4] rounded-3xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-            </div>
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Views</p>
-            {isStatsLoading ? (
-              <div className="h-10 w-20 bg-gray-100 animate-pulse mt-2 rounded-lg" />
-            ) : (
-              <p className="mt-2 text-4xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{formatNumber(stats?.totalViews ?? 0)}</p>
-            )}
-            <div className="mt-3 flex items-center text-[10px] font-medium text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-              <span>Live Traffic</span>
-            </div>
-          </div>
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Tab Switcher */}
+        <div className="flex gap-3 mb-8">
+           <button 
+             onClick={() => setActiveTab('overview')}
+             className={`px-6 py-2.5 rounded-2xl text-[11px] font-bold uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/20' : 'bg-white text-[#A8A29E] border border-[#E7E5E4] hover:border-[#B45309]/30'}`}
+           >
+             Overview
+           </button>
+           <button 
+             onClick={() => setActiveTab('employees')}
+             className={`px-6 py-2.5 rounded-2xl text-[11px] font-bold uppercase tracking-widest transition-all ${activeTab === 'employees' ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/20' : 'bg-white text-[#A8A29E] border border-[#E7E5E4] hover:border-[#B45309]/30'}`}
+           >
+             Field Team Activity
+           </button>
         </div>
 
+        {activeTab === 'overview' ? (
+          <div className="space-y-8">
+            {/* New User Approvals Section */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <h2 className="text-xs font-black text-[#2A2A2A] uppercase tracking-[0.2em]">
+                  New User <span className="text-[#B45309]">Approvals</span>
+                </h2>
+                <div className="h-px bg-[#E7E5E4] flex-1" />
+              </div>
+              <UserApprovals />
+            </div>
 
+            {/* Metrics Row */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div className="group relative p-4.5 bg-white border border-[#E7E5E4] rounded-2xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Active Projects</p>
+                {isStatsLoading ? (
+                  <div className="h-8 w-12 bg-gray-100 animate-pulse mt-1.5 rounded-lg" />
+                ) : (
+                  <p className="mt-1.5 text-2xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{stats?.activeProjects ?? 0}</p>
+                )}
+                <div className="mt-2.5 flex items-center text-[9px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
+                  <span>Real-time</span>
+                </div>
+              </div>
 
+              <div className="group relative p-4.5 bg-white border border-[#E7E5E4] rounded-2xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
+                  <Users className="w-4 h-4" />
+                </div>
+                <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Leads</p>
+                {isStatsLoading ? (
+                  <div className="h-8 w-20 bg-gray-100 animate-pulse mt-1.5 rounded-lg" />
+                ) : (
+                  <p className="mt-1.5 text-2xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{stats?.totalLeads.toLocaleString() ?? 0}</p>
+                )}
+                <div className="mt-2.5 flex items-center text-[9px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
+                  <span>System Total</span>
+                </div>
+              </div>
 
-        <div>
-            <h2 className="text-lg font-bold text-[#2A2A2A] font-serif mb-4">Quick Actions</h2>
-           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Link href="/dashboard/projects/new" className="group flex items-center justify-between p-6 bg-white border border-[#E7E5E4] hover:border-[#B45309] transition-all duration-300 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 cursor-pointer">
-                  <div>
-                      <h3 className="font-bold text-lg text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors">Add New Project</h3>
-                      <p className="text-xs text-[#57534E] mt-1">Launch a new property page</p>
+              <div className="group relative p-4.5 bg-white border border-[#E7E5E4] rounded-2xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
+                  <Activity className="w-4 h-4" />
+                </div>
+                <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Views</p>
+                {isStatsLoading ? (
+                  <div className="h-8 w-16 bg-gray-100 animate-pulse mt-1.5 rounded-lg" />
+                ) : (
+                  <p className="mt-1.5 text-2xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{formatNumber(stats?.totalViews ?? 0)}</p>
+                )}
+                <div className="mt-2.5 flex items-center text-[9px] font-medium text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
+                  <span>Live Traffic</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions Grid */}
+            <div>
+              <h2 className="text-lg font-bold text-[#2A2A2A] font-serif mb-4">Quick Actions</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Link href="/dashboard/projects/new" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
+                      <PlusCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">New Project</h3>
+                      <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Create listing</p>
+                    </div>
                   </div>
-                  <div className="w-10 h-10 bg-[#B45309]/5 rounded-xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all duration-300">
-                    <svg className="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
+                </Link>
+
+                <Link href="/dashboard/projects" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
+                      <LayoutGrid className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">Inventory</h3>
+                      <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Manage listings</p>
+                    </div>
                   </div>
-              </Link>
-              
-              <Link href="/dashboard/projects" className="group flex items-center justify-between p-6 bg-white border border-[#E7E5E4] hover:border-[#B45309] transition-all duration-300 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 cursor-pointer">
-                  <div>
-                      <h3 className="font-bold text-lg text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors">Manage Projects</h3>
-                      <p className="text-xs text-[#57534E] mt-1">View and edit existing listings</p>
+                </Link>
+
+                <Link href="/dashboard/organizations" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
+                      <Users className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">Organizations</h3>
+                      <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Manage partners</p>
+                    </div>
                   </div>
-                  <div className="w-10 h-10 bg-[#B45309]/5 rounded-xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all duration-300">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 6h16M4 12h16M4 18h7" /></svg>
+                </Link>
+
+                <div className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 cursor-pointer">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
+                      <Settings className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">Settings</h3>
+                      <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Global config</p>
+                    </div>
                   </div>
-              </Link>
- 
-              <Link href="/dashboard/organizations" className="group flex items-center justify-between p-6 bg-white border border-[#E7E5E4] hover:border-[#B45309] transition-all duration-300 rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 cursor-pointer">
-                  <div>
-                      <h3 className="font-bold text-lg text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors">Organizations</h3>
-                      <p className="text-xs text-[#57534E] mt-1">Manage agents and access</p>
-                  </div>
-                  <div className="w-10 h-10 bg-[#B45309]/5 rounded-xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all duration-300">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" /></svg>
-                  </div>
-              </Link>
-           </div>
-        </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <EmployeeTrackingTab />
+        )}
       </div>
     </div>
   );

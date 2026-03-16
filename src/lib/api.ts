@@ -13,21 +13,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 type MediaType = "cover" | "gallery" | "video" | "brochure";
 
 
-// Get mock user ID from localStorage (for RBAC)
-function getMockUserId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('mock_user_id');
-}
-
 // Get headers with auth
 function getAuthHeaders(): HeadersInit {
-  const userId = typeof window !== 'undefined' ? localStorage.getItem('mock_user_id') : null;
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  if (userId) {
-    headers['x-mock-user-id'] = userId;
-  }
   return headers;
 }
 
@@ -572,38 +562,127 @@ export const analyticsApi = {
    User Types & API
 -----------------------------------*/
 
-export interface MockUser {
+export interface AuthUser {
   id: string;
+  _id?: string;
   name: string;
   email: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user';
+  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee';
   companyName?: string;
   phone?: string;
+  isActive: boolean;
+  isEmployerConfirmed?: boolean;
+  employerId?: string | { _id: string; name: string; phone: string };
+  isAlreadyAssigned?: boolean;
+}    
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function transformUserBackendToFrontend(backendUser: any): AuthUser {
+  return {
+    ...backendUser,
+    id: String(backendUser.id || backendUser._id || ''),
+  };
 }
+
+export const employeeApi = {
+  async search(phone: string): Promise<AuthUser & { isAlreadyAssigned: boolean }> {
+    const response = await fetch(`${API_URL}/employee/search?phone=${encodeURIComponent(phone)}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<any>(response);
+    return {
+      ...transformUserBackendToFrontend(data),
+      isAlreadyAssigned: data.isAlreadyAssigned
+    };
+  },
+
+
+  async requestAssignment(employeeId: string): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/request-assignment`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId }),
+    });
+    return handleResponse(response);
+  },
+
+  async confirmAssignment(): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/confirm-assignment`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async submitLocation(latitude: number, longitude: number, placeName?: string | null): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/location`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude, placeName }),
+    });
+    return handleResponse(response);
+  },
+
+  async logMeeting(data: { 
+    withWhom: string; 
+    description: string; 
+    latitude?: number; 
+    longitude?: number; 
+    placeName?: string | null;
+    projectName?: string;
+    projectLocation?: string;
+    projectPrice?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/meeting`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  async getMyEmployees(): Promise<AuthUser[]> {
+    const response = await fetch(`${API_URL}/employee/my-employees`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<any[]>(response);
+    return data.map(transformUserBackendToFrontend);
+  },
+
+  async getHistory(employeeId: string): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/history/${employeeId}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+};
+
 
 export const usersApi = {
   // Get current user based on mock header
-  async getMe(): Promise<MockUser | null> {
+  async getMe(): Promise<AuthUser | null> {
     try {
       const response = await fetch(`${API_URL}/users/me`, {
         ...COMMON_FETCH_OPTIONS,
         headers: getAuthHeaders(),
       });
       if (!response.ok) return null;
-      return handleResponse<MockUser>(response);
+      return handleResponse<AuthUser>(response);
     } catch {
       return null;
     }
   },
 
-  // Get available mock accounts for role switcher
-  async getMockAccounts(): Promise<MockUser[]> {
-    const response = await fetch(`${API_URL}/users/mock-accounts`, COMMON_FETCH_OPTIONS);
-    return handleResponse<MockUser[]>(response);
-  },
 
   // Get all users (admin only)
-  async getAll(role?: string): Promise<MockUser[]> {
+  async getAll(role?: string): Promise<AuthUser[]> {
     const url = role
       ? `${API_URL}/users?role=${role}`
       : `${API_URL}/users`;
@@ -611,18 +690,7 @@ export const usersApi = {
       ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
-    return handleResponse<MockUser[]>(response);
-  },
-
-  // Login by name and role (for mock login flow)
-  async loginByName(name: string, role: string, phone: string): Promise<MockUser> {
-    const response = await fetch(`${API_URL}/users/login-by-name`, {
-      ...COMMON_FETCH_OPTIONS,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, role, phone }),
-    });
-    return handleResponse<MockUser>(response);
+    return handleResponse<AuthUser[]>(response);
   },
 
   // Get users by role (for login dropdown)
@@ -636,7 +704,7 @@ export const usersApi = {
   },
 
   // Update user role (admin only)
-  async assignRole(userId: string, role: string): Promise<MockUser> {
+  async assignRole(userId: string, role: string): Promise<AuthUser> {
     const response = await fetch(`${API_URL}/users/${userId}/role`, {
       ...COMMON_FETCH_OPTIONS,
       method: "PUT",
@@ -653,9 +721,6 @@ export const usersApi = {
       headers: getAuthHeaders(),
     });
     return handleResponse<{ token: string }>(response);
-
-
-    return handleResponse(response);
   },
   async verifyUser(phone: string) {
     const response = await fetch(`${API_URL}/projects/verify-user/${phone}`, COMMON_FETCH_OPTIONS);
@@ -670,7 +735,7 @@ export const usersApi = {
 export const authApi = {
 
   // Start Registration
-  async register(data: { name: string; phone: string; mpin: string; email?: string }): Promise<{ message: string }> {
+  async register(data: { name: string; phone: string; mpin: string; email?: string; role?: string }): Promise<{ message: string }> {
     const response = await fetch(`${API_URL}/auth/register`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -681,7 +746,7 @@ export const authApi = {
   },
 
   // Verify OTP
-  async verifyOtp(phone: string, code: string): Promise<{ user: MockUser }> {
+  async verifyOtp(phone: string, code: string): Promise<{ user: AuthUser }> {
     const response = await fetch(`${API_URL}/auth/verify-otp`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -692,7 +757,7 @@ export const authApi = {
   },
 
   // Login with Phone + MPIN
-  async login(phone: string, mpin: string): Promise<{ user: MockUser }> {
+  async login(phone: string, mpin: string): Promise<{ user: AuthUser }> {
     const response = await fetch(`${API_URL}/auth/login`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -731,6 +796,17 @@ export const authApi = {
       method: "POST"
     });
     await handleResponse(response);
+  },
+
+  // Silent session check (no 401 errors)
+  async getSession(): Promise<{ authenticated: boolean; user: AuthUser | null }> {
+    try {
+      const response = await fetch(`${API_URL}/auth/session`, COMMON_FETCH_OPTIONS);
+      if (!response.ok) return { authenticated: false, user: null };
+      return handleResponse<{ authenticated: boolean; user: AuthUser | null }>(response);
+    } catch {
+      return { authenticated: false, user: null };
+    }
   }
 };
 
@@ -792,6 +868,7 @@ export interface OrgProject {
 
   status?: string;
 }
+
 export interface OrgAgent {
   _id: string;
   name: string;

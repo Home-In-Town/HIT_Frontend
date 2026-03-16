@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { organizationsApi, Organization, usersApi, getLeadGenUrl } from '@/lib/api';
 import toast from 'react-hot-toast';
+import EmployeeTrackingTab from '@/components/employees/EmployeeTrackingTab';
+import { Building2, Globe, LayoutGrid, ChevronDown, User, LogOut } from 'lucide-react';
 
 export default function AgentDashboardPage() {
   const { user, status, logout } = useAuth();
@@ -14,6 +16,7 @@ export default function AgentDashboardPage() {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'network' | 'employees'>('network');
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'agent')) {
@@ -89,96 +92,130 @@ export default function AgentDashboardPage() {
         </div>
       </div>
 
-      {/* Stats */}
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm shadow-[#B45309]/5">
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Organizations</p>
-            <p className="mt-2 text-4xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{organizations.length}</p>
-          </div>
-          <div className="bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm shadow-[#B45309]/5">
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Assigned Projects</p>
-            <p className="mt-2 text-4xl font-bold text-[#B45309] font-mono tracking-tighter">{totalProjects}</p>
-          </div>
+        {/* Tab Switcher */}
+        <div className="flex gap-4 mb-8">
+           <button 
+             onClick={() => setActiveTab('network')}
+             className={`px-6 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'network' ? 'bg-[#B45309] text-white shadow-md' : 'bg-white text-[#A8A29E] border border-[#E7E5E4] hover:border-[#B45309]/50'}`}
+           >
+             Network
+           </button>
+           <button 
+             onClick={() => setActiveTab('employees')}
+             className={`px-6 py-2 rounded-xl text-sm font-bold uppercase tracking-widest transition-all ${activeTab === 'employees' ? 'bg-[#B45309] text-white shadow-md' : 'bg-white text-[#A8A29E] border border-[#E7E5E4] hover:border-[#B45309]/50'}`}
+           >
+             Field Team
+           </button>
         </div>
 
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-[#2A2A2A] font-serif mb-4">Your Partner Network</h2>
-          {organizations.length === 0 ? (
-            <div className="bg-white border border-[#E7E5E4] rounded-[2.5rem] p-20 text-center shadow-sm">
-              <div className="mx-auto w-20 h-20 bg-[#FAF7F2] rounded-[2rem] flex items-center justify-center border border-[#E7E5E4] mb-6">
-                <svg className="h-10 w-10 text-[#A8A29E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-                </svg>
+        {activeTab === 'network' ? (
+          <>
+            {/* Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Organizations</p>
+                <p className="mt-2 text-4xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{organizations.length}</p>
+                <div className="mt-2 flex items-center text-[10px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
+                  <span>Assigned</span>
+                </div>
               </div>
-              <p className="text-xl font-bold text-[#2A2A2A] font-serif">No assignments yet</p>
-              <p className="text-sm text-[#57534E] mt-2 font-medium max-w-sm mx-auto">Contact your administrator to be added to an organization and begin managing projects.</p>
+              <div className="bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
+                  <LayoutGrid className="w-5 h-5" />
+                </div>
+                <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Projects</p>
+                <p className="mt-2 text-4xl font-bold text-[#B45309] font-mono tracking-tighter">{totalProjects}</p>
+                <div className="mt-2 flex items-center text-[10px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
+                  <span>Active Listings</span>
+                </div>
+              </div>
             </div>
-          ) : (
-            organizations.map((org) => (
-              <div key={org.id} className="bg-white border border-[#E7E5E4] rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 transition-all duration-300">
-                {/* Org Header */}
-                <button
-                  onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
-                  className="w-full px-6 py-4 flex items-center justify-between hover:bg-[#FAF7F2]/30 transition-colors"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#B45309]/10 text-[#B45309] rounded-xl flex items-center justify-center text-lg font-bold font-serif shadow-inner border border-[#B45309]/10">
-                      {org.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-lg font-bold text-[#2A2A2A] font-serif tracking-tight">{org.name}</h3>
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-widest text-[#A8A29E] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E7E5E4]">
-                          {org.projects?.length || 0} projects
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`p-2 rounded-xl transition-all ${expandedOrg === org.id ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/30' : 'bg-[#FAF7F2] text-[#A8A29E]'}`}>
-                    <svg 
-                      className={`w-6 h-6 transform transition-transform ${expandedOrg === org.id ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+
+            <div className="space-y-4">
+              <h2 className="text-lg font-bold text-[#2A2A2A] font-serif mb-4">Your Partner Network</h2>
+              {organizations.length === 0 ? (
+                <div className="bg-white border border-[#E7E5E4] rounded-[2.5rem] p-20 text-center shadow-sm">
+                  <div className="mx-auto w-20 h-20 bg-[#FAF7F2] rounded-[2rem] flex items-center justify-center border border-[#E7E5E4] mb-6">
+                    <svg className="h-10 w-10 text-[#A8A29E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
                     </svg>
                   </div>
-                </button>
-
-                {/* Expanded Projects */}
-                {expandedOrg === org.id && (
-                  <div className="border-t border-[#E7E5E4] bg-[#FAF7F2]/30 p-4">
-                    {org.projects && org.projects.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {org.projects.map((project: { id?: string; _id?: string; name?: string; projectName?: string; status?: string }) => (
-                          <div key={project.id || project._id} className="p-5 bg-white border border-[#E7E5E4] rounded-2xl flex items-center justify-between shadow-sm hover:border-[#B45309] transition-all group">
-                            <div className="flex items-center gap-4">
-                              <div className="w-2.5 h-2.5 rounded-full bg-[#B45309]/40 group-hover:bg-[#B45309] transition-colors shadow-sm" />
-                              <span className="text-sm font-bold text-[#2A2A2A] font-serif tracking-tight">{project.name || project.projectName}</span>
-                            </div>
-                            <span className={`text-[10px] font-bold uppercase tracking-widest px-3 py-1 rounded-lg border ${
-                              project.status === 'published' 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm' 
-                                : 'bg-gray-50 text-gray-500 border-gray-100'
-                            }`}>
-                              {project.status}
+                  <p className="text-xl font-bold text-[#2A2A2A] font-serif">No assignments yet</p>
+                  <p className="text-sm text-[#57534E] mt-2 font-medium max-w-sm mx-auto">Contact your administrator to be added to an organization and begin managing projects.</p>
+                </div>
+              ) : (
+                organizations.map((org) => (
+                  <div key={org.id} className="bg-white border border-[#E7E5E4] rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 transition-all duration-300">
+                    {/* Org Header */}
+                    <button
+                      onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
+                      className="w-full px-5 py-3 flex items-center justify-between hover:bg-[#FAF7F2]/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-[#B45309]/10 text-[#B45309] rounded-lg flex items-center justify-center text-sm font-bold font-serif shadow-inner border border-[#B45309]/10">
+                          {org.name.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="text-left">
+                          <h3 className="text-base font-bold text-[#2A2A2A] font-serif tracking-tight leading-tight">{org.name}</h3>
+                          <div className="mt-0.5 flex items-center gap-2">
+                            <span className="text-[9px] font-bold uppercase tracking-widest text-[#A8A29E] bg-[#FAF7F2] px-1.5 py-0.5 rounded border border-[#E7E5E4]">
+                              {org.projects?.length || 0} projects
                             </span>
                           </div>
-                        ))}
+                        </div>
                       </div>
-                    ) : (
-                      <div className="px-6 py-8 text-center bg-white rounded-2xl border border-[#E7E5E4] border-dashed">
-                        <p className="text-sm text-[#A8A29E] font-bold uppercase tracking-widest">No projects assigned yet</p>
+                      <div className={`p-1.5 rounded-lg transition-all ${expandedOrg === org.id ? 'bg-[#B45309] text-white shadow-md shadow-[#B45309]/30' : 'bg-[#FAF7F2] text-[#A8A29E]'}`}>
+                        <svg 
+                          className={`w-5 h-5 transform transition-transform ${expandedOrg === org.id ? 'rotate-180' : ''}`} 
+                          fill="none" 
+                          stroke="currentColor" 
+                          viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </button>
+
+                    {/* Expanded Projects */}
+                    {expandedOrg === org.id && (
+                      <div className="border-t border-[#E7E5E4] bg-[#FAF7F2]/30 p-4">
+                        {org.projects && org.projects.length > 0 ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {org.projects.map((project: { id?: string; _id?: string; name?: string; projectName?: string; status?: string }) => (
+                              <div key={project.id || project._id} className="p-3.5 bg-white border border-[#E7E5E4] rounded-xl flex items-center justify-between shadow-sm hover:border-[#B45309] transition-all group">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-2 h-2 rounded-full bg-[#B45309]/40 group-hover:bg-[#B45309] transition-colors shadow-sm" />
+                                  <span className="text-[13px] font-bold text-[#2A2A2A] font-serif tracking-tight">{project.name || project.projectName}</span>
+                                </div>
+                                <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border ${
+                                  project.status === 'published' 
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm' 
+                                    : 'bg-gray-50 text-gray-500 border-gray-100'
+                                }`}>
+                                  {project.status}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-6 py-8 text-center bg-white rounded-2xl border border-[#E7E5E4] border-dashed">
+                            <p className="text-sm text-[#A8A29E] font-bold uppercase tracking-widest">No projects assigned yet</p>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
-                )}
-              </div>
-            ))
-          )}
-        </div>
+                ))
+              )}
+            </div>
+          </>
+        ) : (
+          <EmployeeTrackingTab />
+        )}
       </div>
     </div>
   );

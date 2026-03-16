@@ -239,7 +239,7 @@ const landmarkLabelsRef = useRef<google.maps.OverlayView[]>([]);
   const is3D = useRef(false);
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ['places', 'drawing', 'geometry'],
+    libraries: ['places', 'drawing', 'geometry', 'marker'],
   });
 
 useEffect(() => {
