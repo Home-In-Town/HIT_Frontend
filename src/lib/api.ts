@@ -566,13 +566,14 @@ export interface AuthUser {
   id: string;
   _id?: string;
   name: string;
-  email: string;
+  email?: string;
   role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee';
   companyName?: string;
-  phone?: string;
+  phone: string;
   isActive: boolean;
+  isVerified: boolean;
   isEmployerConfirmed?: boolean;
-  employerId?: string | { _id: string; name: string; phone: string };
+  employerId?: string | { id?: string; _id?: string; name: string; phone?: string; role?: string };
   isAlreadyAssigned?: boolean;
 }    
 

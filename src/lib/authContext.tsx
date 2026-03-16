@@ -1,23 +1,10 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authApi, usersApi } from './api';
+import { authApi, usersApi, AuthUser } from './api';
 
-// Realistic User type matching model
-export interface User {
-  id: string;
-  name: string;
-  email?: string;
-  phone: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee';
-  isVerified: boolean;
-  employerId?: {
-    id: string;
-    name: string;
-    role: string;
-  };
-  isEmployerConfirmed?: boolean;
-}
+// Re-export AuthUser as User for the context
+export type User = AuthUser;
 
 interface AuthContextType {
   user: User | null;

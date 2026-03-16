@@ -246,15 +246,17 @@ export default function EmployeeDashboard() {
 
         setSubmittingMeeting(true);
         try {
+            const isEmployerAdmin = user?.employerId && typeof user.employerId === 'object' && 'role' in user.employerId && user.employerId.role === 'admin';
+            
             await employeeApi.logMeeting({
                 withWhom: meetingWith,
                 description: meetingDesc,
                 latitude: pointedLocation.lat,
                 longitude: pointedLocation.lng,
                 placeName: pointingAddress,
-                projectName: user?.employerId?.role === 'admin' ? projectName : undefined,
-                projectLocation: user?.employerId?.role === 'admin' ? projectLocationField : undefined,
-                projectPrice: user?.employerId?.role === 'admin' ? projectPrice : undefined
+                projectName: isEmployerAdmin ? projectName : undefined,
+                projectLocation: isEmployerAdmin ? projectLocationField : undefined,
+                projectPrice: isEmployerAdmin ? projectPrice : undefined
             });
 
             toast.success("Intelligence Logged Successfully");
@@ -415,7 +417,7 @@ export default function EmployeeDashboard() {
                                 </div>
                             </div>
                             
-                            {user?.employerId?.role === 'admin' && (
+                            {(user?.employerId && typeof user.employerId === 'object' && 'role' in user.employerId && user.employerId.role === 'admin') && (
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 animate-in fade-in slide-in-from-top-2 duration-500">
                                     <div className="space-y-2">
                                         <label className="text-[10px] font-black text-[#A8A29E] uppercase tracking-[0.15em] ml-1">Project Name</label>
