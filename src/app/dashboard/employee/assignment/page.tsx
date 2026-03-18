@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
+import { employeeApi } from '@/lib/api';
 import { CheckCircle, XCircle, Clock, Building } from 'lucide-react';
 
 export default function AssignmentPage() {
@@ -15,26 +16,13 @@ export default function AssignmentPage() {
         setLoading(true);
         setError(null);
         try {
-            const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-            
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001'}/api/employee/confirm-assignment`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.error || 'Failed to confirm assignment');
-            }
+            await employeeApi.confirmAssignment();
 
             // Successfully confirmed, trigger re-check of auth to get updated user
             await checkAuth();
             router.push('/dashboard/employee');
         } catch (err: any) {
-            setError(err.message);
+            setError(err.message || 'Failed to confirm assignment');
             setLoading(false);
         }
     };

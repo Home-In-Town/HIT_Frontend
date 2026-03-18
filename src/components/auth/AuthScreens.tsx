@@ -43,12 +43,23 @@ export default function AuthScreens() {
     };
 
     // ========================================
+    const validatePhone = (p: string) => /^(?:\+91)?[6-9]\d{9}$/.test(p);
+    const validateMpin = (m: string) => /^\d{4,6}$/.test(m);
+
+    // ========================================
     // 1. LOGIN — Phone + MPIN (Direct)
     // ========================================
     const onLoginSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!phone || phone.length < 10) return toast.error("Enter a valid phone number");
-        if (!mpin || mpin.length < 4) return toast.error("MPIN should be at least 4 digits");
+
+        if (!validatePhone(phone)) {
+            toast.error('Please enter a valid phone number (e.g. 9970119846)');
+            return;
+        }
+        if (!validateMpin(mpin)) {
+            toast.error("MPIN should be 4-6 digits");
+            return;
+        }
 
         try {
             setLoading(true);
@@ -105,9 +116,16 @@ export default function AuthScreens() {
     // ========================================
     const onRegisterSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!name) return toast.error("Name is required");
-        if (!phone || phone.length < 10) return toast.error("Enter a valid phone number");
-        if (mpin.length < 4) return toast.error("MPIN should be at least 4 digits");
+        
+        if (!name.trim()) return toast.error("Name is required");
+        if (!validatePhone(phone)) {
+            toast.error('Please enter a valid phone number (e.g. 9970119846)');
+            return;
+        }
+        if (!validateMpin(mpin)) {
+            toast.error("MPIN should be 4-6 digits");
+            return;
+        }
         if (mpin !== confirmMpin) return toast.error("MPINs do not match");
         
         try {
@@ -130,7 +148,11 @@ export default function AuthScreens() {
     // ========================================
     const onForgotPhoneSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!forgotPhone || forgotPhone.length < 10) return toast.error("Enter a valid phone number");
+        
+        if (!validatePhone(forgotPhone)) {
+            toast.error('Please enter a valid registered phone number');
+            return;
+        }
 
         try {
             setLoading(true);
@@ -178,7 +200,10 @@ export default function AuthScreens() {
     // ========================================
     const onResetMpinSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (mpin.length < 4) return toast.error("MPIN should be at least 4 digits");
+        if (!validateMpin(mpin)) {
+            toast.error("New MPIN should be 4-6 digits");
+            return;
+        }
         if (mpin !== confirmMpin) return toast.error("MPINs do not match");
 
         try {
