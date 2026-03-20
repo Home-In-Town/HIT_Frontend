@@ -420,7 +420,7 @@ useEffect(() => {
   if (!isLoaded || !focusedProject) return;
 
   const handleHash = () => {
-    const hash = window.location.hash.replace("#", "");
+    const hash = window.location.hash.replace("#", "").split("?")[0]; // strip any leaked query params
 
     if (!hash) return;
 
@@ -894,6 +894,7 @@ editBoundary: () => {
         if (!mapRef.current) return;
 
         if (!is3D.current) {
+          mapRef.current.setTilt(45);
           mapRef.current.setZoom(18);
           mapRef.current.setMapTypeId(google.maps.MapTypeId.SATELLITE);
         } else {

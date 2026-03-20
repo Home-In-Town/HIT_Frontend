@@ -1,42 +1,27 @@
 'use client';
 
-import Link from 'next/link';
-import { useAuth } from '@/lib/authContext';
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { usersApi, getLeadGenUrl, analyticsApi, GlobalAnalytics } from '@/lib/api';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/authContext';
+import { usersApi, getLeadGenUrl } from '@/lib/api';
 import toast from 'react-hot-toast';
-import UserApprovals from '@/components/dashboard/UserApprovals';
-import { UserPlus, PlusCircle, Activity, Settings, LayoutGrid, Users, Navigation } from 'lucide-react';
+import { LayoutGrid, PlusCircle, Users, Zap, FilePlus, ArrowRight, Settings } from 'lucide-react';
+import CrmPipeline from '@/components/dashboard/CrmPipeline';
 
-export default function AdminDashboardPage() {
+export default function BuilderAdminDashboardPage() {
   const { user, status, logout } = useAuth();
-  const [stats, setStats] = useState<GlobalAnalytics | null>(null);
-  const [isStatsLoading, setIsStatsLoading] = useState(true);
-  const isLoading = status === 'loading';
+  const authLoading = status === 'loading';
   const router = useRouter();
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== 'admin')) {
+    if (!authLoading && (!user || user.role !== 'admin')) {
       router.push('/login');
+      return;
     }
-  }, [user, status, router, isLoading]);
-
-  useEffect(() => {
-    async function fetchStats() {
-      if (user?.role === 'admin') {
-        try {
-          const data = await analyticsApi.getGlobalOverview();
-          setStats(data);
-        } catch (error) {
-          console.error('Failed to fetch stats:', error);
-        } finally {
-          setIsStatsLoading(false);
-        }
-      }
-    }
-    fetchStats();
-  }, [user]);
+    setLoading(false);
+  }, [user, authLoading, router]);
 
   async function handleGenerateLead() {
     try {
@@ -49,13 +34,7 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-    if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
-    return num.toString();
-  };
-
-  if (isLoading || !user) {
+  if (authLoading || loading || !user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-gray-900" />
@@ -64,149 +43,104 @@ export default function AdminDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
+    <div className="min-h-screen bg-[#FAF7F2] pb-20">
       {/* Header Section */}
-      <div className="border-b border-[#E7E5E4] bg-white px-6 py-6 shadow-sm shadow-[#B45309]/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
+      <div className="bg-white border-b border-[#E7E5E4] px-6 py-6 shadow-sm shadow-[#B45309]/5">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-[#2A2A2A] font-serif tracking-tight">
-              Welcome back, <span className="text-[#B45309]">{user.name}</span>
+              Admin <span className="text-[#B45309]">Control Center</span>
             </h1>
-            <p className="mt-1.5 text-[#57534E] font-mono text-[10px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2.5 py-1 rounded-lg border border-[#E7E5E4]">
-              Admin Dashboard — Full Access
+            <p className="mt-1 text-[#57534E] font-mono text-[10px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2.5 py-1 rounded-lg border border-[#E7E5E4]">
+              Executive Overview — System-wide Performance & Pipeline
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <button
-              onClick={handleGenerateLead}
-              className="px-6 py-3 bg-[#B45309] text-white text-sm font-bold rounded-2xl shadow-lg shadow-[#B45309]/20 hover:bg-[#92400E] transition-all active:scale-95 cursor-pointer"
-            >
-              Generate Lead
-            </button>
-            <button
-              onClick={async () => { await logout(); router.push('/login'); }}
-              className="text-sm text-gray-500 hover:text-gray-900 underline cursor-pointer"
-            >
-              Sign Out
-            </button>
-          </div>
+          <button
+            onClick={async () => { await logout(); router.push('/login'); }}
+            className="text-[10px] text-[#A8A29E] hover:text-[#B45309] font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 group border border-transparent hover:border-[#B45309]/10 px-3 py-1.5 rounded-lg whitespace-nowrap"
+          >
+            Sign Out <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="space-y-8">
-          {/* New User Approvals Section */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <h2 className="text-xs font-black text-[#2A2A2A] uppercase tracking-[0.2em]">
-                New User <span className="text-[#B45309]">Approvals</span>
-              </h2>
-              <div className="h-px bg-[#E7E5E4] flex-1" />
-            </div>
-            <UserApprovals />
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Quick Actions Grid */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 opacity-60">
+            <Zap className="w-3.5 h-3.5 text-[#B45309]" />
+            <h2 className="text-[10px] font-bold text-[#57534E] uppercase tracking-[0.2em]">Administrative Workflows</h2>
           </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              href="/dashboard/employees"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Users className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Users className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Field Team</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Management</p>
+              </div>
+            </Link>
 
-          {/* Metrics Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="group relative p-4.5 bg-white border border-[#E7E5E4] rounded-2xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-                <Activity className="w-4 h-4" />
+            <Link
+              href="/dashboard/projects/new"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <FilePlus className="w-12 h-12" />
               </div>
-              <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Active Projects</p>
-              {isStatsLoading ? (
-                <div className="h-8 w-12 bg-gray-100 animate-pulse mt-1.5 rounded-lg" />
-              ) : (
-                <p className="mt-1.5 text-2xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{stats?.activeProjects ?? 0}</p>
-              )}
-              <div className="mt-2.5 flex items-center text-[9px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-                <span>Real-time</span>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <PlusCircle className="w-6 h-6" />
               </div>
-            </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">New Project</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Stock Entry</p>
+              </div>
+            </Link>
 
-            <div className="group relative p-4.5 bg-white border border-[#E7E5E4] rounded-2xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-                <Users className="w-4 h-4" />
+            <button
+              onClick={handleGenerateLead}
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden text-left w-full"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Zap className="w-12 h-12" />
               </div>
-              <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Leads</p>
-              {isStatsLoading ? (
-                <div className="h-8 w-20 bg-gray-100 animate-pulse mt-1.5 rounded-lg" />
-              ) : (
-                <p className="mt-1.5 text-2xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{stats?.totalLeads.toLocaleString() ?? 0}</p>
-              )}
-              <div className="mt-2.5 flex items-center text-[9px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-                <span>System Total</span>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Zap className="w-6 h-6" />
               </div>
-            </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Generate Lead</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Sales Handover</p>
+              </div>
+            </button>
 
-            <div className="group relative p-4.5 bg-white border border-[#E7E5E4] rounded-2xl hover:border-[#B45309] transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 overflow-hidden">
-              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-                <Activity className="w-4 h-4" />
+            <Link
+              href="/dashboard/organizations"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Settings className="w-12 h-12" />
               </div>
-              <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Views</p>
-              {isStatsLoading ? (
-                <div className="h-8 w-16 bg-gray-100 animate-pulse mt-1.5 rounded-lg" />
-              ) : (
-                <p className="mt-1.5 text-2xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{formatNumber(stats?.totalViews ?? 0)}</p>
-              )}
-              <div className="mt-2.5 flex items-center text-[9px] font-medium text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-                <span>Live Traffic</span>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Settings className="w-6 h-6" />
               </div>
-            </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Market Settings</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Global Config</p>
+              </div>
+            </Link>
           </div>
+        </section>
 
-          {/* Quick Actions Grid */}
-          <div>
-            <h2 className="text-lg font-bold text-[#2A2A2A] font-serif mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Link href="/dashboard/projects/new" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
-                    <PlusCircle className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">New Project</h3>
-                    <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Create listing</p>
-                  </div>
-                </div>
-              </Link>
-
-              <Link href="/dashboard/projects" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
-                    <LayoutGrid className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">Inventory</h3>
-                    <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Manage listings</p>
-                  </div>
-                </div>
-              </Link>
-
-              <Link href="/dashboard/organizations" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
-                    <Users className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">Organizations</h3>
-                    <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Manage partners</p>
-                  </div>
-                </div>
-              </Link>
-
-              <Link href="/dashboard/employees" className="bg-white border border-[#E7E5E4] rounded-2xl p-4.5 hover:border-[#B45309] transition-all group shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-[#B45309]/5 text-[#B45309] rounded-xl flex items-center justify-center border border-[#B45309]/10 transition-transform group-hover:scale-110">
-                    <Navigation className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-[#2A2A2A] font-serif tracking-tight text-sm">Field Team</h3>
-                    <p className="text-[10px] text-[#57534E] font-medium leading-tight mt-0.5">Live tracking</p>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
+        {/* Embedded CRM Pipeline */}
+        <div className="mt-8">
+          <CrmPipeline embedded={true} />
         </div>
       </div>
     </div>

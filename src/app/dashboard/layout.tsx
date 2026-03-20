@@ -231,6 +231,49 @@ const orgPath = user
             </Link>
           )}
 
+          {/* CRM & Tools Section */}
+          {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'agent') && (
+            <>
+              {!isCollapsed && (
+                <div className="px-2 mb-2 mt-6 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap transition-all duration-300">
+                  CRM & Tools
+                </div>
+              )}
+
+              <Link
+                href="/dashboard/chat"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/chat')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Chat" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Chat</span>}
+              </Link>
+
+              <Link
+                href="/dashboard/marketplace"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/marketplace')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Marketplace" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Marketplace</span>}
+              </Link>
+            </>
+          )}
+
 
 
         </nav>

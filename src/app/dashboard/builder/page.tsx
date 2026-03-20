@@ -4,16 +4,15 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { usersApi, projectsApi, getLeadGenUrl } from '@/lib/api';
-import { Project } from '@/types/project';
+import { usersApi, getLeadGenUrl } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { PlusCircle, LayoutGrid, FileText, Globe, ExternalLink, Edit3, Copy, Users } from 'lucide-react';
+import { PlusCircle, Users, Zap, LayoutGrid, FilePlus, ArrowRight } from 'lucide-react';
+import CrmPipeline from '@/components/dashboard/CrmPipeline';
 
 export default function BuilderDashboardPage() {
   const { user, status, logout } = useAuth();
   const authLoading = status === 'loading';
   const router = useRouter();
-  const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,10 +20,7 @@ export default function BuilderDashboardPage() {
       router.push('/login');
       return;
     }
-
-    if (user) {
-      fetchProjects();
-    }
+    setLoading(false);
   }, [user, authLoading, router]);
 
   async function handleGenerateLead() {
@@ -38,24 +34,6 @@ export default function BuilderDashboardPage() {
     }
   }
 
-  async function fetchProjects() {
-    try {
-      const data = await projectsApi.getAll();
-      setProjects(data);
-    } catch (error) {
-      console.error('Failed to fetch projects:', error);
-      toast.error('Failed to load projects');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function copyLink(link: string) {
-    const fullUrl = `${window.location.origin}${link}`;
-    navigator.clipboard.writeText(fullUrl);
-    toast.success('Link copied to clipboard!');
-  }
-
   if (authLoading || loading || !user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -64,153 +42,89 @@ export default function BuilderDashboardPage() {
     );
   }
 
-  const publishedCount = projects.filter(p => p.isPublished).length;
-  const draftCount = projects.filter(p => !p.isPublished).length;
-
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
+    <div className="min-h-screen bg-[#FAF7F2] pb-20">
       {/* Header Section */}
-      <div className="bg-white border-b border-[#E7E5E4] px-6 py-4 shadow-sm shadow-[#B45309]/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
+      <div className="bg-white border-b border-[#E7E5E4] px-6 py-6 shadow-sm shadow-[#B45309]/5">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-[#2A2A2A] font-serif tracking-tight">
+            <h1 className="text-2xl md:text-3xl font-bold text-[#2A2A2A] font-serif tracking-tight">
               Welcome, <span className="text-[#B45309]">{user.name}</span>
             </h1>
-            <p className="mt-1 text-[#57534E] font-mono text-[9px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2 py-0.5 rounded-lg border border-[#E7E5E4]">
-              Builder Dashboard — Portfolio Management
+            <p className="mt-1 text-[#57534E] font-mono text-[10px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2.5 py-1 rounded-lg border border-[#E7E5E4]">
+              Builder Overview — Relationship & Pipeline Management
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <Link
-              href="/dashboard/employees"
-              className="px-5 py-2.5 bg-white text-[#57534E] border border-[#E7E5E4] text-xs font-bold rounded-xl shadow-sm hover:bg-[#FAF7F2] transition-all flex items-center gap-2 active:scale-95"
-            >
-              <Users className="w-4 h-4 text-[#B45309]" />
-              Field Team
-            </Link>
-            <Link
-              href="/dashboard/projects/new"
-              className="px-5 py-2.5 bg-[#B45309] text-white text-xs font-bold rounded-xl shadow-lg shadow-[#B45309]/20 hover:bg-[#92400E] transition-all flex items-center gap-2 active:scale-95"
-            >
-              <PlusCircle className="w-4 h-4" />
-              New Project
-            </Link>
-            <button
-              onClick={handleGenerateLead}
-              className="px-5 py-2.5 bg-white text-[#B45309] border border-[#B45309]/30 text-xs font-bold rounded-xl shadow-sm hover:bg-[#FAF7F2] transition-all active:scale-95"
-            >
-              Generate Lead
-            </button>
-            <button
-              onClick={async () => { await logout(); router.push('/login'); }}
-              className="text-xs text-[#A8A29E] hover:text-[#2A2A2A] font-bold uppercase tracking-widest transition-colors underline decoration-[#B45309]/30 underline-offset-4"
-            >
-              Sign Out
-            </button>
-          </div>
+          <button
+            onClick={async () => { await logout(); router.push('/login'); }}
+            className="text-[10px] text-[#A8A29E] hover:text-[#B45309] font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 group border border-transparent hover:border-[#B45309]/10 px-3 py-1.5 rounded-lg whitespace-nowrap"
+          >
+            Sign Out <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-6">
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white p-5 border border-[#E7E5E4] rounded-2xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-3 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <LayoutGrid className="w-4 h-4" />
-            </div>
-            <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Inventory</p>
-            <p className="mt-1 text-3xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{projects.length}</p>
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Quick Actions Grid */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 opacity-60">
+            <Zap className="w-3.5 h-3.5 text-[#B45309]" />
+            <h2 className="text-[10px] font-bold text-[#57534E] uppercase tracking-[0.2em]">Priority Workflows</h2>
           </div>
-          <div className="bg-white p-5 border border-[#E7E5E4] rounded-2xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-3 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <Globe className="w-4 h-4" />
-            </div>
-            <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Live Listings</p>
-            <p className="mt-1 text-3xl font-bold text-emerald-600 font-mono tracking-tighter">{publishedCount}</p>
-          </div>
-          <div className="bg-white p-5 border border-[#E7E5E4] rounded-2xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-3 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <FileText className="w-4 h-4" />
-            </div>
-            <p className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Pending Drafts</p>
-            <p className="mt-1 text-3xl font-bold text-[#A8A29E] font-mono tracking-tighter">{draftCount}</p>
-          </div>
-        </div>
-
-        {/* Projects List Container */}
-        <div className="bg-white border border-[#E7E5E4] rounded-2xl overflow-hidden shadow-sm shadow-[#B45309]/5">
-          <div className="px-5 py-3.5 border-b border-[#E7E5E4]/50 flex items-center justify-between bg-[#FAF7F2]/30">
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm font-bold text-[#2A2A2A] font-serif">Portfolio Overview</h2>
-              <span className="text-[8px] font-bold text-[#B45309] bg-[#B45309]/5 px-1.5 py-0.5 rounded border border-[#B45309]/10 uppercase tracking-widest">Master List</span>
-            </div>
-            <Link href="/dashboard/projects" className="text-[9px] font-bold uppercase tracking-widest text-[#B45309] hover:underline flex items-center gap-1">View Full Inventory <ExternalLink className="w-2.5 h-2.5" /></Link>
-          </div>
-
-          {projects.length === 0 ? (
-            <div className="p-16 text-center">
-              <div className="mx-auto w-16 h-16 bg-[#FAF7F2] rounded-2xl flex items-center justify-center border border-[#E7E5E4] mb-4">
-                <LayoutGrid className="h-8 w-8 text-[#A8A29E] opacity-50" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Link
+              href="/dashboard/employees"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Users className="w-12 h-12" />
               </div>
-              <p className="text-lg font-bold text-[#2A2A2A] font-serif">Empty Portfolio</p>
-              <p className="text-xs text-[#57534E] mt-1.5 font-medium mb-6">Ready to showcase your next property developments?</p>
-              <Link
-                href="/dashboard/projects/new"
-                className="inline-flex items-center px-6 py-2.5 bg-[#B45309] text-white text-xs font-bold rounded-xl shadow-lg shadow-[#B45309]/20 hover:bg-[#92400E] transition-all"
-              >
-                Create First Project
-              </Link>
-            </div>
-          ) : (
-            <div className="divide-y divide-[#E7E5E4]/30">
-              {projects.slice(0, 10).map((project) => (
-                <div key={project.id} className="px-5 py-2.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-[#FAF7F2]/30 transition-all group">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-bold text-sm text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">{project.name}</h3>
-                      {project.isPublished && <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)] animate-pulse" />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <p className="text-[10px] text-[#57534E] font-medium">{project.location}, {project.city}</p>
-                      <span className="w-0.5 h-0.5 rounded-full bg-[#E7E5E4]" />
-                      <p className="text-[8px] font-bold text-[#A8A29E] uppercase tracking-widest">{project.type}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 self-end md:self-center">
-                    <span className={`px-2 py-0.5 text-[8px] font-bold uppercase tracking-widest rounded border ${
-                      project.isPublished 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm' 
-                        : 'bg-[#FAF7F2] text-gray-500 border-[#E7E5E4]'
-                    }`}>
-                      {project.isPublished ? 'Published' : 'Draft'}
-                    </span>
-                    
-                    {project.isPublished && project.trackableLink && (
-                      <button
-                        onClick={() => copyLink(project.trackableLink!)}
-                        className="p-1.5 text-[#A8A29E] hover:text-[#B45309] bg-white border border-[#E7E5E4] rounded-lg transition-all hover:border-[#B45309]/30"
-                        title="Copy Link"
-                      >
-                        <Copy className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                    
-                    <Link
-                      href={`/dashboard/projects/${project.id}/edit`}
-                      className="text-[9px] font-bold uppercase tracking-widest text-[#B45309] bg-[#B45309]/5 px-3 py-1.5 rounded-lg border border-[#B45309]/10 hover:bg-[#B45309] hover:text-white transition-all flex items-center gap-1.5"
-                    >
-                      <Edit3 className="w-3 h-3" /> Edit
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {projects.length > 10 && (
-            <div className="px-6 py-4 bg-[#FAF7F2]/20 text-center border-t border-[#E7E5E4]/50">
-                <Link href="/dashboard/projects" className="text-xs font-bold text-[#B45309] hover:underline flex items-center justify-center gap-2">View All Portfolio Assets <LayoutGrid className="w-3 h-3" /></Link>
-            </div>
-          )}
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Users className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Field Team</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Team Management</p>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/projects/new"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <FilePlus className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <PlusCircle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">New Project</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Inventory Expansion</p>
+              </div>
+            </Link>
+
+            <button
+              onClick={handleGenerateLead}
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden text-left w-full"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Zap className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Zap className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Generate Lead</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Pipeline Handover</p>
+              </div>
+            </button>
+          </div>
+        </section>
+
+        {/* Embedded CRM Pipeline */}
+        <div className="mt-8">
+          <CrmPipeline embedded={true} />
         </div>
       </div>
     </div>

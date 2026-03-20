@@ -4,27 +4,23 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { organizationsApi, Organization, usersApi, getLeadGenUrl } from '@/lib/api';
+import { usersApi, getLeadGenUrl } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { Building2, Globe, LayoutGrid, ChevronDown, User, LogOut, Users } from 'lucide-react';
+import { Users, Zap, FilePlus, ArrowRight, PlusCircle } from 'lucide-react';
+import CrmPipeline from '@/components/dashboard/CrmPipeline';
 
 export default function AgentDashboardPage() {
   const { user, status, logout } = useAuth();
   const authLoading = status === 'loading';
   const router = useRouter();
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'agent')) {
       router.push('/login');
       return;
     }
-
-    if (user) {
-      fetchOrganizations();
-    }
+    setLoading(false);
   }, [user, authLoading, router]);
 
   async function handleGenerateLead() {
@@ -38,18 +34,6 @@ export default function AgentDashboardPage() {
     }
   }
 
-  async function fetchOrganizations() {
-    try {
-      const data = await organizationsApi.getAll();
-      setOrganizations(data);
-    } catch (error) {
-      console.error('Failed to fetch organizations:', error);
-      toast.error('Failed to load organizations');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   if (authLoading || loading || !user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
@@ -58,145 +42,89 @@ export default function AgentDashboardPage() {
     );
   }
 
-  const totalProjects = organizations.reduce((acc, org) => acc + (org.projects?.length || 0), 0);
-
   return (
-    <div className="min-h-screen bg-[#FAF7F2]">
-      {/* Header */}
+    <div className="min-h-screen bg-[#FAF7F2] pb-20">
+      {/* Header Section */}
       <div className="bg-white border-b border-[#E7E5E4] px-6 py-6 shadow-sm shadow-[#B45309]/5">
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-[#2A2A2A] font-serif tracking-tight">
               Welcome, <span className="text-[#B45309]">{user.name}</span>
             </h1>
-            <p className="mt-1.5 text-[#57534E] font-mono text-[10px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2.5 py-1 rounded-lg border border-[#E7E5E4]">
-              Agent Dashboard — Your Organizations
+            <p className="mt-1 text-[#57534E] font-mono text-[10px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2.5 py-1 rounded-lg border border-[#E7E5E4]">
+              Agent Overview — Client Relations & Lead Management
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-4">
-            <Link
-              href="/dashboard/employees"
-              className="px-6 py-3 bg-white text-[#57534E] border border-[#E7E5E4] text-sm font-bold rounded-2xl shadow-sm hover:bg-[#FAF7F2] transition-all flex items-center gap-2 active:scale-95"
-            >
-              <Users className="w-4 h-4 text-[#B45309]" />
-              Field Team
-            </Link>
-            <button
-              onClick={handleGenerateLead}
-              className="px-6 py-3 bg-[#B45309] text-white text-sm font-bold rounded-2xl shadow-lg shadow-[#B45309]/20 hover:bg-[#92400E] transition-all active:scale-95"
-            >
-              Generate Lead
-            </button>
-            <button
-              onClick={async () => { await logout(); router.push('/login'); }}
-              className="text-sm text-[#A8A29E] hover:text-[#2A2A2A] font-bold uppercase tracking-widest transition-colors underline decoration-[#B45309]/30 underline-offset-4"
-            >
-              Sign Out
-            </button>
-          </div>
+          <button
+            onClick={async () => { await logout(); router.push('/login'); }}
+            className="text-[10px] text-[#A8A29E] hover:text-[#B45309] font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 group border border-transparent hover:border-[#B45309]/10 px-3 py-1.5 rounded-lg whitespace-nowrap"
+          >
+            Sign Out <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+          </button>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <Building2 className="w-5 h-5" />
-            </div>
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Organizations</p>
-            <p className="mt-2 text-4xl font-bold text-[#2A2A2A] font-mono tracking-tighter">{organizations.length}</p>
-            <div className="mt-2 flex items-center text-[10px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-              <span>Assigned</span>
-            </div>
+      <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
+        {/* Quick Actions Grid */}
+        <section>
+          <div className="flex items-center gap-2 mb-4 opacity-60">
+            <Zap className="w-3.5 h-3.5 text-[#B45309]" />
+            <h2 className="text-[10px] font-bold text-[#57534E] uppercase tracking-[0.2em]">Quick Access</h2>
           </div>
-          <div className="bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm shadow-[#B45309]/5 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-10 group-hover:opacity-100 transition-opacity">
-              <LayoutGrid className="w-5 h-5" />
-            </div>
-            <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Total Projects</p>
-            <p className="mt-2 text-4xl font-bold text-[#B45309] font-mono tracking-tighter">{totalProjects}</p>
-            <div className="mt-2 flex items-center text-[10px] font-bold text-[#065F46] bg-[#ECFDF5] px-2 py-0.5 rounded border border-[#D1FAE5] w-fit">
-              <span>Active Listings</span>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Link
+              href="/dashboard/employees"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Users className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Users className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Field Team</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Team Management</p>
+              </div>
+            </Link>
+
+            <Link
+              href="/dashboard/projects/new"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <FilePlus className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <PlusCircle className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">New Project</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Inventory Expansion</p>
+              </div>
+            </Link>
+
+            <button
+              onClick={handleGenerateLead}
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden text-left w-full"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <Zap className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <Zap className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Generate Lead</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Pipeline Handover</p>
+              </div>
+            </button>
           </div>
-        </div>
+        </section>
 
-        <div className="space-y-4">
-          <h2 className="text-lg font-bold text-[#2A2A2A] font-serif mb-4">Your Partner Network</h2>
-          {organizations.length === 0 ? (
-            <div className="bg-white border border-[#E7E5E4] rounded-[2.5rem] p-20 text-center shadow-sm">
-              <div className="mx-auto w-20 h-20 bg-[#FAF7F2] rounded-[2rem] flex items-center justify-center border border-[#E7E5E4] mb-6">
-                <svg className="h-10 w-10 text-[#A8A29E]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5" />
-                </svg>
-              </div>
-              <p className="text-xl font-bold text-[#2A2A2A] font-serif">No assignments yet</p>
-              <p className="text-sm text-[#57534E] mt-2 font-medium max-w-sm mx-auto">Contact your administrator to be added to an organization and begin managing projects.</p>
-            </div>
-          ) : (
-            organizations.map((org) => (
-              <div key={org.id} className="bg-white border border-[#E7E5E4] rounded-[2rem] overflow-hidden shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 transition-all duration-300">
-                {/* Org Header */}
-                <button
-                  onClick={() => setExpandedOrg(expandedOrg === org.id ? null : org.id)}
-                  className="w-full px-5 py-3 flex items-center justify-between hover:bg-[#FAF7F2]/30 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-[#B45309]/10 text-[#B45309] rounded-lg flex items-center justify-center text-sm font-bold font-serif shadow-inner border border-[#B45309]/10">
-                      {org.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="text-left">
-                      <h3 className="text-base font-bold text-[#2A2A2A] font-serif tracking-tight leading-tight">{org.name}</h3>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <span className="text-[9px] font-bold uppercase tracking-widest text-[#A8A29E] bg-[#FAF7F2] px-1.5 py-0.5 rounded border border-[#E7E5E4]">
-                          {org.projects?.length || 0} projects
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className={`p-1.5 rounded-lg transition-all ${expandedOrg === org.id ? 'bg-[#B45309] text-white shadow-md shadow-[#B45309]/30' : 'bg-[#FAF7F2] text-[#A8A29E]'}`}>
-                    <svg 
-                      className={`w-5 h-5 transform transition-transform ${expandedOrg === org.id ? 'rotate-180' : ''}`} 
-                      fill="none" 
-                      stroke="currentColor" 
-                      viewBox="0 0 24 24"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                    </svg>
-                  </div>
-                </button>
-
-                {/* Expanded Projects */}
-                {expandedOrg === org.id && (
-                  <div className="border-t border-[#E7E5E4] bg-[#FAF7F2]/30 p-4">
-                    {org.projects && org.projects.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {org.projects.map((project: { id?: string; _id?: string; name?: string; projectName?: string; status?: string }) => (
-                          <div key={project.id || project._id} className="p-3.5 bg-white border border-[#E7E5E4] rounded-xl flex items-center justify-between shadow-sm hover:border-[#B45309] transition-all group">
-                            <div className="flex items-center gap-3">
-                              <div className="w-2 h-2 rounded-full bg-[#B45309]/40 group-hover:bg-[#B45309] transition-colors shadow-sm" />
-                              <span className="text-[13px] font-bold text-[#2A2A2A] font-serif tracking-tight">{project.name || project.projectName}</span>
-                            </div>
-                            <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-md border ${
-                              project.status === 'published' 
-                                ? 'bg-emerald-50 text-emerald-700 border-emerald-100 shadow-sm' 
-                                : 'bg-gray-50 text-gray-500 border-gray-100'
-                            }`}>
-                              {project.status}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="px-6 py-8 text-center bg-white rounded-2xl border border-[#E7E5E4] border-dashed">
-                        <p className="text-sm text-[#A8A29E] font-bold uppercase tracking-widest">No projects assigned yet</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+        {/* Embedded CRM Pipeline */}
+        <div className="mt-8">
+          <CrmPipeline embedded={true} />
         </div>
       </div>
     </div>
