@@ -230,74 +230,69 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
     let project: Project;
 
-   if (mode === 'create') {
-    // Step 1: create project WITHOUT media
-    const tempData = {
-      ...formData,
-      slug,
-      coverImage: '',
-      galleryImages: [],
-      videos: [],
-      brochureUrl: '',
-    };
+    if (mode === 'create') {
+      // Step 1: Initial Create with text metadata to get a valid ID
+      const initialPayload = {
+        ...formData,
+        slug,
+        coverImage: '',
+        galleryImages: [],
+        videos: [],
+        brochureUrl: '',
+      };
 
-    project = await projectsApi.create(tempData);
+      project = await projectsApi.create(initialPayload);
+      const projectId = project.id; // Correct project ID for media uploads
 
-    // Step 2: upload media AFTER project created
-    const projectId = project.id;
+      setUploading(true);
 
-    // COVER
-    let coverUrl = '';
-    if (coverImageFile) {
-      const { url } = await mediaApi.uploadAndSave({
-        file: coverImageFile,
-        projectId,
-        type: 'cover',
+      // Step 2: Upload all media using the REAL Project ID
+      
+      // COVER
+      let coverObj = null;
+      if (coverImageFile) {
+        coverObj = await mediaApi.uploadAndSave({
+          file: coverImageFile,
+          projectId,
+          type: 'cover',
+        });
+      }
+
+      // GALLERY
+      const galleryObjs = [];
+      for (const file of galleryFiles) {
+        const obj = await mediaApi.uploadAndSave({ file, projectId, type: 'gallery' });
+        galleryObjs.push(obj);
+      }
+
+      // VIDEOS
+      const videoObjs = [];
+      for (const file of videoFiles) {
+        const obj = await mediaApi.uploadAndSave({ file, projectId, type: 'video' });
+        videoObjs.push(obj);
+      }
+
+      // BROCHURE
+      let brochureObj = null;
+      if (brochureFile) {
+        brochureObj = await mediaApi.uploadAndSave({
+          file: brochureFile,
+          projectId,
+          type: 'brochure',
+        });
+      }
+
+      setUploading(false);
+
+      // Step 3: Final synchronization to link media to project
+      project = await projectsApi.update(projectId, {
+        ...formData, // Ensures price/name stay consistent
+        coverImage: coverObj as any,
+        galleryImages: galleryObjs as any,
+        videos: videoObjs as any,
+        brochureUrl: brochureObj as any,
       });
-      coverUrl = url;
-    }
-
-    // GALLERY
-    const galleryUrls: string[] = [];
-    for (const file of galleryFiles) {
-      const { url } = await mediaApi.uploadAndSave({
-        file,
-        projectId,
-        type: 'gallery',
-      });
-      galleryUrls.push(url);
-    }
-
-    // VIDEOS
-    const videoUrls: string[] = [];
-    for (const file of videoFiles) {
-      const { url } = await mediaApi.uploadAndSave({
-        file,
-        projectId,
-        type: 'video',
-      });
-      videoUrls.push(url);
-    }
-
-    // BROCHURE
-    let brochureUrl = '';
-    if (brochureFile) {
-      const { url } = await mediaApi.uploadAndSave({
-        file: brochureFile,
-        projectId,
-        type: 'brochure',
-      });
-      brochureUrl = url;
-    }
-
-    // Step 3: update project with media URLs
-    project = await projectsApi.update(projectId, {
-      coverImage: coverUrl,
-      galleryImages: galleryUrls,
-      videos: videoUrls,
-      brochureUrl,
-    });
-  } else {
+    } else {
       const projectId = initialData!.id!;
       const updateData = { ...formData };
       
@@ -368,18 +363,6 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       project = await projectsApi.update(projectId, updateData);
     }
 
-    // if (publish) {
-    //   const result = await projectsApi.publish(project.id);
-    //   setPublishedLink(result.trackableLink);
-    //   const fullLink = window.location.origin + result.trackableLink;
-    //   try {
-    //     await navigator.clipboard.writeText(fullLink);
-    //     toast.success('Project Created & Link Copied!');
-    //   } catch (err) {
-    //     console.error('Failed to copy link:', err);
-    //     toast.success('Project Created! (Copy link manually)');
-    //   }
-    // }
     if (publish) {
     const result = await projectsApi.publish(project.id);
     setPublishedLink(result.trackableLink);

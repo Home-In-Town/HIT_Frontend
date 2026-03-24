@@ -8,9 +8,10 @@ import {
   DirectionsRenderer,
   useJsApiLoader,
   Polygon,
+  GroundOverlay,
 } from '@react-google-maps/api';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { projectsApi, saveProjectLandmarks } from '@/lib/api';
+import { mediaApi, projectsApi, saveProjectLandmarks } from '@/lib/api';
 import { Landmark, Project } from '@/types/project';
 import SearchFiltersPanel from "./SearchFiltersPanel";
 import { DrawingManager } from '@react-google-maps/api';
@@ -18,6 +19,7 @@ import { useRouter } from 'next/navigation';
 import React from 'react';
 import AILayoutConfigModal from '../ui/AILayoutConfigModal';
 import ProjectBoundaryUI from '../ui/ProjectBoundaryUI';
+import html2canvas from "html2canvas";
 type CustomOverlay = google.maps.OverlayView & {
   div?: HTMLDivElement;
 };
@@ -305,12 +307,35 @@ const latestAiBoundary = useMemo(() => {
     .find((e) => e.type === "ai-boundary");
 }, [mapEntities]);
 const router = useRouter();
+const [layoutImage, setLayoutImage] = useState<string | null>(null);
+ const layoutBounds = useMemo<google.maps.LatLngBoundsLiteral | null>(() => {
+    const boundary = mapEntities.find(
+      e => e.type === "project-boundary" && e.saved
+    );
+
+    if (!boundary) return null;
+
+    const bounds = new google.maps.LatLngBounds();
+
+    boundary.path.forEach(p => bounds.extend(p));
+
+    const ne = bounds.getNorthEast();
+    const sw = bounds.getSouthWest();
+
+    return {
+      north: ne.lat(),
+      south: sw.lat(),
+      east: ne.lng(),
+      west: sw.lng(),
+    };
+  }, [mapEntities]);
+const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>(["flat", "plot"]);
 const [mapZoom, setMapZoom] = useState(16);
 const [availableLandmarks, setAvailableLandmarks] = useState<Landmark[]>([]);
 const [selectedLandmarks, setSelectedLandmarksState] = useState<Landmark[]>([]);
 const landmarkMarkersRef = useRef<google.maps.Marker[]>([]);
 const destinationIcon = 'https://maps.google.com/mapfiles/ms/icons/red-flag.png'; // flag
-
+const [showNeighborhood, setShowNeighborhood] = useState(false);
   const [neighborhoodType, setNeighborhoodType] = useState<string | null>(null);
   const neighborhoodMarkersRef = useRef<google.maps.Marker[]>([]);
 const clientMarkerRef = useRef<google.maps.Marker | null>(null);
@@ -417,9 +442,9 @@ useEffect(() => {
 
     let filtered = allProjects.filter((p) => {
       if (p.latitude == null || p.longitude == null) return false;
-
       const pos = new google.maps.LatLng(p.latitude, p.longitude);
-      return bounds.contains(pos);
+      const typeMatch = selectedPropertyTypes.length === 0 || selectedPropertyTypes.includes(p.type);
+      return bounds.contains(pos) && typeMatch;
     });
 
     
@@ -434,7 +459,7 @@ useEffect(() => {
       return filtered;
     });
 
-  }, [allProjects, searchBounds, isFocusMode, selectedProjectId]);
+  }, [allProjects, searchBounds, isFocusMode, selectedProjectId, selectedPropertyTypes]);
 
   useEffect(() => {
   if (!mapRef.current) return;
@@ -600,7 +625,29 @@ useEffect(() => {
     window.removeEventListener("hashchange", handleHash);
   };
 }, [isLoaded, focusedProject]);
+useEffect(() => {
+  if (!projectId) return;
 
+  const loadLayoutImage = async () => {
+    try {
+      const project = await projectsApi.getById(projectId);
+
+      if (!project?.layoutImage) return;
+
+      const image =
+        typeof project.layoutImage === "object"
+          ? project.layoutImage.url
+          : project.layoutImage;
+
+      setLayoutImage(image);
+
+    } catch (err) {
+      console.error("Failed to load layout image", err);
+    }
+  };
+
+  loadLayoutImage();
+}, [projectId]);
 const filteredLandmarks = useMemo(() => {
   if (!landmarkSearch.trim()) return availableLandmarks;
 
@@ -901,8 +948,118 @@ const attachPolygonListeners = (poly: google.maps.Polygon, id: string) => {
   setSelectedPlotId(null);
   setEditingPlotId(null);
 };
+const captureLayoutImage = async () => {
+  const sanitizeColors = (root: HTMLElement) => {
+    const elements = root.querySelectorAll("*");
+
+    elements.forEach((el) => {
+      const style = window.getComputedStyle(el);
+
+      if (style.color.includes("lab(")) {
+        (el as HTMLElement).style.color = "#000";
+      }
+
+      if (style.backgroundColor.includes("lab(")) {
+        (el as HTMLElement).style.backgroundColor = "#fff";
+      }
+
+      if (style.borderColor.includes("lab(")) {
+        (el as HTMLElement).style.borderColor = "#000";
+      }
+    });
+  };
+  if (!mapRef.current || !projectId) return;
+
+  const mapDiv = mapRef.current.getDiv();
+
+  try {
+    const mapDiv = mapRef.current.getDiv();
+
+    sanitizeColors(mapDiv);
+
+    const canvas = await html2canvas(mapDiv, {
+      useCORS: true,
+      scale: 2,
+      backgroundColor: null,
+      logging: false,
+    });
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/png")
+    );
+
+    if (!blob) return;
+
+    const file = new File([blob], `layout-${projectId}.png`, {
+      type: "image/png",
+    });
+
+    // 🔹 fetch project
+    const project = await projectsApi.getById(projectId);
+
+    const existingLayout =
+      typeof project.layoutImage === "object"
+        ? project.layoutImage
+        : undefined;
+
+    let saved;
+
+    if (existingLayout?.key) {
+      // 🔹 replace existing layout
+      saved = await mediaApi.replaceFile({
+        projectId,
+        type: "layout",
+        oldKey: existingLayout.key,
+        file,
+      });
+    } else {
+      // 🔹 first upload
+      saved = await mediaApi.uploadAndSave({
+        projectId,
+        type: "layout",
+        file,
+      });
+    }
+
+    console.log("Layout saved:", saved);
+
+    alert("Layout saved successfully");
+
+  } catch (err) {
+    console.error("Layout capture failed", err);
+  }
+};
+const deleteLayoutImage = async () => {
+  if (!projectId) return;
+
+  try {
+    const project = await projectsApi.getById(projectId);
+
+    const layout =
+      typeof project.layoutImage === "object"
+        ? project.layoutImage
+        : undefined;
+
+    if (!layout?.key) {
+      alert("No layout image found");
+      return;
+    }
+
+    await mediaApi.deleteFile({
+      projectId,
+      type: "layout",
+      key: layout.key,
+    });
+
+    alert("Layout deleted");
+
+  } catch (err) {
+    console.error("Delete failed", err);
+  }
+};
   // 🔹 Expose functions via ref
   useImperativeHandle(ref, () => ({
+    deleteLayoutImage,
+    captureLayoutImage,
     deleteSelectedPlot,
     saveAiLayout: () => {
 
@@ -1326,12 +1483,14 @@ clearNeighborhood: () => {
       }, [autocomplete]);
 
 
-    const applySearch = () => {
+    const applySearch = (propertyTypes: string[]) => {
     if (!pendingPlaceRef.current || !mapRef.current) return;
     clearNeighborhoodMarkers();
     clearNavigation();
     setNeighborhoodType(null);
     setDirections(null);
+
+    setSelectedPropertyTypes(propertyTypes);
     const place = pendingPlaceRef.current;
 
     setIsFocusMode(false);
@@ -1360,7 +1519,8 @@ clearNeighborhood: () => {
         if (p.latitude == null || p.longitude == null) return false;
 
         const pos = new google.maps.LatLng(p.latitude, p.longitude);
-        return bounds!.contains(pos);
+        const typeMatch = propertyTypes.length === 0 || propertyTypes.includes(p.type);
+        return bounds!.contains(pos) && typeMatch;
       });
 
       setVisibleProjects(filtered);
@@ -1690,104 +1850,107 @@ const REQUIRED_PROJECT_UI_ZOOM = 18;
 const showProjectUI =
   isBoundarySaved &&
   mapZoom >= REQUIRED_PROJECT_UI_ZOOM;
+
+ 
   return (
     <div className="relative h-full w-full z-0">
-      <div
-  className="absolute top-4 left-1/2 z-10
-             -translate-x-1/2
-             w-[340px] lg:w-[420px]
-             rounded-2xl bg-white shadow-xl  p-3"
->
-  <Autocomplete
-    onLoad={setAutocomplete}
-    onPlaceChanged={handlePlaceChanged}
-  >
-    <div className="flex items-center">
-      <input
-        placeholder="Search city / locality"
-        onFocus={() => setSearchOpen(true)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.preventDefault();
-        }}
-        className="flex-1 text-sm outline-none bg-transparent"
-      />
-
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        className="ml-2 h-4 w-4 text-gray-500"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-        strokeWidth={2}
-      >
-        <circle cx="11" cy="11" r="7" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
-      </svg>
-    </div>
-  </Autocomplete>
-
-  <SearchFiltersPanel
-    open={searchOpen}
-    onClose={() => setSearchOpen(false)}
-    onSearch={applySearch}
-    noResults={searchAttempted && visibleProjects.length === 0}
-  />
- {/* Neighborhood Filters */}
-<div className="absolute top-[60px] left-0 right-0 z-30 px-3">
-  <div className="flex gap-2 overflow-x-auto no-scrollbar pb-2">
-
-    {/* Clear button */}
-    <button
-      onClick={() => {
-        clearNeighborhoodMarkers();
-        setNeighborhoodType(null);
-      }}
-      className="
-        flex items-center gap-1
-        px-4 py-1.5
-        rounded-full
-        text-sm font-medium
-        bg-white text-gray-700
-        border border-gray-200
-        shadow-sm
-        hover:bg-gray-100
-        active:scale-95
-        transition
-        whitespace-nowrap
-      "
+        {/* Search area — col on mobile, row on desktop */}
+    <div className="absolute top-4 left-1/2 z-10 -translate-x-1/2
+      flex flex-col lg:flex-row lg:items-start gap-2
+      w-[340px] lg:w-auto"
     >
-      Clear
-    </button>
+   {/* Search card */}
+      <div className="w-full lg:w-[420px] rounded-2xl bg-white shadow-xl p-3">
+        <Autocomplete onLoad={setAutocomplete} onPlaceChanged={handlePlaceChanged}>
+          <div className="flex items-center">
+            <input
+              placeholder="Search city / locality"
+              onFocus={() => setSearchOpen(true)}
+              onKeyDown={(e) => { if (e.key === "Enter") e.preventDefault(); }}
+              className="flex-1 text-sm outline-none bg-transparent"
+            />
+            <svg xmlns="http://www.w3.org/2000/svg" className="ml-2 h-4 w-4 text-gray-500"
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+        </Autocomplete>
 
-    {neighborhoodFilters.map((f) => (
-      <button
-        key={f.key}
-        onClick={() => loadNeighborhood(f.key)}
-        className={`
-          flex items-center gap-1
-          px-4 py-1.5
-          rounded-full
-          text-sm font-medium
-          border
-          shadow-sm
-          whitespace-nowrap
-          transition
-          active:scale-95
-          
-          ${
-            neighborhoodType === f.key
-              ? "bg-black text-white border-black"
-              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"
-          }
-        `}
-      >
-        {f.label}
-      </button>
-    ))}
+        <SearchFiltersPanel
+          open={searchOpen}
+          onClose={() => setSearchOpen(false)}
+          onSearch={applySearch}
+          noResults={searchAttempted && visibleProjects.length === 0}
+        />
+      </div>
 
-  </div>
-</div>
-</div>
+      {/* Neighborhood filters */}
+      {/* Mobile: collapsed behind a toggle button */}
+      <div className="lg:hidden flex flex-col gap-2">
+        <button
+          onClick={() => setShowNeighborhood((v) => !v)}
+          className="flex items-center justify-between px-4 py-2 bg-white
+            rounded-2xl shadow-xl border border-gray-100 text-sm font-medium w-full"
+        >
+          <span>Nearby Places</span>
+          <span className={`transition-transform duration-200 ${showNeighborhood ? "rotate-180" : ""}`}>
+            ▾
+          </span>
+        </button>
+
+        {showNeighborhood && (
+          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
+            <button
+              onClick={() => { clearNeighborhoodMarkers(); setNeighborhoodType(null); }}
+              className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white
+                text-gray-700 border border-gray-200 shadow-sm hover:bg-gray-100 active:scale-95 transition whitespace-nowrap"
+            >
+              Clear
+            </button>
+            {neighborhoodFilters.map((f) => (
+              <button
+                key={f.key}
+                onClick={() => loadNeighborhood(f.key)}
+                className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border shadow-sm
+                  whitespace-nowrap transition active:scale-95
+                  ${neighborhoodType === f.key
+                    ? "bg-black text-white border-black"
+                    : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: always visible pill row to the right of search card */}
+      <div className="hidden lg:flex gap-2 overflow-x-auto scrollbar-hide pb-1 max-w-[380px]">
+        <button
+          onClick={() => { clearNeighborhoodMarkers(); setNeighborhoodType(null); }}
+          className="shrink-0 px-4 py-1.5 rounded-full text-sm font-medium bg-white
+            text-gray-700 border border-gray-200 shadow-sm hover:bg-gray-100 active:scale-95 transition whitespace-nowrap"
+        >
+          Clear
+        </button>
+        {neighborhoodFilters.map((f) => (
+          <button
+            key={f.key}
+            onClick={() => loadNeighborhood(f.key)}
+            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium border shadow-sm
+              whitespace-nowrap transition active:scale-95
+              ${neighborhoodType === f.key
+                ? "bg-black text-white border-black"
+                : "bg-white text-gray-700 border-gray-200 hover:bg-gray-100"}`}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+    </div>
+
 
  
                   <GoogleMap
@@ -1823,6 +1986,13 @@ const showProjectUI =
     boundaryBottom={boundaryBottom}
     focusedProject={focusedProject}
   />
+  {layoutImage && layoutBounds && (
+    <GroundOverlay
+      url={layoutImage}
+      bounds={layoutBounds}
+      opacity={0.9}
+    />
+  )}
   {mapEntities
     .filter(entity => !entity.deleted)
     .map((entity) => {
