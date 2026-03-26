@@ -586,7 +586,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
 <button
   onClick={async () => {
   const pageUrl = window.location.href;
-  const { jsPDF } = await import('jspdf');
+  const { default: jsPDF } = await import('jspdf');
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = 210;
@@ -1010,7 +1010,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
   // BUILDER INFO
   // ════════════════════════════════════════════════
   sectionHead('Builder Information');
-  infoRow('Builder Name', project.builderName || 'Builder Name');
+  infoRow('Builder Name', project.owner?.companyName || project.owner?.name || 'Builder Name');
   infoRow('Address', 'Skyline Developers Pvt. Ltd., 4th Floor, Landmark Business Plaza, Ring Road, Civil Lines, Nagpur - 440001');
   y += 4;
 

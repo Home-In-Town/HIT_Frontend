@@ -85,7 +85,7 @@ export default function ProjectBoundaryUI({
 
             <div className="p-3">
               <div className="text-sm text-center font-semibold text-gray-800">
-                {focusedProject?.builderName || "Builder Name"}
+                {focusedProject?.owner?.companyName || focusedProject?.owner?.name || "Builder Name"}
               </div>
 
               <div className="text-xs text-center text-gray-500 mt-1">
