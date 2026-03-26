@@ -1,36 +1,161 @@
+// import { useState } from "react";
+// import { motion, AnimatePresence } from "framer-motion";
+
+// const PROPERTY_TYPES = [
+//   { label: "Flat/Apartment", value: "flat" },
+//   { label: "Residential Land", value: "plot" },
+// ] as const;
+
+// type PropertyType = (typeof PROPERTY_TYPES)[number];
+
+// type Props = {
+//   open: boolean;
+//   onClose: () => void;
+//   onSearch: () => void;
+//   noResults?:boolean;
+// };
+
+// export default function SearchFiltersPanel({ open, onClose, onSearch, noResults }: Props) {
+//   const [selected, setSelected] = useState<PropertyType[]>([
+//     ...PROPERTY_TYPES,
+//   ]);
+
+//   const toggleType = (type: PropertyType) => {
+//     setSelected((prev) =>
+//       prev.includes(type)
+//         ? prev.filter((t) => t !== type)
+//         : [...prev, type]
+//     );
+//   };
+
+//   const clearAll = () => setSelected([]);
+
+//   return (
+//     <AnimatePresence>
+//       {open && (
+//         <motion.div
+//           initial={{ height: 0, opacity: 0 }}
+//           animate={{ height: "auto", opacity: 1 }}
+//           exit={{ height: 0, opacity: 0 }}
+//           transition={{ duration: 0.25 }}
+//           className="overflow-hidden"
+//         >
+//           {/* Divider */}
+//           <div className="my-4 h-px bg-gray-200" />
+
+//           {/* Header */}
+//           <div className="flex justify-between mb-3">
+//             <span className="font-semibold text-sm">
+//               Property Types ({selected.length})
+//             </span>
+
+//             <button
+//               onClick={clearAll}
+//               className="text-xs text-[#3E5F16] hover:underline"
+//             >
+//               Clear all
+//             </button>
+//           </div>
+
+//           {/* Grid */}
+//           <div className="grid grid-cols-2 gap-2 mb-4">
+//             {PROPERTY_TYPES.map((type) => {
+//               const checked = selected.includes(type);
+
+//               return (
+//                 <label
+//                   key={type}
+//                   className="flex items-center gap-2 text-sm cursor-pointer select-none"
+//                 >
+//                   {/* Hidden checkbox */}
+//                   <input
+//                     type="checkbox"
+//                     checked={checked}
+//                     onChange={() => toggleType(type)}
+//                     className="sr-only"
+//                   />
+
+//                   {/* Custom checkbox */}
+//                   <div
+//                     className={`
+//                       w-4 h-4 shrink-0 
+//                       flex items-center justify-center
+//                       border transition-colors
+//                       ${checked
+//                         ? "bg-[#3E5F16] border-[#3E5F16]"
+//                         : "border-gray-400 bg-white"}
+//                     `}
+//                   >
+//                     {checked && (
+//                       <span className="text-white text-[12px] leading-none">
+//                         ✓
+//                       </span>
+//                     )}
+//                   </div>
+
+//                   <span className="leading-tight">{type}</span>
+//                 </label>
+//               );
+//             })}
+//           </div>
+
+
+
+//           {noResults && (
+//             <div className="mb-4 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">
+//               No projects available for this location
+//             </div>
+//           )}
+
+//           {/* Footer */}
+//           <div className="flex justify-end gap-2">
+//             <button
+//               onClick={onClose}
+//               className="px-3 py-1 hover:bg-gray-100 rounded text-sm"
+//             >
+//               Cancel
+//             </button>
+
+//             <button
+//               onClick={onSearch}
+//               className="px-4 py-1 bg-[#3E5F16] text-white rounded text-sm"
+//             >
+//               Search
+//             </button>
+//           </div>
+//         </motion.div>
+//       )}
+//     </AnimatePresence>
+//   );
+// }
+
+
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
+// Maps display label → backend ProjectType value
 const PROPERTY_TYPES = [
-  "Flat/Apartment",
-  "Residential Land",
-  // "Independent / Builder Floor",
-  // "Independent House/Villa",
-  // "1 RK / Studio Apartment",
-  // "Farm House",
-  // "Serviced Apartments",
-  // "Other",
+  { label: "Flat/Apartment", value: "flat" },
+  { label: "Residential Land", value: "plot" },
 ] as const;
 
-type PropertyType = (typeof PROPERTY_TYPES)[number];
+type PropertyValue = (typeof PROPERTY_TYPES)[number]["value"];
 
 type Props = {
   open: boolean;
   onClose: () => void;
-  onSearch: () => void;
-  noResults?:boolean;
+  onSearch: (selectedTypes: PropertyValue[]) => void;
+  noResults?: boolean;
 };
 
 export default function SearchFiltersPanel({ open, onClose, onSearch, noResults }: Props) {
-  const [selected, setSelected] = useState<PropertyType[]>([
-    ...PROPERTY_TYPES,
-  ]);
+  const [selected, setSelected] = useState<PropertyValue[]>(
+    PROPERTY_TYPES.map((t) => t.value) // all selected by default
+  );
 
-  const toggleType = (type: PropertyType) => {
+  const toggle = (value: PropertyValue) => {
     setSelected((prev) =>
-      prev.includes(type)
-        ? prev.filter((t) => t !== type)
-        : [...prev, type]
+      prev.includes(value) ? prev.filter((v) => v !== value) : [...prev, value]
     );
   };
 
@@ -46,66 +171,38 @@ export default function SearchFiltersPanel({ open, onClose, onSearch, noResults 
           transition={{ duration: 0.25 }}
           className="overflow-hidden"
         >
-          {/* Divider */}
           <div className="my-4 h-px bg-gray-200" />
 
-          {/* Header */}
           <div className="flex justify-between mb-3">
             <span className="font-semibold text-sm">
               Property Types ({selected.length})
             </span>
-
-            <button
-              onClick={clearAll}
-              className="text-xs text-[#3E5F16] hover:underline"
-            >
+            <button onClick={clearAll} className="text-xs text-[#3E5F16] hover:underline">
               Clear all
             </button>
           </div>
 
-          {/* Grid */}
           <div className="grid grid-cols-2 gap-2 mb-4">
-            {PROPERTY_TYPES.map((type) => {
-              const checked = selected.includes(type);
-
+            {PROPERTY_TYPES.map(({ label, value }) => {
+              const checked = selected.includes(value);
               return (
-                <label
-                  key={type}
-                  className="flex items-center gap-2 text-sm cursor-pointer select-none"
-                >
-                  {/* Hidden checkbox */}
+                <label key={value} className="flex items-center gap-2 text-sm cursor-pointer select-none">
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => toggleType(type)}
+                    onChange={() => toggle(value)}
                     className="sr-only"
                   />
-
-                  {/* Custom checkbox */}
-                  <div
-                    className={`
-                      w-4 h-4 shrink-0 
-                      flex items-center justify-center
-                      border transition-colors
-                      ${checked
-                        ? "bg-[#3E5F16] border-[#3E5F16]"
-                        : "border-gray-400 bg-white"}
-                    `}
+                  <div className={`w-4 h-4 shrink-0 flex items-center justify-center border transition-colors
+                    ${checked ? "bg-[#3E5F16] border-[#3E5F16]" : "border-gray-400 bg-white"}`}
                   >
-                    {checked && (
-                      <span className="text-white text-[12px] leading-none">
-                        ✓
-                      </span>
-                    )}
+                    {checked && <span className="text-white text-[12px] leading-none">✓</span>}
                   </div>
-
-                  <span className="leading-tight">{type}</span>
+                  <span className="leading-tight">{label}</span>
                 </label>
               );
             })}
           </div>
-
-
 
           {noResults && (
             <div className="mb-4 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600">
@@ -113,17 +210,12 @@ export default function SearchFiltersPanel({ open, onClose, onSearch, noResults 
             </div>
           )}
 
-          {/* Footer */}
           <div className="flex justify-end gap-2">
-            <button
-              onClick={onClose}
-              className="px-3 py-1 hover:bg-gray-100 rounded text-sm"
-            >
+            <button onClick={onClose} className="px-3 py-1 hover:bg-gray-100 rounded text-sm">
               Cancel
             </button>
-
             <button
-              onClick={onSearch}
+              onClick={() => onSearch(selected)}
               className="px-4 py-1 bg-[#3E5F16] text-white rounded text-sm"
             >
               Search

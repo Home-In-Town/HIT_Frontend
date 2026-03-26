@@ -10,7 +10,7 @@ import { Project, ProjectFormData, FileData } from '@/types/project';
 export type { Project, ProjectFormData, FileData };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-type MediaType = "cover" | "gallery" | "video" | "brochure";
+type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
 
 
 // Get headers with auth
@@ -98,6 +98,7 @@ export function transformBackendToFrontend(backendProject: any): Project {
     galleryImages: backendProject.media?.galleryImages ?? [],
     videos: backendProject.media?.videos ?? [],
     brochureUrl: backendProject.media?.brochurePdf ?? null,
+    layoutImage: backendProject.media?.layoutImage ?? null,
     ctaButtonText: backendProject.cta?.buttonText ?? backendProject.ctaButtonText ?? 'Contact Us',
     whatsappNumber: backendProject.cta?.whatsappNumber ?? backendProject.whatsappNumber ?? '',
     callNumber: backendProject.cta?.callNumber ?? backendProject.callNumber ?? '',
@@ -148,7 +149,8 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
       ...(project.coverImage && typeof project.coverImage === 'object' && { coverImage: project.coverImage }),
       ...(project.galleryImages?.length && { galleryImages: project.galleryImages.filter((img: any) => typeof img === 'object' && img?.url) }),
       ...(project.videos?.length && { videos: project.videos.filter((vid: any) => typeof vid === 'object' && vid?.url) }),
-      ...(project.brochureUrl && typeof project.brochureUrl === 'object' && { brochurePdf: project.brochureUrl })
+      ...(project.brochureUrl && typeof project.brochureUrl === 'object' && { brochurePdf: project.brochureUrl }),
+      ...(project.layoutImage && typeof project.layoutImage === 'object' && { layoutImage: project.layoutImage })
     },
 
     cta: {
@@ -274,32 +276,7 @@ export const projectsApi = {
     };
   },
 
-  async uploadBrochure(file: File): Promise<{ url: string }> {
-    const formData = new FormData();
-    formData.append("brochure", file);
-
-    const headers = getAuthHeaders ? getAuthHeaders() : {};
-
-    // ❌ REMOVE content-type if present
-    delete (headers as any)["Content-Type"];
-
-    const response = await fetch(`${API_URL}/upload/brochure`, {
-      method: "POST",
-      body: formData,
-      headers,
-    });
-
-    if (!response.ok) {
-      let errorMessage = "Upload failed";
-      try {
-        const err = await response.json();
-        errorMessage = err.message || errorMessage;
-      } catch { }
-      throw new Error(errorMessage);
-    }
-
-    return response.json();
-  }
+  
 };
 
 export const mediaApi = {
@@ -411,7 +388,7 @@ export const mediaApi = {
   // ================= 6. REPLACE (proxy-based) =================
   async replaceFile(params: {
     projectId: string;
-    type: "cover" | "brochure";
+    type: "cover" | "brochure" | "layout";
     oldKey: string;
     file: File;
   }): Promise<FileData> {

@@ -58,7 +58,7 @@ export interface Project {
   galleryImages: (string | FileData)[];
   videos: (string | FileData)[];
   brochureUrl?: string | FileData;
-
+  layoutImage?: string | FileData;
   // Sales CTA
   ctaButtonText: string;
   whatsappNumber: string;

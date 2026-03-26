@@ -2,7 +2,7 @@
 
 //sales-website-private-dev\frontend\src\app\visit\[slug]\page.tsx
 'use client';
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import DesktopVisit from './DesktopVisit';
 import { useParams, notFound } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback } from 'react';
@@ -410,71 +410,46 @@ const CTAButtons = (
                shadow-[0_-4px_12px_rgba(0,0,0,0.06)]
                pb-[env(safe-area-inset-bottom)]"
   >
-    <div className="grid gap-1.5">
+    <div className="grid grid-cols-3 gap-1.5">
 
-      {/* ROW 1 — CALL + WHATSAPP */}
-      <div className={`grid gap-1.5 ${
-        project.brochureUrl ? "grid-cols-3" : "grid-cols-2"
-      }`}>
+      {/* CALL */}
+      <button
+        onClick={handleCall}
+        disabled={isCalling}
+        className="rounded-md border border-[#3E5F16] py-1.5
+                   text-[10px] font-semibold text-[#3E5F16]
+                   transition disabled:opacity-60"
+      >
+        {isCalling ? "Calling…" : "Call"}
+      </button>
 
-        {/* CALL */}
-        <button
-          onClick={handleCall}
-          disabled={isCalling}
-          className="rounded-md border border-[#3E5F16] py-1.5
-                    text-[10px] font-semibold text-[#3E5F16]
-                    transition disabled:opacity-60"
-        >
-          {isCalling ? 'Calling…' : 'Call'}
-        </button>
+      {/* WHATSAPP */}
+      <button
+        onClick={handleWhatsApp}
+        className="flex items-center justify-center gap-1
+                   rounded-md border border-[#3E5F16]
+                   bg-white py-1.5 px-2
+                   text-[10px] font-semibold text-[#3E5F16]
+                   hover:bg-[#25D366]/10
+                   transition"
+      >
+        <FaWhatsapp className="text-sm" />
+        WhatsApp
+      </button>
 
-        {/* WHATSAPP */}
-        <button
-          onClick={handleWhatsApp}
-          className="flex items-center justify-center gap-1
-                     rounded-md border border-[#3E5F16]
-                     bg-white py-1.5 px-2
-                     text-[10px] font-semibold text-[#3E5F16]
-                     hover:bg-[#25D366]/10
-                     transition"
-        >
-          <FaWhatsapp className="text-sm" />
-          WhatsApp
-        </button>
-
-        {/* BROCHURE */}
-        {project.brochureUrl && (
-          <button
-            onClick={downloadBrochure}
-            className="
-              rounded-md border border-[#3E5F16]
-              py-1.5 text-[10px] font-semibold
-              text-[#3E5F16]
-              hover:bg-[#3E5F16]/10
-              transition
-            "
-          >
-            Brochure
-          </button>
-        )}
-
-      </div>
-     
-
-      {/* ROW 2 — BOOK SITE VISIT */}
+      {/* BOOK SITE VISIT */}
       <button
         onClick={handleFormOpen}
-        className="w-full rounded-md bg-[#3E5F16] py-1.5
+        className="rounded-md bg-[#3E5F16] py-1.5
                    text-[10px] font-semibold text-white
                    transition"
       >
-        {project.ctaButtonText || 'Book Site Visit'}
+        {project.ctaButtonText || "Book Visit"}
       </button>
 
     </div>
   </div>
 );
-
 
 const isPlot = project.type === "plot";
 type FloorPlan = {
@@ -565,29 +540,6 @@ const floorPlans: FloorPlan[] = isPlot
     </>
   );
 }
-const onDragStart = (e: React.TouchEvent | React.MouseEvent) => {
-  isDragging.current = true;
-
-  startY.current =
-    "touches" in e
-      ? e.touches[0].clientY
-      : e.clientY;
-};
-
-const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
-  if (!isDragging.current || !sheetRef.current) return;
-
-  currentY.current =
-    "touches" in e
-      ? e.touches[0].clientY
-      : e.clientY;
-
-  const delta = currentY.current - startY.current;
-
-  if (delta > 0) {
-    sheetRef.current.style.transform = `translateY(${delta}px)`;
-  }
-};
 
 
   return (
@@ -647,26 +599,551 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
           ${open ? "translate-y-0" : "translate-y-full"}
         `}
       >
-        <div className="flex items-center justify-between px-4 pt-3 pb-1 ">
- 
-          <button
-            onClick={closeProjectDetails}
-            className="p-2 rounded-full hover:bg-gray-100 transition"
-          >
-            <ChevronDown className="w-5 h-5 text-gray-700" />
-          </button>
-        </div>
+     
          <div
             ref={scrollRef}
             id="project-details-scroll"
-            className="overflow-y-auto overflow-x-visible  max-h-[80vh] "
+            className="overflow-y-auto overflow-x-visible  max-h-[90vh] "
 
           >
-            <div className="px-4">
-          {/* TOP SECTION: DETAILS */}
-          <div className="flex justify-center">
-            
-            <div className="w-full max-w-md mr-3 text-center">
+           <div className="px-4">
+            {/* TOP SECTION: DETAILS */}
+            <div className="relative pl-4 mt-3 flex justify-start">
+            {/* SHARE BUTTON — add this just before the close button */}
+{/* SHARE BUTTON */}
+<button
+  onClick={async () => {
+  const pageUrl = window.location.href;
+  const { jsPDF } = await import('jspdf');
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  const pageW = 210;
+  const pageH = 297;
+  const margin = 14;
+  const contentW = pageW - margin * 2;
+  let y = 0;
+
+  // ── COLORS ──────────────────────────────────────
+  const C = {
+    green:      '#3E5F16',
+    greenLight: '#EEF3E8',
+    greenMid:   '#6B8F3E',
+    white:      '#FFFFFF',
+    gray50:     '#F9FAFB',
+    gray100:    '#F3F4F6',
+    gray200:    '#E5E7EB',
+    gray500:    '#6B7280',
+    gray700:    '#374151',
+    gray900:    '#111827',
+    blue:       '#2563EB',
+    amber:      '#D97706',
+    red:        '#DC2626',
+  };
+
+  const hex2rgb = (hex: string) => ({
+    r: parseInt(hex.slice(1,3),16),
+    g: parseInt(hex.slice(3,5),16),
+    b: parseInt(hex.slice(5,7),16),
+  });
+  const fillBg  = (h: string) => { const {r,g,b}=hex2rgb(h); doc.setFillColor(r,g,b); };
+  const setTxt  = (h: string) => { const {r,g,b}=hex2rgb(h); doc.setTextColor(r,g,b); };
+  const setDrw  = (h: string) => { const {r,g,b}=hex2rgb(h); doc.setDrawColor(r,g,b); };
+
+  const checkPage = (needed = 12) => {
+    if (y + needed > pageH - 16) { doc.addPage(); y = 16; }
+  };
+
+  // ── PILL (no emoji) ──────────────────────────────
+  const pill = (text: string, bgH: string, txtH: string, x: number, py: number) => {
+    doc.setFontSize(7); doc.setFont('helvetica','bold');
+    const w = doc.getTextWidth(text) + 7;
+    fillBg(bgH); setDrw(bgH);
+    doc.roundedRect(x, py - 4, w, 6, 1.5, 1.5, 'F');
+    setTxt(txtH);
+    doc.text(text, x + 3.5, py + 0.3);
+    return w + 3;
+  };
+
+  // ── SECTION HEADING BAR ──────────────────────────
+  const sectionHead = (title: string) => {
+    checkPage(14);
+    fillBg(C.green);
+    doc.roundedRect(margin, y, contentW, 9, 2, 2, 'F');
+    setTxt(C.white);
+    doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+    doc.text(title.toUpperCase(), margin + 5, y + 6.2);
+    y += 13;
+  };
+
+  // ── INFO ROW ─────────────────────────────────────
+  const infoRow = (label: string, value: string, valColor = C.gray900) => {
+    checkPage(8);
+    setTxt(C.gray500); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+    doc.text(label, margin + 3, y);
+    setTxt(valColor); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    // Wrap long values
+    const maxValW = contentW - 68;
+    const lines = doc.splitTextToSize(String(value || '-'), maxValW);
+    doc.text(lines, margin + 68, y);
+    y += Math.max(lines.length * 5, 6.5);
+  };
+
+  // ── PROGRESS BAR ─────────────────────────────────
+  const progressBar = (pct: number, px: number, py: number, pw: number) => {
+    fillBg(C.gray200); setDrw(C.gray200);
+    doc.roundedRect(px, py, pw, 4, 1, 1, 'F');
+    fillBg(C.green); setDrw(C.green);
+    doc.roundedRect(px, py, pw * (pct / 100), 4, 1, 1, 'F');
+  };
+
+  // ── STAT TILE ────────────────────────────────────
+  const statTile = (label: string, value: string, x: number, tw: number, ty: number) => {
+    fillBg(C.gray50); setDrw(C.gray200);
+    doc.roundedRect(x, ty, tw, 17, 2, 2, 'FD');
+    setTxt(C.gray500); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+    doc.text(label, x + 4, ty + 6);
+    setTxt(C.green); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+    const valLines = doc.splitTextToSize(value, tw - 8);
+    doc.text(valLines[0], x + 4, ty + 13);
+  };
+
+  // ── CLICKABLE CTA BUTTON ─────────────────────────
+  const ctaBtn = (label: string, sub: string, bgH: string, x: number, bw: number, by: number, url: string) => {
+    fillBg(bgH); setDrw(bgH);
+    doc.roundedRect(x, by, bw, 14, 2.5, 2.5, 'F');
+    setTxt(C.white);
+    doc.setFontSize(8); doc.setFont('helvetica','bold');
+    doc.text(label, x + bw / 2, by + 6, { align: 'center' });
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+    doc.text(sub, x + bw / 2, by + 10.5, { align: 'center' });
+    // Invisible clickable link over the button
+    doc.link(x, by, bw, 14, { url });
+  };
+
+  // ════════════════════════════════════════════════
+  // HEADER
+  // ════════════════════════════════════════════════
+  fillBg(C.green); doc.rect(0, 0, pageW, 50, 'F');
+
+  // Decorative accent circle (no emoji, pure geometry)
+  fillBg(C.greenMid); doc.circle(pageW - 18, 8, 30, 'F');
+  fillBg(C.green);    doc.circle(pageW - 10, 4, 24, 'F');
+
+  // Project name
+  setTxt(C.white);
+  doc.setFontSize(20); doc.setFont('helvetica','bold');
+  const nameLines = doc.splitTextToSize(project.name, 135);
+  doc.text(nameLines, margin, 17);
+
+  // Location
+  setTxt('#c8dfa8');
+  doc.setFontSize(8.5); doc.setFont('helvetica','normal');
+  doc.text(`${project.location}, ${project.city}`, margin, 17 + nameLines.length * 9);
+
+  y = 56;
+
+  // Pills row
+  let px = margin;
+  px += pill(formatStatus(project.projectStatus), C.greenLight, C.green, px, y);
+  if (project.reraApproved) px += pill('RERA Approved', C.greenLight, C.green, px, y);
+  if (project.bankLoanAvailable) pill('Bank Loan Available', C.greenLight, C.green, px, y);
+  y += 11;
+
+  // Stat tiles
+  const tileW = (contentW - 6) / 3;
+  statTile('Starting Price', 'Rs. 65 L+', margin, tileW, y);
+  statTile('Saleable Area', '850-1200 sq.ft', margin + tileW + 3, tileW, y);
+  statTile(
+    isPlot ? 'Plot Size' : 'Configuration',
+    isPlot ? (project.plotSizeRange || '-') : (project.bhkOptions?.join(' / ') || '-'),
+    margin + (tileW + 3) * 2, tileW, y
+  );
+  y += 23;
+
+  // CTA BUTTONS — clickable links
+  const bw = (contentW - 6) / 3;
+  const callNum = (project.callNumber || project.whatsappNumber || '').replace(/\D/g,'');
+  const waNum   = (project.whatsappNumber || project.callNumber || '').replace(/\D/g,'');
+  const waMsg   = encodeURIComponent(`Hi, I'm interested in ${project.name} at ${project.location}, ${project.city}. Please share more details.`);
+
+  ctaBtn('Call Now', callNum ? `+91 ${callNum}` : 'Tap to Call', C.green,
+    margin, bw, y, callNum ? `tel:+91${callNum}` : pageUrl);
+  ctaBtn('WhatsApp', 'Quick Response', '#25A244',
+    margin + bw + 3, bw, y, waNum ? `https://wa.me/91${waNum}?text=${waMsg}` : pageUrl);
+  ctaBtn(project.ctaButtonText || 'Book Site Visit', 'Schedule Now', C.amber,
+    margin + (bw + 3) * 2, bw, y, pageUrl);
+  y += 20;
+
+  // ── Try embed cover image ──
+  const coverSrc = getImageUrl(project.coverImage);
+  if (coverSrc) {
+    try {
+      const imgUrl = coverSrc.startsWith('http')
+        ? coverSrc
+        : `${process.env.NEXT_PUBLIC_API_URL}${coverSrc}`;
+      const res = await fetch(imgUrl);
+      const blob = await res.blob();
+      const b64: string = await new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+      const ext = blob.type.includes('png') ? 'PNG' : 'JPEG';
+      checkPage(55);
+      doc.addImage(b64, ext, margin, y, contentW, 52);
+      // Clickable overlay on image → opens page
+      doc.link(margin, y, contentW, 52, { url: pageUrl });
+      y += 56;
+    } catch {
+      // image failed to load — skip silently
+    }
+  }
+
+  // ════════════════════════════════════════════════
+  // MEDIA GALLERY IMAGES
+  // ════════════════════════════════════════════════
+  const galleryImages = mediaItems.filter((m) => m.type === 'image').slice(0, 6);
+
+  if (galleryImages.length > 0) {
+    sectionHead('Project Gallery');
+
+    const cols = 2;
+    const imgW = (contentW - (cols - 1) * 4) / cols;
+    const imgH = imgW * 0.6;
+
+    for (let i = 0; i < galleryImages.length; i++) {
+      const col = i % cols;
+      const fx  = margin + col * (imgW + 4);
+
+      if (col === 0) checkPage(imgH + 6);
+
+      // Pre-fetch all gallery images, collect only successful ones
+      type FetchedImg = { b64: string; ext: string };
+      const fetchedImgs: FetchedImg[] = [];
+
+      for (const gImg of galleryImages) {
+        try {
+          const src = gImg.src;
+          const imgUrl = src.startsWith('http')
+            ? src
+            : `${process.env.NEXT_PUBLIC_API_URL}${src}`;
+          const res  = await fetch(imgUrl);
+          const blob = await res.blob();
+          const b64: string = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve((reader.result as string).split(',')[1]);
+            reader.readAsDataURL(blob);
+          });
+          fetchedImgs.push({ b64, ext: blob.type.includes('png') ? 'PNG' : 'JPEG' });
+        } catch {
+          // skip failed images entirely — no placeholder
+        }
+      }
+
+      for (let i = 0; i < fetchedImgs.length; i++) {
+        const col = i % cols;
+        const fx  = margin + col * (imgW + 4);
+        if (col === 0) checkPage(imgH + 6);
+        doc.addImage(fetchedImgs[i].b64, fetchedImgs[i].ext, fx, y, imgW, imgH);
+        doc.link(fx, y, imgW, imgH, { url: pageUrl });
+        if (col === cols - 1 || i === fetchedImgs.length - 1) y += imgH + 5;
+      }
+    }
+    y += 4;
+  }
+
+  // ════════════════════════════════════════════════
+  // PROJECT OVERVIEW
+  // ════════════════════════════════════════════════
+  sectionHead('Project Overview');
+  infoRow('Project Name',   project.name);
+  infoRow('Location',       `${project.location}, ${project.city}`);
+  infoRow('Status',         formatStatus(project.projectStatus), C.green);
+  if (project.type)               infoRow('Property Type',  project.type.charAt(0).toUpperCase() + project.type.slice(1));
+  if (project.bhkOptions?.length) infoRow('BHK Options',    project.bhkOptions.join(' / '));
+  if (project.floorRange)         infoRow('Total Floors',   project.floorRange);
+  if (project.carpetAreaRange)    infoRow('Carpet Area',    project.carpetAreaRange);
+  if (project.plotSizeRange)      infoRow('Plot Size Range',project.plotSizeRange);
+  if (project.facingOptions?.length) infoRow('Facing',      project.facingOptions.join(', '));
+  if (typeof project.gatedCommunity === 'boolean')
+    infoRow('Gated Community', project.gatedCommunity ? 'Yes' : 'No',
+      project.gatedCommunity ? C.green : C.gray700);
+  infoRow('Bank Loan', project.bankLoanAvailable ? 'Available' : 'Not Available',
+    project.bankLoanAvailable ? C.green : C.red);
+  y += 4;
+
+  // ════════════════════════════════════════════════
+  // PRICING BREAKDOWN
+  // ════════════════════════════════════════════════
+  sectionHead('Pricing Breakdown');
+
+  const priceData = [
+    ['MRP (Rs. / sq.ft)', 'Rs. 5,200'],
+    ['GST (5%)',           'Rs. 3,25,000'],
+    ['Registration',       'Rs. 1,10,000'],
+    ['Other Charges',      'Rs. 85,000'],
+    ['Government Charges', 'Rs. 75,000'],
+    ['Legal Charges',      'Rs. 50,000'],
+  ] as const;
+
+  const labelColW = contentW * 0.62;
+  const valColW   = contentW - labelColW;
+
+  priceData.forEach(([label, val], i) => {
+    checkPage(9);
+    if (i % 2 === 0) { fillBg(C.gray50); doc.rect(margin, y - 2.5, contentW, 8, 'F'); }
+    setTxt(C.gray700); doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text(label, margin + 4, y + 3);
+    setTxt(C.gray900); doc.setFont('helvetica','bold');
+    doc.text(val, margin + labelColW + valColW - 3, y + 3, { align: 'right' });
+    y += 8;
+  });
+
+  // Total bar
+  checkPage(12);
+  fillBg(C.green); doc.rect(margin, y, contentW, 10, 'F');
+  setTxt(C.white); doc.setFontSize(9); doc.setFont('helvetica','bold');
+  doc.text('TOTAL COST', margin + 5, y + 7);
+  doc.text('Rs. 72,45,000', margin + contentW - 4, y + 7, { align: 'right' });
+  y += 15;
+
+  // EMI hint card
+  checkPage(10);
+  fillBg(C.greenLight); setDrw(C.green);
+  doc.roundedRect(margin, y, contentW, 9, 2, 2, 'FD');
+  setTxt(C.green); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  doc.text('EMI from approx. Rs. 48,000/month  |  Bank finance available', margin + 5, y + 6);
+  y += 14;
+
+  
+  // ════════════════════════════════════════════════
+  // FLOOR PLANS & PRICING — fixed layout
+  // ════════════════════════════════════════════════
+  sectionHead('Floor Plans & Pricing');
+
+  const cardW   = (contentW - 5) / 2;
+  const cardH   = 32;
+  const priceW  = 52; // reserved right column for price
+
+  for (let i = 0; i < floorPlans.length; i++) {
+    const plan = floorPlans[i];
+    const col  = i % 2;
+    if (col === 0) checkPage(cardH + 4);
+    const fx = margin + col * (cardW + 5);
+    const fy = y;
+
+    // Card background
+    fillBg(C.gray50); setDrw(C.gray200);
+    doc.roundedRect(fx, fy, cardW, cardH, 2, 2, 'FD');
+
+    // Tag pill
+    doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    const tagText = isPlot ? 'Plot' : 'New Launch';
+    const tagW    = doc.getTextWidth(tagText) + 6;
+    fillBg(C.green); setDrw(C.green);
+    doc.roundedRect(fx + 3, fy + 3, tagW, 5.5, 1, 1, 'F');
+    setTxt(C.white); doc.text(tagText, fx + 6, fy + 7.2);
+
+    // Title — constrained to left portion
+    const titleMaxW = cardW - priceW - 6;
+    setTxt(C.gray900); doc.setFontSize(8); doc.setFont('helvetica','bold');
+    const titleLines = doc.splitTextToSize(plan.title, titleMaxW);
+    doc.text(titleLines, fx + 4, fy + 14);
+
+    // Area
+    setTxt(C.gray500); doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(`Area: ${plan.area}`, fx + 4, fy + 20);
+
+    // Possession
+    if (!isPlot && plan.possession) {
+      doc.text(`Possession: ${plan.possession}`, fx + 4, fy + 25.5);
+    }
+
+    // Price — right aligned, constrained to right column
+    setTxt(C.green); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+    const priceLines = doc.splitTextToSize(plan.price, priceW - 4);
+    doc.text(priceLines, fx + cardW - 4, fy + 21, { align: 'right' });
+
+    // Call Now link on each card
+    setTxt(C.blue); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+    doc.textWithLink('Call Now', fx + 4, fy + cardH - 3, { url: callNum ? `tel:+91${callNum}` : pageUrl });
+
+    if (col === 1 || i === floorPlans.length - 1) y += cardH + 5;
+  }
+  y += 2;
+
+  // ════════════════════════════════════════════════
+  // BOOKING STATUS
+  // ════════════════════════════════════════════════
+  checkPage(55);
+  sectionHead(isPlot ? 'Plot Booking Status' : 'Flat Booking Status');
+
+  // Available badge
+  checkPage(10);
+  fillBg(C.greenLight); setDrw(C.green);
+  doc.roundedRect(margin, y, contentW, 9, 2, 2, 'FD');
+  setTxt(C.green); doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+  doc.text('Available for Booking', margin + 5, y + 6.2);
+  y += 13;
+
+  infoRow(isPlot ? 'Plots Available' : 'Units Available',
+    isPlot ? '8 vacant / 20 total' : '12 vacant / 30 total', C.green);
+  y += 2;
+
+  // Progress
+  checkPage(14);
+  setTxt(C.gray700); doc.setFontSize(7.5); doc.setFont('helvetica','normal');
+  doc.text('Booking Progress', margin + 3, y);
+  setTxt(C.green); doc.setFont('helvetica','bold');
+  doc.text('60% Sold', margin + contentW - 3, y, { align: 'right' });
+  y += 5;
+  progressBar(60, margin, y, contentW);
+  y += 9;
+
+  // Note card
+  checkPage(12);
+  fillBg(C.gray50); setDrw(C.gray200);
+  doc.roundedRect(margin, y, contentW, 10, 2, 2, 'FD');
+  setTxt(C.amber); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+  const noteText = isPlot
+    ? 'Limited premium plots available. Early booking recommended.'
+    : 'Only a few premium flats remain. Price lock available.';
+  doc.text(noteText, margin + 5, y + 7);
+  y += 15;
+
+  // ════════════════════════════════════════════════
+  // AMENITIES
+  // ════════════════════════════════════════════════
+  if (project.amenities?.length) {
+    sectionHead('Amenities & Facilities');
+    const amenityNames: string[] = project.amenities.map((a: any) =>
+      typeof a === 'string' ? a : (a.name || a.label || ''));
+
+    let ax = margin;
+    amenityNames.forEach((name) => {
+      checkPage(12);
+      doc.setFontSize(7); doc.setFont('helvetica','normal');
+      const chipW = Math.min(doc.getTextWidth(`  ${name}  `) + 6, 88);
+      if (ax + chipW > pageW - margin) { y += 9; ax = margin; }
+      fillBg(C.greenLight); setDrw(C.green);
+      doc.roundedRect(ax, y, chipW, 7, 1.5, 1.5, 'FD');
+      setTxt(C.green);
+      doc.text(name, ax + chipW / 2, y + 4.8, { align: 'center' });
+      ax += chipW + 3;
+    });
+    y += 12;
+  }
+
+  // ════════════════════════════════════════════════
+  // BUILDER INFO
+  // ════════════════════════════════════════════════
+  sectionHead('Builder Information');
+  infoRow('Builder Name', project.builderName || 'Builder Name');
+  infoRow('Address', 'Skyline Developers Pvt. Ltd., 4th Floor, Landmark Business Plaza, Ring Road, Civil Lines, Nagpur - 440001');
+  y += 4;
+
+  // Contact cards — side by side
+  checkPage(18);
+  const colW2 = (contentW - 4) / 2;
+
+  fillBg(C.gray50); setDrw(C.gray200);
+  doc.roundedRect(margin, y, colW2, 15, 2, 2, 'FD');
+  setTxt(C.gray500); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+  doc.text('Legal Contact', margin + 4, y + 5.5);
+  setTxt(C.blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.textWithLink('+91 98765 43210', margin + 4, y + 11, { url: 'tel:+919876543210' });
+
+  fillBg(C.gray50); setDrw(C.gray200);
+  doc.roundedRect(margin + colW2 + 4, y, colW2, 15, 2, 2, 'FD');
+  setTxt(C.gray500); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+  doc.text('Bank Finance Desk', margin + colW2 + 8, y + 5.5);
+  setTxt(C.blue); doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.textWithLink('+91 91234 56789', margin + colW2 + 8, y + 11, { url: 'tel:+919123456789' });
+  y += 20;
+
+  // ── Page link card ──
+  checkPage(12);
+  fillBg(C.green); setDrw(C.green);
+  doc.roundedRect(margin, y, contentW, 10, 2, 2, 'F');
+  setTxt(C.white); doc.setFontSize(7.5); doc.setFont('helvetica','bold');
+  doc.text('View full project online:', margin + 5, y + 4.5);
+  setTxt('#c8dfa8'); doc.setFontSize(7); doc.setFont('helvetica','normal');
+  doc.textWithLink(pageUrl, margin + 5, y + 8.5, { url: pageUrl });
+  y += 14;
+
+  // ════════════════════════════════════════════════
+  // FOOTER — every page
+  // ════════════════════════════════════════════════
+  const totalPages: number = (doc as any).internal.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    fillBg(C.green);
+    doc.rect(0, pageH - 11, pageW, 11, 'F');
+    setTxt(C.white); doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+    doc.textWithLink(pageUrl, margin, pageH - 4, { url: pageUrl });
+    doc.text(
+      `Generated ${new Date().toLocaleDateString('en-IN')}  |  Page ${p} of ${totalPages}`,
+      pageW - margin, pageH - 4, { align: 'right' }
+    );
+  }
+
+  // ════════════════════════════════════════════════
+  // SHARE
+  // ════════════════════════════════════════════════
+  const pdfBlob = doc.output('blob');
+  const safeName = project.name.replace(/\s+/g,'_');
+  const pdfFile  = new File([pdfBlob], `${safeName}_Details.pdf`, { type: 'application/pdf' });
+
+  const shareText = [
+    project.name,
+    `${project.location}, ${project.city}`,
+    project.bhkOptions?.length ? project.bhkOptions.join(', ') : '',
+    'Starting Rs. 65L onwards',
+    project.projectStatus ? formatStatus(project.projectStatus) : '',
+    'RERA Approved',
+    pageUrl,
+  ].filter(Boolean).join('\n');
+
+  const canShareFiles = navigator.canShare?.({ files: [pdfFile] });
+  if (navigator.share && canShareFiles) {
+    try { await navigator.share({ title: project.name, text: shareText, files: [pdfFile] }); return; }
+    catch (e: any) { if (e?.name === 'AbortError') return; }
+  }
+  if (navigator.share) {
+    try { await navigator.share({ title: project.name, text: shareText, url: pageUrl }); return; }
+    catch (e: any) { if (e?.name === 'AbortError') return; }
+  }
+  doc.save(`${safeName}_Details.pdf`);
+  try { await navigator.clipboard.writeText(shareText); alert('PDF downloaded & link copied!'); }
+  catch { alert('PDF downloaded. Share the link manually.'); }
+}}
+  className="absolute right-10 top-2 p-1.5 rounded-full hover:bg-gray-100 transition"
+  title="Share project"
+>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className="w-4 h-4 text-gray-700"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <circle cx="18" cy="5" r="3" />
+    <circle cx="6" cy="12" r="3" />
+    <circle cx="18" cy="19" r="3" />
+    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+    <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+  </svg>
+</button>
+              {/* CLOSE BUTTON */}
+              <button
+                onClick={closeProjectDetails}
+                className="absolute right-2 top-2 p-1.5 rounded-full hover:bg-gray-100 transition"
+              >
+                <X className="w-4 h-4 text-gray-700" />
+              </button>
+
+              <div className="w-full max-w-md mr-3 text-left">
               <p className="mt-1 text-[11px] sm:text-[12px] font-medium text-gray-700">
                   {formatStatus(project.projectStatus)}
                 </p> 
@@ -674,7 +1151,7 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 {project.name}
               </h1>
 
-             <p className="mt-0.5 text-[11px] sm:text-[12px] text-center">
+             <p className="mt-0.5 text-[11px] sm:text-[12px] ">
               <MapPin className="inline h-3.5 w-3.5 mr-1 -mt-0.5 text-gray-600" />
               {project.location}, {project.city}
             </p>
@@ -701,12 +1178,7 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
             
           </div>
           </div>
-          <div className="px-4 mt-3">
-          <SubNavbar
-            scrollContainerRef={scrollRef}
-            sectionRefs={sectionRefs}
-          />
-          </div>
+         
           <div className="px-4">
           {/* PRICE CARD */}
           <div ref={priceRef} className="mt-0.5 relative">
@@ -770,6 +1242,7 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 space-y-1.5 lg:space-y-2
                 shadow-xl border border-gray-200"
               >
+                
                 {/* CLOSE BUTTON */}
                 <button
                   onClick={() => setShowPriceBreakdown(false)}
@@ -882,21 +1355,21 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
 
             {/* MAP ACTION BUTTONS */}
             <div className="relative mt-4 mb-4">
-             <div className="flex gap-2 overflow-x-auto overflow-y-visible pb-1 scrollbar-hide relative">
-
-
+             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide">
               {/* DIRECTIONS */}
               <button
                 onClick={() =>  {
                 closeProjectDetails();
                 mapRef.current?.getDirections();}}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <MapPinIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <MapPinIcon className="h-3 w-3" /> */}
                 Directions
               </button>
 
@@ -906,13 +1379,15 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                   closeProjectDetails();
                   mapRef.current?.setMapView();
                 }}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Map className="h-3 w-3" /> */}
                 Geographic
               </button>
 
@@ -922,13 +1397,15 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                   closeProjectDetails();
                   mapRef.current?.setSatelliteView();
                 }}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Map className="h-3 w-3" /> */}
                 Satellite
               </button>
 
@@ -938,13 +1415,15 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 onClick={() => {
                   closeProjectDetails()
                   mapRef.current?.set3DView()}}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Map className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Map className="h-3 w-3" /> */}
                 3D View
               </button>
 
@@ -953,16 +1432,23 @@ const onDragMove = (e: React.TouchEvent | React.MouseEvent) => {
                 onClick={() => {
                   closeProjectDetails()
                   mapRef.current?.toggleStreetView()}}
-                className="flex shrink-0 items-center justify-center gap-1
-                          rounded-full bg-[#3E5F16] px-3 py-1.5
-                          text-[10px] sm:text-[11px]
-                          font-medium text-white
-                          hover:bg-[#3E5F16] transition shadow-sm"
+                className="flex shrink-0 items-center gap-1
+                rounded-full bg-[#3E5F16]
+                px-2.5 h-5
+                text-[10px] font-medium
+                text-white
+                hover:bg-[#2f4711]
+                transition"
               >
-                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                {/* <Eye className="h-3 w-3 " /> */}
                 Virtual View
               </button>
               
+                {/* SUB NAVBAR BUTTONS */}
+                <SubNavbar
+                  scrollContainerRef={scrollRef}
+                  sectionRefs={sectionRefs}
+                />
 
             </div>
 

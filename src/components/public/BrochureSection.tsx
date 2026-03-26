@@ -13,7 +13,7 @@ export default function BrochureSection({ pdfUrl }: BrochureSectionProps) {
       Project Brochure
     </h2>
 
-    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+    <div className="flex flex-row gap-3">
       
       {/* VIEW BUTTON */}
       <a

@@ -364,22 +364,22 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
     }
 
     if (publish) {
-      const result = await projectsApi.publish(project.id);
-      setPublishedLink(result.trackableLink);
+    const result = await projectsApi.publish(project.id);
+    setPublishedLink(result.trackableLink);
 
-      const fullLink = window.location.origin + result.trackableLink;
+    const fullLink = window.location.origin + result.trackableLink;
 
-      if (navigator.clipboard && window.isSecureContext) {
-        try {
-          await navigator.clipboard.writeText(fullLink);
-          toast.success("Project Published & Link Copied!");
-        } catch {
-          toast.success("Project Published! Copy link manually.");
-        }
-      } else {
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(fullLink);
+        toast.success("Project Published & Link Copied!");
+      } catch {
         toast.success("Project Published! Copy link manually.");
       }
+    } else {
+      toast.success("Project Published! Copy link manually.");
     }
+  }
 
     router.push('/dashboard/projects');
   } catch (err: any) {
