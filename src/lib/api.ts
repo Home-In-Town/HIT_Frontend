@@ -13,21 +13,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
 
 
-// Get mock user ID from localStorage (for RBAC)
-function getMockUserId(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem('mock_user_id');
-}
-
 // Get headers with auth
 function getAuthHeaders(): HeadersInit {
-  const userId = typeof window !== 'undefined' ? localStorage.getItem('mock_user_id') : null;
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
-  if (userId) {
-    headers['x-mock-user-id'] = userId;
-  }
   return headers;
 }
 
@@ -549,38 +539,128 @@ export const analyticsApi = {
    User Types & API
 -----------------------------------*/
 
-export interface MockUser {
+export interface AuthUser {
   id: string;
+  _id?: string;
   name: string;
-  email: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user';
+  email?: string;
+  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee';
   companyName?: string;
-  phone?: string;
+  phone: string;
+  isActive: boolean;
+  isVerified: boolean;
+  isEmployerConfirmed?: boolean;
+  employerId?: string | { id?: string; _id?: string; name: string; phone?: string; role?: string };
+  isAlreadyAssigned?: boolean;
+}    
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function transformUserBackendToFrontend(backendUser: any): AuthUser {
+  return {
+    ...backendUser,
+    id: String(backendUser.id || backendUser._id || ''),
+  };
 }
+
+export const employeeApi = {
+  async search(phone: string): Promise<AuthUser & { isAlreadyAssigned: boolean }> {
+    const response = await fetch(`${API_URL}/employee/search?phone=${encodeURIComponent(phone)}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<any>(response);
+    return {
+      ...transformUserBackendToFrontend(data),
+      isAlreadyAssigned: data.isAlreadyAssigned
+    };
+  },
+
+
+  async requestAssignment(employeeId: string): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/request-assignment`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ employeeId }),
+    });
+    return handleResponse(response);
+  },
+
+  async confirmAssignment(): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/confirm-assignment`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async submitLocation(latitude: number, longitude: number, placeName?: string | null): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/location`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ latitude, longitude, placeName }),
+    });
+    return handleResponse(response);
+  },
+
+  async logMeeting(data: { 
+    withWhom: string; 
+    description: string; 
+    latitude?: number; 
+    longitude?: number; 
+    placeName?: string | null;
+    projectName?: string;
+    projectLocation?: string;
+    projectPrice?: string;
+  }): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/meeting`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  async getMyEmployees(): Promise<AuthUser[]> {
+    const response = await fetch(`${API_URL}/employee/my-employees`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<any[]>(response);
+    return data.map(transformUserBackendToFrontend);
+  },
+
+  async getHistory(employeeId: string): Promise<any> {
+    const response = await fetch(`${API_URL}/employee/history/${employeeId}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+};
+
 
 export const usersApi = {
   // Get current user based on mock header
-  async getMe(): Promise<MockUser | null> {
+  async getMe(): Promise<AuthUser | null> {
     try {
       const response = await fetch(`${API_URL}/users/me`, {
         ...COMMON_FETCH_OPTIONS,
         headers: getAuthHeaders(),
       });
       if (!response.ok) return null;
-      return handleResponse<MockUser>(response);
+      return handleResponse<AuthUser>(response);
     } catch {
       return null;
     }
   },
 
-  // Get available mock accounts for role switcher
-  async getMockAccounts(): Promise<MockUser[]> {
-    const response = await fetch(`${API_URL}/users/mock-accounts`, COMMON_FETCH_OPTIONS);
-    return handleResponse<MockUser[]>(response);
-  },
 
   // Get all users (admin only)
-  async getAll(role?: string): Promise<MockUser[]> {
+  async getAll(role?: string): Promise<AuthUser[]> {
     const url = role
       ? `${API_URL}/users?role=${role}`
       : `${API_URL}/users`;
@@ -588,18 +668,7 @@ export const usersApi = {
       ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
-    return handleResponse<MockUser[]>(response);
-  },
-
-  // Login by name and role (for mock login flow)
-  async loginByName(name: string, role: string, phone: string): Promise<MockUser> {
-    const response = await fetch(`${API_URL}/users/login-by-name`, {
-      ...COMMON_FETCH_OPTIONS,
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, role, phone }),
-    });
-    return handleResponse<MockUser>(response);
+    return handleResponse<AuthUser[]>(response);
   },
 
   // Get users by role (for login dropdown)
@@ -613,7 +682,7 @@ export const usersApi = {
   },
 
   // Update user role (admin only)
-  async assignRole(userId: string, role: string): Promise<MockUser> {
+  async assignRole(userId: string, role: string): Promise<AuthUser> {
     const response = await fetch(`${API_URL}/users/${userId}/role`, {
       ...COMMON_FETCH_OPTIONS,
       method: "PUT",
@@ -630,9 +699,6 @@ export const usersApi = {
       headers: getAuthHeaders(),
     });
     return handleResponse<{ token: string }>(response);
-
-
-    return handleResponse(response);
   },
   async verifyUser(phone: string) {
     const response = await fetch(`${API_URL}/projects/verify-user/${phone}`, COMMON_FETCH_OPTIONS);
@@ -647,7 +713,7 @@ export const usersApi = {
 export const authApi = {
 
   // Start Registration
-  async register(data: { name: string; phone: string; mpin: string; email?: string }): Promise<{ message: string }> {
+  async register(data: { name: string; phone: string; mpin: string; email?: string; role?: string }): Promise<{ message: string }> {
     const response = await fetch(`${API_URL}/auth/register`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -658,7 +724,7 @@ export const authApi = {
   },
 
   // Verify OTP
-  async verifyOtp(phone: string, code: string): Promise<{ user: MockUser }> {
+  async verifyOtp(phone: string, code: string): Promise<{ user: AuthUser }> {
     const response = await fetch(`${API_URL}/auth/verify-otp`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -669,7 +735,7 @@ export const authApi = {
   },
 
   // Login with Phone + MPIN
-  async login(phone: string, mpin: string): Promise<{ user: MockUser }> {
+  async login(phone: string, mpin: string): Promise<{ user: AuthUser }> {
     const response = await fetch(`${API_URL}/auth/login`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -708,6 +774,17 @@ export const authApi = {
       method: "POST"
     });
     await handleResponse(response);
+  },
+
+  // Silent session check (no 401 errors)
+  async getSession(): Promise<{ authenticated: boolean; user: AuthUser | null }> {
+    try {
+      const response = await fetch(`${API_URL}/auth/session`, COMMON_FETCH_OPTIONS);
+      if (!response.ok) return { authenticated: false, user: null };
+      return handleResponse<{ authenticated: boolean; user: AuthUser | null }>(response);
+    } catch {
+      return { authenticated: false, user: null };
+    }
   }
 };
 
@@ -769,6 +846,7 @@ export interface OrgProject {
 
   status?: string;
 }
+
 export interface OrgAgent {
   _id: string;
   name: string;
@@ -914,5 +992,328 @@ export const organizationsApi = {
 
       throw new ApiError(message, response.status);
     }
+  },
+};
+
+/* ----------------------------------
+   Chat API
+-----------------------------------*/
+
+export interface ChatSession {
+  _id: string;
+  participants: { _id: string; name: string; role: string }[];
+  project?: { _id: string; projectName: string };
+  lastMessage?: { content: string; sender: string; timestamp: string };
+  unreadCount?: Record<string, number>;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  _id: string;
+  session: string;
+  sender: { _id: string; name: string; role: string };
+  content: string;
+  messageType: 'text' | 'image' | 'file';
+  attachment?: { url: string; name: string; size: number };
+  readBy: string[];
+  createdAt: string;
+}
+
+export const chatApi = {
+  async getContacts(): Promise<{ _id: string; name: string; role: string; phone: string }[]> {
+    const response = await fetch(`${API_URL}/chat/contacts`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ contacts: any[] }>(response);
+    return data.contacts;
+  },
+
+  async qualifyAndConnect(data: {
+    partnerId: string;
+    projectId?: string;
+    qualificationData: Record<string, string>;
+  }): Promise<ChatSession> {
+    const response = await fetch(`${API_URL}/chat/qualify`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await handleResponse<{ session: ChatSession }>(response);
+    return result.session;
+  },
+
+  async getSessions(): Promise<ChatSession[]> {
+    const response = await fetch(`${API_URL}/chat/sessions`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ sessions: ChatSession[] }>(response);
+    return data.sessions;
+  },
+
+  async getMessages(sessionId: string, page = 1): Promise<ChatMessage[]> {
+    const response = await fetch(`${API_URL}/chat/sessions/${sessionId}/messages?page=${page}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ messages: ChatMessage[] }>(response);
+    return data.messages;
+  },
+
+  async markRead(sessionId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/chat/sessions/${sessionId}/read`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+    });
+    await handleResponse(response);
+  },
+};
+
+/* ----------------------------------
+   CRM API
+-----------------------------------*/
+
+export interface CrmLead {
+  _id: string;
+  project: { _id: string; projectName: string } | string;
+  owner: { _id: string; name: string; role: string } | string;
+  leadContact: {
+    name: string;
+    phone: string;
+    email?: string;
+    notes?: string;
+  };
+  stage: 'new' | 'contacted' | 'qualified' | 'negotiation' | 'closed_won' | 'closed_lost';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  source: string;
+  estimatedValue?: number;
+  notes: string[];
+  tags: string[];
+  stageHistory: { stage: string; changedBy: string; timestamp: string; note?: string }[];
+  followUpDate?: string;
+  isArchived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const crmApi = {
+  async getLeads(filters?: { stage?: string; priority?: string; search?: string }): Promise<CrmLead[]> {
+    const params = new URLSearchParams();
+    if (filters?.stage) params.set('stage', filters.stage);
+    if (filters?.priority) params.set('priority', filters.priority);
+    if (filters?.search) params.set('search', filters.search);
+
+    const response = await fetch(`${API_URL}/crm/leads?${params.toString()}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ leads: CrmLead[] }>(response);
+    return data.leads;
+  },
+
+  async createLead(data: {
+    project?: string;
+    leadContact: { name: string; phone: string; email?: string; notes?: string };
+    stage?: string;
+    priority?: string;
+    source?: string;
+    estimatedValue?: number;
+    tags?: string[];
+  }): Promise<CrmLead> {
+    const response = await fetch(`${API_URL}/crm/leads`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await handleResponse<{ lead: CrmLead }>(response);
+    return result.lead;
+  },
+
+  async updateLead(id: string, data: Partial<CrmLead>): Promise<CrmLead> {
+    const response = await fetch(`${API_URL}/crm/leads/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await handleResponse<{ lead: CrmLead }>(response);
+    return result.lead;
+  },
+
+  async updateStage(id: string, stage: string, note?: string): Promise<CrmLead> {
+    const response = await fetch(`${API_URL}/crm/leads/${id}/stage`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage, note }),
+    });
+    const result = await handleResponse<{ lead: CrmLead }>(response);
+    return result.lead;
+  },
+
+  async getPipelineStats(): Promise<Record<string, number>> {
+    const response = await fetch(`${API_URL}/crm/pipeline-stats`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ pipeline: { _id: string; count: number }[] }>(response);
+    const result: Record<string, number> = {};
+    if (data.pipeline) {
+      data.pipeline.forEach(stat => {
+        result[stat._id] = stat.count;
+      });
+    }
+    return result;
+  },
+
+  async deleteLead(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/crm/leads/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    if (!response.ok) throw new ApiError('Failed to delete lead', response.status);
+  },
+};
+
+/* ----------------------------------
+   Marketplace API
+-----------------------------------*/
+
+export interface MarketplaceListing {
+  _id: string;
+  project: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number; pricePerSqFt?: number }; media?: { coverImage?: { url: string } }; configuration?: { carpetAreaRange?: string } } | string;
+  listedBy: { _id: string; name: string; companyName?: string; role: string } | string;
+  listingType: 'selling' | 'buying';
+  commissionPercentage: number;
+  description: string;
+  status: 'Active' | 'Paused' | 'Closed' | 'Sold';
+  expectedValue: number;
+  tags: string[];
+  viewsCount: number;
+  createdAt: string;
+}
+
+export interface MarketplaceAction {
+  _id: string;
+  listing: string;
+  performedBy: { _id: string; name: string } | string;
+  actionType: 'viewed' | 'inquired' | 'shared' | 'claimed' | 'deal_closed';
+  commissionEarned?: number;
+  status: 'pending' | 'approved' | 'paid';
+  createdAt: string;
+}
+
+export const marketplaceApi = {
+  async getListings(filters?: { listingType?: string; status?: string; search?: string }): Promise<MarketplaceListing[]> {
+    const params = new URLSearchParams();
+    if (filters?.listingType) params.set('listingType', filters.listingType);
+    if (filters?.status) params.set('status', filters.status);
+    if (filters?.search) params.set('search', filters.search);
+
+    const response = await fetch(`${API_URL}/marketplace/listings?${params.toString()}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ listings: MarketplaceListing[] }>(response);
+    return data.listings;
+  },
+
+  async getMyListings(): Promise<MarketplaceListing[]> {
+    const response = await fetch(`${API_URL}/marketplace/listings/my`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ listings: MarketplaceListing[] }>(response);
+    return data.listings;
+  },
+
+  async createListing(data: {
+    project: string;
+    listingType: 'selling' | 'buying';
+    commissionPercentage: number;
+    description?: string;
+    expectedValue?: number;
+    tags?: string[];
+  }): Promise<MarketplaceListing> {
+    const response = await fetch(`${API_URL}/marketplace/listings`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const data2 = await handleResponse<{ listing: MarketplaceListing }>(response);
+    return data2.listing;
+  },
+
+  async updateListing(id: string, data: Partial<MarketplaceListing>): Promise<MarketplaceListing> {
+    const response = await fetch(`${API_URL}/marketplace/listings/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const res = await handleResponse<{ listing: MarketplaceListing }>(response);
+    return res.listing;
+  },
+
+  async trackAction(listingId: string, actionType: string): Promise<MarketplaceAction> {
+    const response = await fetch(`${API_URL}/marketplace/listings/${listingId}/action`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionType }),
+    });
+    const data = await handleResponse<{ action: MarketplaceAction }>(response);
+    return data.action;
+  },
+
+  async getMyCommissions(): Promise<{ actions: MarketplaceAction[]; totalEarned: number; totalPending: number }> {
+    const response = await fetch(`${API_URL}/marketplace/commissions`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+};
+
+/* ----------------------------------
+   Notification API
+-----------------------------------*/
+
+export interface AppNotification {
+  _id: string;
+  recipient: string;
+  type: 'lead_stage_change' | 'new_lead_assigned' | 'new_chat_message' | 'marketplace_action' | 'commission_update' | 'system';
+  title: string;
+  message: string;
+  data?: Record<string, unknown>;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export const notificationsApi = {
+  async getAll(unreadOnly = false): Promise<AppNotification[]> {
+    const params = unreadOnly ? '?unread=true' : '';
+    const response = await fetch(`${API_URL}/notifications${params}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async markAsRead(ids: string[]): Promise<void> {
+    const response = await fetch(`${API_URL}/notifications/read`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notificationIds: ids }),
+    });
+    await handleResponse(response);
   },
 };

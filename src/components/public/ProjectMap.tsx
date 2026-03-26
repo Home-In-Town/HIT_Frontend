@@ -375,7 +375,7 @@ const landmarkLabelsRef = useRef<google.maps.OverlayView[]>([]);
   const is3D = useRef(false);
   const { isLoaded } = useJsApiLoader({
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: ['places', 'drawing', 'geometry'],
+    libraries: ['places', 'drawing', 'geometry', 'marker'],
   });
 
 useEffect(() => {
@@ -594,7 +594,7 @@ useEffect(() => {
   if (!isLoaded || !focusedProject) return;
 
   const handleHash = () => {
-    const hash = window.location.hash.replace("#", "");
+    const hash = window.location.hash.replace("#", "").split("?")[0]; // strip any leaked query params
 
     if (!hash) return;
 
@@ -1373,6 +1373,7 @@ editBoundary: () => {
         if (!mapRef.current) return;
 
         if (!is3D.current) {
+          mapRef.current.setTilt(45);
           mapRef.current.setZoom(18);
           mapRef.current.setMapTypeId(google.maps.MapTypeId.SATELLITE);
         } else {

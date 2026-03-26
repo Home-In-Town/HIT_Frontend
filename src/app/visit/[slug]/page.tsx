@@ -5,7 +5,7 @@
 import { ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 import DesktopVisit from './DesktopVisit';
 import { useParams, notFound } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import Image from 'next/image';
 import ProjectMap from '@/components/public/ProjectMap';
 import { Project } from '@/types/project';
@@ -141,6 +141,34 @@ useEffect(() => {
 const { handleCallClick, handleWhatsAppClick, handleFormSubmit } = useTracking({
   projectId: project?.id || '', // empty string until project loads
 });
+
+// ===== Stable Map Handlers =====
+const handleDirections = useCallback(() => {
+  mapRef.current?.getDirections();
+}, []);
+
+const handleMapView = useCallback(() => {
+  mapRef.current?.setMapView();
+}, []);
+
+const handleSatelliteView = useCallback(() => {
+  mapRef.current?.setSatelliteView();
+}, []);
+
+const handle3DView = useCallback(() => {
+  mapRef.current?.set3DView();
+}, []);
+
+const handleStreetView = useCallback(() => {
+  mapRef.current?.toggleStreetView();
+}, []);
+
+const handleDrawerData = useCallback((data: { projects: Project[]; selectedId: string | null; open: boolean }) => {
+  setDrawerProjects(data.projects);
+  setDrawerSelected(data.selectedId);
+  setDrawerOpen(data.open);
+}, []);
+
 const mapHashes = [
   "direction",
   "map",
@@ -159,7 +187,7 @@ const mapHashes = [
 useEffect(() => {
   if (!project) return;
 
-  const hash = window.location.hash.replace("#", "");
+  const hash = window.location.hash.replace("#", "").split("?")[0]; // strip any leaked query params
 
   const isMapAction = mapHashes.includes(hash);
 
@@ -171,7 +199,7 @@ useEffect(() => {
 }, [project]);
 useEffect(() => {
   const scrollToHash = () => {
-    const hash = window.location.hash.replace("#", "");
+    const hash = window.location.hash.replace("#", "").split("?")[0]; // strip any leaked query params
     if (!hash) return;
 
     const container = scrollRef.current;
@@ -200,7 +228,7 @@ useEffect(() => {
 const handleMapHash = () => {
   if (!mapRef.current) return;
 
-  const hash = window.location.hash.replace("#", "");
+  const hash = window.location.hash.replace("#", "").split("?")[0]; // strip any leaked query params
 
   switch (hash) {
     case "direction":
@@ -374,6 +402,8 @@ const closeProjectDetails = () => {
   requestAnimationFrame(() => setOpen(false));
 };
 
+
+
 const CTAButtons = (
   <div
     className="bg-white p-1.5 mb-2 mt-2
@@ -467,28 +497,6 @@ const floorPlans: FloorPlan[] = isPlot
 
 
  if (isDesktop) {
-  // ===== MAP ACTIONS =====
-const handleDirections = () => {
-  mapRef.current?.getDirections();
-};
-
-const handleMapView = () => {
-  mapRef.current?.setMapView();
-};
-
-const handleSatelliteView = () => {
-  mapRef.current?.setSatelliteView();
-};
-
-const handle3DView = () => {
-  mapRef.current?.set3DView();
-};
-
-const handleStreetView = () => {
-  mapRef.current?.toggleStreetView();
-};
-
-
   return (
     <>
     <DesktopVisit
@@ -515,14 +523,11 @@ const handleStreetView = () => {
       drawerProjects={drawerProjects}
       drawerSelected={drawerSelected}
       drawerOpen={drawerOpen}
-      onDrawerData={({ projects, selectedId, open }) => {
-        setDrawerProjects(projects);
-        setDrawerSelected(selectedId);
-        setDrawerOpen(open);
-      }}
+      onDrawerData={handleDrawerData}
 
       
     />
+
      <EnquiryModal
         open={showFormModal}
         onClose={handleFormClose}
@@ -553,11 +558,7 @@ const handleStreetView = () => {
       logo={getImageUrl(project.coverImage)}
       focusOnly
       onMarkerClick={openProjectDetails}
-      onDrawerData={({ projects, selectedId, open }) => {
-        setDrawerProjects(projects);
-        setDrawerSelected(selectedId);
-        setDrawerOpen(open);
-      }}
+      onDrawerData={handleDrawerData}
     />
     
   ) : (

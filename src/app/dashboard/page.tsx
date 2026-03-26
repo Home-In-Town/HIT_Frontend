@@ -28,6 +28,13 @@ export default function DashboardPage() {
       case 'agent':
         router.replace('/dashboard/agent');
         break;
+      case 'employee':
+        if (user.isEmployerConfirmed) {
+          router.replace('/dashboard/employee');
+        } else {
+          router.replace('/dashboard/employee/assignment');
+        }
+        break;
       case 'unassigned':
         router.replace('/dashboard/pending');
         break;

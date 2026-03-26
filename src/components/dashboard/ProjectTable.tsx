@@ -182,6 +182,16 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                           </button>
 
                           )}
+                          <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onCopyLink(project.trackableLink || `/visit/${project.slug}`);
+                              }}
+                              className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                            >
+                              Copy Project Link
+                            </button>
+
                           <div className="border-t border-[#E7E5E4] my-1"></div>
                             <button
                               onClick={() => {

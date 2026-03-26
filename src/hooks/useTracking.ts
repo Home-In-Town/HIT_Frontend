@@ -23,8 +23,9 @@ export function useTracking({ projectId, trackTimeInterval = 30 }: UseTrackingOp
 
     const source = searchParams.get('source') || undefined;
     const leadId = searchParams.get('leadId') || undefined;
+    const automationId = searchParams.get('automationId') || undefined;
 
-    const trackingParams = { projectId, source, leadId, visitId };
+    const trackingParams = { projectId, source, leadId, automationId, visitId };
 
     // Track page view on mount - only when projectId is valid
     useEffect(() => {
@@ -33,7 +34,7 @@ export function useTracking({ projectId, trackTimeInterval = 30 }: UseTrackingOp
             return;
         }
 
-        const currentTrackingParams = { projectId, source, leadId, visitId };
+        const currentTrackingParams = { projectId, source, leadId, automationId, visitId };
 
         trackPageView(currentTrackingParams);
         startTimeRef.current = Date.now();
@@ -72,7 +73,7 @@ export function useTracking({ projectId, trackTimeInterval = 30 }: UseTrackingOp
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [projectId, source, leadId, visitId, trackTimeInterval]);
+    }, [projectId, source, leadId, automationId, visitId, trackTimeInterval]);
 
     // CTA click handlers - only track with valid projectId
     const handleCallClick = useCallback(() => {
@@ -99,5 +100,6 @@ export function useTracking({ projectId, trackTimeInterval = 30 }: UseTrackingOp
         handleFormSubmit,
         source,
         leadId,
+        automationId,
     };
 }

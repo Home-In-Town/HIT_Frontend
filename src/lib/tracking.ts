@@ -6,6 +6,7 @@ interface TrackingParams {
     projectId: string;
     source?: string;
     leadId?: string;
+    automationId?: string;
     visitId?: string;
 }
 
@@ -19,6 +20,7 @@ export async function trackPageView(params: TrackingParams): Promise<void> {
                 projectId: params.projectId,
                 source: params.source,
                 leadId: params.leadId,
+                automationId: params.automationId,
                 visitId: params.visitId,
                 timestamp: Date.now(),
             }),
@@ -35,6 +37,7 @@ export async function trackTimeSpent(params: TrackingParams, duration: number): 
             projectId: params.projectId,
             source: params.source,
             leadId: params.leadId,
+            automationId: params.automationId,
             visitId: params.visitId,
             duration, // in seconds
             timestamp: Date.now(),
@@ -69,6 +72,7 @@ export async function trackCTAClick(
                 projectId: params.projectId,
                 source: params.source,
                 leadId: params.leadId,
+                automationId: params.automationId,
                 visitId: params.visitId,
                 ctaType,
                 timestamp: Date.now(),
@@ -92,6 +96,7 @@ export async function trackFormSubmit(
                 projectId: params.projectId,
                 source: params.source,
                 leadId: params.leadId,
+                automationId: params.automationId,
                 visitId: params.visitId,
                 formData,
                 timestamp: Date.now(),
