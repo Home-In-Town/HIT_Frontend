@@ -73,7 +73,6 @@ export function transformBackendToFrontend(backendProject: any): Project {
     id: String(id),   // ✅ guaranteed string (or "undefined" logged above)
     name: backendProject.projectName || backendProject.name || '',
     type: backendProject.projectType || backendProject.type || 'flat',
-    builderName: backendProject.builderName || '',
     city: backendProject.city || '',
     location: backendProject.location || '',
     latitude: backendProject.latitude,
@@ -106,6 +105,10 @@ export function transformBackendToFrontend(backendProject: any): Project {
     trackableLink: backendProject.slug ? `/visit/${backendProject.slug}` : '',
     isPublished: backendProject.status === 'published' || backendProject.isPublished,
     landmarks: backendProject.landmarks || [],
+    owner: backendProject.owner ? {
+      ...backendProject.owner,
+      id: String(backendProject.owner.id || backendProject.owner._id || ''),
+    } : undefined,
   };
 }
 
@@ -114,7 +117,6 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
   return {
     projectName: project.name,
     projectType: project.type,
-    builderName: project.builderName,
     city: project.city,
     location: project.location,
     latitude: project.latitude,
@@ -799,7 +801,6 @@ export interface OrgProject {
   name?: string;
   projectName?: string;
   projectType?: string;
-  builderName?: string;
   city?: string;
   location?: string;
 
@@ -1190,7 +1191,8 @@ export interface MarketplaceListing {
   project: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number; pricePerSqFt?: number }; media?: { coverImage?: { url: string } }; configuration?: { carpetAreaRange?: string } } | string;
   listedBy: { _id: string; name: string; companyName?: string; role: string } | string;
   listingType: 'selling' | 'buying';
-  commissionPercentage: number;
+  commissionType: 'percentage' | 'fixed';
+  commissionValue: number;
   description: string;
   status: 'Active' | 'Paused' | 'Closed' | 'Sold';
   expectedValue: number;
@@ -1234,9 +1236,10 @@ export const marketplaceApi = {
   },
 
   async createListing(data: {
-    project: string;
+    project?: string;
     listingType: 'selling' | 'buying';
-    commissionPercentage: number;
+    commissionType: 'percentage' | 'fixed';
+    commissionValue: number;
     description?: string;
     expectedValue?: number;
     tags?: string[];
@@ -1279,6 +1282,26 @@ export const marketplaceApi = {
       headers: getAuthHeaders(),
     });
     return handleResponse(response);
+  },
+
+  async getAllActions(): Promise<MarketplaceAction[]> {
+    const response = await fetch(`${API_URL}/marketplace/admin/actions`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ actions: MarketplaceAction[] }>(response);
+    return data.actions;
+  },
+
+  async updateActionStatus(actionId: string, status: string): Promise<MarketplaceAction> {
+    const response = await fetch(`${API_URL}/marketplace/admin/actions/${actionId}/status`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    const data = await handleResponse<{ action: MarketplaceAction }>(response);
+    return data.action;
   },
 };
 

@@ -243,9 +243,9 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
                 <h1 className="text-3xl text-gray-800 font-semibold leading-tight">
                   {project.name}
                 </h1>
-                {project.builderName && (
+                {project.owner?.name && (
                   <p className="text-sm font-medium text-gray-600 mt-1">
-                    By <span className="font-medium">{project.builderName}</span>
+                    By <span className="font-medium">{project.owner.name}</span>
                   </p>
                 )}
                  {/* Location with Map Pin, Location + City */}
@@ -529,7 +529,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
 
               <div className="text-xs md:text-sm text-gray-700 space-y-1 md:space-y-2">
                 <p className="font-medium text-gray-800 md:text-base">
-                  {project.builderName || "Builder Name"}
+                  {project.owner?.name || "Builder Name"}
                 </p>
 
                 <p className="leading-relaxed">

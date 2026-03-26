@@ -12,7 +12,6 @@ const MOCK_PROJECTS: Record<string, Project> = {
     id: '1',
     name: 'Sunrise Heights',
     type: 'flat',
-    builderName: 'ABC Developers',
     city: 'Mumbai',
     location: 'Andheri West',
     googleMapLink: 'https://maps.google.com',

@@ -20,7 +20,6 @@ export interface Project {
   id: string;
   name: string;
   type: ProjectType;
-  builderName: string;
   city: string;
   location: string;
   latitude?: number;
@@ -70,6 +69,13 @@ export interface Project {
   isPublished: boolean;
   createdAt?: string;
   updatedAt?: string;
+  owner?: {
+    id: string;
+    _id: string;
+    name: string;
+    companyName?: string;
+    role: string;
+  };
 }
 
 export type ProjectFormData = Omit<Project, 'id' | 'slug' | 'trackableLink' | 'createdAt' | 'updatedAt'>;

@@ -166,9 +166,9 @@ export default function CrmPipeline({ embedded = false }: CrmPipelineProps) {
 
                 {/* Cards Container */}
                 <div className={`space-y-4 min-h-[500px] p-4 rounded-3xl transition-colors duration-300 border-2 border-dashed ${draggedLead ? 'bg-[#B45309]/5 border-[#B45309]/20' : 'bg-white/40 border-transparent'}`}>
-                  {getLeadsByStage(stage.key).map(lead => (
+                  {getLeadsByStage(stage.key).map((lead, idx) => (
                     <div
-                      key={lead._id}
+                      key={(lead as any)._id || `lead-${stage.key}-${idx}`}
                       draggable
                       onDragStart={() => handleDragStart(lead._id)}
                       className={`group bg-white rounded-2xl p-5 border border-[#E7E5E4] shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all cursor-grab active:cursor-grabbing relative overflow-hidden ${

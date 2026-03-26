@@ -19,7 +19,6 @@ const validateFileSize = (file: File, maxKB: number) => {
 const DEFAULT_FORM_DATA: ProjectFormData = {
   name: '',
   type: 'flat',
-  builderName: '',
   city: '',
   location: '',
   latitude: 0,
@@ -144,7 +143,6 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   // Section 1
   if (!formData.name?.trim()) errors.name = 'Project name is required';
   if (!formData.type) errors.type = 'Project type is required';
-  if (!formData.builderName?.trim()) errors.builderName = 'Builder name is required';
   if (!formData.city?.trim()) errors.city = 'City is required';
   if (!formData.location?.trim()) errors.location = 'Location is required';
   if (!formData.googleMapLink?.trim()) errors.googleMapLink = 'Google Map Link is required';
@@ -530,17 +528,6 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
               </p>
             )}
           </div>
-
-          <InputField
-            label="Builder / Developer Name"
-            name="builderName"
-            placeholder="e.g., ABC Developers"
-            required
-            value={formData.builderName}
-            error={formErrors.builderName}
-            refCallback={(el) => (fieldRefs.current.builderName = el)}
-            onChange={(v) => updateField('builderName', v)}
-          />
 
           <InputField
             label="City"

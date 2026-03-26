@@ -1674,7 +1674,7 @@ const floorPlans: FloorPlan[] = isPlot
 
                       {/* Builder name (dynamic) */}
                       <p className="font-medium text-gray-800">
-                        {project.builderName || "Builder Name"}
+                        {project.owner?.name || "Builder Name"}
                       </p>
 
                       {/* Static address placeholder */}

@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useAuth } from '@/lib/authContext';
 import { chatApi, ChatSession, ChatMessage as ChatMsg } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
 
 const QUALIFICATION_QUESTIONS = [
@@ -14,8 +15,20 @@ const QUALIFICATION_QUESTIONS = [
 ];
 
 export default function ChatPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading...</div>}>
+      <ChatContent />
+    </Suspense>
+  );
+}
+
+function ChatContent() {
   const { user } = useAuth();
   const socket = useSocket();
+  const searchParams = useSearchParams();
+  const partnerIdUrl = searchParams.get('partnerId');
+  const projectIdUrl = searchParams.get('projectId');
+  const [hasProcessedUrlId, setHasProcessedUrlId] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
   const [messages, setMessages] = useState<ChatMsg[]>([]);
@@ -47,6 +60,42 @@ export default function ChatPage() {
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  // Handle direct partner chat from URL params
+  useEffect(() => {
+    if (partnerIdUrl && sessions.length > 0 && !hasProcessedUrlId && !loading) {
+      // 1. Check if we already have a session active (or in the list)
+      const existing = sessions.find(s => 
+        s.participants.some(p => p._id === partnerIdUrl) && 
+        (!projectIdUrl || s.project?._id === projectIdUrl)
+      );
+      
+      if (existing) {
+        setActiveSession(existing);
+        setHasProcessedUrlId(true);
+      } else {
+        // 2. We need to start a new chat, but we need the contact object
+        const initNewChatFromUrl = async () => {
+          try {
+            const data = await chatApi.getContacts();
+            setContacts(data);
+            const target = data.find((c: any) => c._id === partnerIdUrl);
+            if (target) {
+              setSelectedPartner(target);
+              setShowQualification(true);
+            }
+            setHasProcessedUrlId(true);
+          } catch (err) {
+            console.error('Err starting chat from URL:', err);
+            setHasProcessedUrlId(true);
+          }
+        };
+        initNewChatFromUrl();
+      }
+    } else if (!partnerIdUrl) {
+      setHasProcessedUrlId(true);
+    }
+  }, [partnerIdUrl, sessions, projectIdUrl, hasProcessedUrlId, loading]);
 
   // Load messages when session changes
   useEffect(() => {
@@ -146,6 +195,7 @@ export default function ChatPage() {
     try {
       const session = await chatApi.qualifyAndConnect({
         partnerId: selectedPartner._id,
+        projectId: projectIdUrl || undefined,
         qualificationData: qualificationAnswers,
       });
       setSessions(prev => [session, ...prev]);
