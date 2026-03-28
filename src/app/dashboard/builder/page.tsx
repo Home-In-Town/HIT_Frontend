@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { usersApi, getLeadGenUrl } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { PlusCircle, Users, Zap, LayoutGrid, FilePlus, ArrowRight } from 'lucide-react';
+import { PlusCircle, Users, Zap, LayoutGrid, FilePlus, ArrowRight, ShoppingBag } from 'lucide-react';
 import CrmPipeline from '@/components/dashboard/CrmPipeline';
 
 export default function BuilderDashboardPage() {
@@ -71,7 +71,22 @@ export default function BuilderDashboardPage() {
             <Zap className="w-3.5 h-3.5 text-[#B45309]" />
             <h2 className="text-[10px] font-bold text-[#57534E] uppercase tracking-[0.2em]">Priority Workflows</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Link
+              href="/dashboard/marketplace"
+              className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"
+            >
+              <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
+                <ShoppingBag className="w-12 h-12" />
+              </div>
+              <div className="w-12 h-12 bg-[#B45309]/5 rounded-2xl flex items-center justify-center text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white transition-all shadow-inner">
+                <ShoppingBag className="w-6 h-6" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">sell & earn</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Marketplace</p>
+              </div>
+            </Link>
             <Link
               href="/dashboard/employees"
               className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden"

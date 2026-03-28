@@ -28,8 +28,11 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/lib/authContext';
 
 export default function Home() {
+  const { status } = useAuth();
+  
   const fadeIn = {
     initial: { opacity: 0, y: 24 },
     whileInView: { opacity: 1, y: 0 },
@@ -61,10 +64,10 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-4">
               <Link
-                href="/login"
+                href={status === 'authenticated' ? "/dashboard" : "/login"}
                 className="px-6 py-2.5 bg-[#2A2A2A] text-white text-sm font-semibold rounded-full hover:bg-black transition-all hover:shadow-xl hover:-translate-y-0.5"
               >
-                Login
+                {status === 'authenticated' ? 'Dashboard' : 'Login'}
               </Link>
             </div>
           </div>
@@ -125,10 +128,10 @@ export default function Home() {
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
             <Link
-              href="/login"
+              href={status === 'authenticated' ? "/dashboard" : "/login"}
               className="group w-full sm:w-auto px-8 py-4 bg-[#B45309] text-white font-bold rounded-2xl hover:bg-[#92400E] transition-all flex items-center justify-center gap-2 shadow-xl shadow-[#B45309]/20 hover:-translate-y-1"
             >
-              Create Your Project Page
+              {status === 'authenticated' ? 'Go to Dashboard' : 'Create Your Project Page'}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <a 

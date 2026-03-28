@@ -19,10 +19,16 @@ const nextConfig: NextConfig = {
     ],
   },
   async rewrites() {
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+    const prodUrl = 'https://sales-website-backend-624770114041.asia-south1.run.app/api';
+    const backendUrl = (apiUrl && apiUrl.startsWith('http')) 
+      ? apiUrl 
+      : (process.env.NODE_ENV === 'production' ? prodUrl : 'http://localhost:5001/api');
+
     return [
       {
         source: '/api/:path*',
-        destination: (process.env.NEXT_PUBLIC_API_URL || 'https://sales-website-backend-624770114041.asia-south1.run.app/api') + '/:path*',
+        destination: backendUrl + '/:path*',
       },
     ];
   },

@@ -1,11 +1,34 @@
 'use client';
 
 import AuthScreens from '@/components/auth/AuthScreens';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useAuth } from '@/lib/authContext';
+import { useRouter } from 'next/navigation';
 
 export default function LoginPage() {
+  const { status } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.replace('/dashboard');
+    }
+  }, [status, router]);
+
+  // Show loading state while checking session
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#B45309]" />
+      </div>
+    );
+  }
+
+  // If already authenticated, don't show the form (prevents flicker before redirect)
+  if (status === 'authenticated') return null;
+
   return (
     <main className="min-h-screen bg-[#FAF7F2] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans selection:bg-[#B45309]/20">
       
