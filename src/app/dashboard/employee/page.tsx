@@ -12,7 +12,7 @@ import {
   Power, 
   History, 
   LayoutDashboard,
-  LogOut,
+
   User,
   Activity,
   ChevronRight,
@@ -45,7 +45,7 @@ const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => 
 };
 
 export default function EmployeeDashboard() {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const router = useRouter();
     const [isTracking, setIsTracking] = useState(false);
     const [lastPosition, setLastPosition] = useState<{lat: number, lng: number} | null>(null);
@@ -271,11 +271,7 @@ export default function EmployeeDashboard() {
         }
     };
 
-    const handleLogout = async () => {
-        stopTracking();
-        await logout();
-        router.push('/login');
-    };
+
 
     return (
         <div className="min-h-screen bg-[#FAF7F2] relative pb-24">
@@ -291,12 +287,7 @@ export default function EmployeeDashboard() {
                             </p>
                         </div>
                     </div>
-                    <button 
-                        onClick={handleLogout}
-                        className="p-2 text-[#A8A29E] hover:text-red-500 bg-[#FAF7F2] rounded-xl border border-[#E7E5E4] transition-all"
-                    >
-                        <LogOut className="w-4 h-4" />
-                    </button>
+
                 </div>
             </div>
 

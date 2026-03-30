@@ -6,11 +6,11 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
 import { usersApi, getLeadGenUrl } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { PlusCircle, Users, Zap, LayoutGrid, FilePlus, ArrowRight, ShoppingBag } from 'lucide-react';
+import { PlusCircle, Users, Zap, LayoutGrid, FilePlus, ShoppingBag } from 'lucide-react';
 import CrmPipeline from '@/components/dashboard/CrmPipeline';
 
 export default function BuilderDashboardPage() {
-  const { user, status, logout } = useAuth();
+  const { user, status } = useAuth();
   const authLoading = status === 'loading';
   const router = useRouter();
   const [loading, setLoading] = useState(true);
@@ -55,12 +55,7 @@ export default function BuilderDashboardPage() {
               Builder Overview — Relationship & Pipeline Management
             </p>
           </div>
-          <button
-            onClick={async () => { await logout(); router.push('/login'); }}
-            className="text-[10px] text-[#A8A29E] hover:text-[#B45309] font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-2 group border border-transparent hover:border-[#B45309]/10 px-3 py-1.5 rounded-lg whitespace-nowrap"
-          >
-            Sign Out <ArrowRight className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
-          </button>
+
         </div>
       </div>
 

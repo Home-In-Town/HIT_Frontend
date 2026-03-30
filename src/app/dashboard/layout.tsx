@@ -15,7 +15,7 @@ export default function DashboardLayout({
   const pathname = usePathname();
   // Ensure active state updates correctly on navigation
 
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
 
   // Fix: Strictly match /dashboard to prevent it from being active on /dashboard/analytics
   const isActive = (path: string) => {
@@ -275,11 +275,24 @@ const orgPath = user
 
         </nav>
         
-        <div className="border-t border-gray-200 pt-4 overflow-hidden">
-           <div className={`px-3 py-2 mb-2 text-xs text-gray-400 font-mono text-center border border-dashed border-gray-200 rounded bg-gray-50 whitespace-nowrap transition-all duration-300 ${isCollapsed ? 'opacity-0 h-0 p-0 m-0 border-0' : 'opacity-100'}`}>
-             Admin Login Data
-           </div>
-
+        <div className="border-t border-gray-200 pt-4 pb-2">
+          <button
+            onClick={() => {
+              logout();
+              window.location.href = '/login';
+            }}
+            className={`
+              w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all
+              text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309] group
+              ${isCollapsed ? 'justify-center px-0' : ''}
+            `}
+            title={isCollapsed ? "Sign Out" : ""}
+          >
+            <svg className="flex-shrink-0 w-6 h-6 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Sign Out</span>}
+          </button>
         </div>
       </aside>
 
