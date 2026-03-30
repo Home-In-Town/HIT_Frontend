@@ -1018,79 +1018,89 @@ export default function MarketplacePage() {
               initial={{ opacity: 0, scale: 0.95, y: 100 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 100 }}
-              className="bg-white w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] rounded-t-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row"
+              className="bg-white w-full max-w-xl max-h-[95vh] md:max-h-[80vh] rounded-t-xl md:rounded-2xl overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-full md:w-2/5 relative h-56 md:h-auto bg-[#B45309]/10">
+              <div className="w-full md:w-1/3 relative h-40 md:h-auto bg-[#B45309]/10">
                 {getProjectDetails(showDetailModal).media ? (
                   <img src={getProjectDetails(showDetailModal).media!} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center"><BanknotesIcon className="w-24 h-24 text-[#B45309]/20" /></div>
                 )}
-                <div className="absolute top-8 left-8">
-                  <div className="bg-white/90 backdrop-blur px-6 py-2 rounded-2xl text-[#B45309] text-lg font-black shadow-2xl">
+                <div className="absolute top-4 left-4">
+                  <div className="bg-white/90 backdrop-blur px-3 py-1 rounded-lg text-[#B45309] text-sm font-black shadow-xl">
                     {formatPrice(getProjectDetails(showDetailModal).price)}
                   </div>
                 </div>
               </div>
 
-              <div className="w-full md:w-3/5 p-6 md:p-10 flex flex-col">
+              <div className="w-full md:w-2/3 p-3 md:p-4 flex flex-col">
                 {(() => {
                   const details = getProjectDetails(showDetailModal);
                   return (
                     <>
-                      <div className="flex justify-between items-start mb-8">
+                      <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
-                          <h2 className="text-xl md:text-3xl font-black font-serif leading-tight">{details.name}</h2>
-                          <p className="text-gray-400 text-xs font-bold flex items-center gap-1.5 mt-1.5">
-                            <MapPinIcon className="w-4 h-4" /> {details.location}, {details.city}
+                          <h2 className="text-base md:text-lg font-black font-serif leading-tight">{details.name}</h2>
+                          <p className="text-gray-400 text-[9px] font-bold flex items-center gap-1 mt-0.5">
+                            <MapPinIcon className="w-2.5 h-2.5" /> {details.location}, {details.city}
                           </p>
                         </div>
-                        <button onClick={() => setShowDetailModal(null)} className="p-3 bg-gray-100 rounded-2xl hover:bg-gray-200 transition-all">
-                          <XMarkIcon className="w-6 h-6" />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {details.slug && (
+                            <button
+                              onClick={() => window.open(`/projects/${details.slug}`, '_blank')}
+                              className="px-3 py-1.5 bg-[#FAF7F5] text-[#1C1917] border border-[#E7E5E4] rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-white transition-all active:scale-95 shadow-sm"
+                            >
+                              Visit Project
+                            </button>
+                          )}
+                          <button onClick={() => setShowDetailModal(null)} className="p-1.5 bg-gray-100 rounded-lg hover:bg-gray-200 transition-all">
+                            <XMarkIcon className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
-                      <div className="flex gap-4 mb-8">
+                      <div className="flex gap-1.5 mb-3">
                         {showDetailModal?.listingType === 'selling' && (
-                          <div className="px-5 py-3 bg-[#B45309]/5 rounded-2xl border border-[#B45309]/20 text-[#B45309] font-black text-sm">
+                          <div className="px-3 py-1.5 bg-[#B45309]/5 rounded-xl border border-[#B45309]/20 text-[#B45309] font-black text-[10px]">
                             {(showDetailModal as any)?.commissionType === 'percentage' ? `${(showDetailModal as any)?.commissionValue || 0}% Commission` : `₹${((showDetailModal as any)?.commissionValue || 0).toLocaleString()} Fixed`}
                           </div>
                         )}
-                        <div className="px-5 py-3 bg-gray-50 rounded-2xl border border-gray-100 text-gray-500 font-bold text-sm">
+                        <div className="px-3 py-1.5 bg-gray-50 rounded-xl border border-gray-100 text-gray-500 font-bold text-[10px]">
                           {showDetailModal?.status}
                         </div>
                         {showDetailModal?.listingType === 'buying' && (
-                          <div className="px-5 py-3 bg-indigo-50 rounded-2xl border border-indigo-200 text-indigo-600 font-black text-xs uppercase tracking-widest">
+                          <div className="px-3 py-1.5 bg-indigo-50 rounded-xl border border-indigo-200 text-indigo-600 font-black text-[9px] uppercase tracking-widest">
                             Requirement
                           </div>
                         )}
                       </div>
 
-                      <div className="space-y-6 flex-1 overflow-y-auto pr-4 custom-scrollbar">
+                      <div className="space-y-3 flex-1 overflow-y-auto pr-1 custom-scrollbar">
                         <div>
-                          <h4 className="text-[10px] uppercase tracking-[0.2em] font-black text-gray-400 mb-3">Pitch / Description</h4>
-                          <p className="text-gray-600 leading-relaxed font-medium bg-[#FAF7F5] p-5 rounded-3xl whitespace-pre-line">{showDetailModal?.description || 'No pitch provided for this project.'}</p>
+                          <h4 className="text-[8px] uppercase tracking-[0.1em] font-black text-gray-400 mb-1.5">Pitch / Description</h4>
+                          <p className="text-gray-600 leading-relaxed text-[10px] font-medium bg-[#FAF7F5] p-2 rounded-xl whitespace-pre-line">{showDetailModal?.description || 'No pitch provided for this project.'}</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="p-5 bg-white border border-[#E7E5E4] rounded-[2rem]">
-                            <p className="text-[10px] font-black uppercase text-gray-400 mb-2">Listed By</p>
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-[#1C1917] text-white flex items-center justify-center font-black border-2 border-white shadow-lg">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-white border border-[#E7E5E4] rounded-2xl">
+                            <p className="text-[9px] font-black uppercase text-gray-400 mb-1.5">Listed By</p>
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-[#1C1917] text-white flex items-center justify-center text-xs font-black border-2 border-white shadow-lg">
                                 {details.listedBy[0]}
                               </div>
                               <div className="flex flex-col">
-                                <div className="text-sm font-black text-[#1C1917] leading-none mb-1">{details.listedBy}</div>
-                                <div className="text-[10px] font-bold text-stone-400 uppercase tracking-widest leading-none">{details.role}</div>
+                                <div className="text-[11px] font-black text-[#1C1917] leading-none mb-0.5">{details.listedBy}</div>
+                                <div className="text-[9px] font-bold text-stone-400 uppercase tracking-widest leading-none">{details.role}</div>
                               </div>
                             </div>
                           </div>
-                          <div className="p-5 bg-white border border-[#E7E5E4] rounded-[2rem]">
-                            <p className="text-[10px] font-black uppercase text-gray-400 mb-2">Value</p>
-                            <div className="flex items-center gap-2">
-                              <BanknotesIcon className="w-5 h-5 text-[#B45309]" />
-                              <p className="text-base font-black text-[#1C1917]">{formatPrice(details.price)}</p>
+                          <div className="p-3 bg-white border border-[#E7E5E4] rounded-2xl">
+                            <p className="text-[9px] font-black uppercase text-gray-400 mb-1.5">Value</p>
+                            <div className="flex items-center gap-1.5">
+                              <BanknotesIcon className="w-4 h-4 text-[#B45309]" />
+                              <p className="text-xs font-black text-[#1C1917]">{formatPrice(details.price)}</p>
                             </div>
                           </div>
                         </div>
@@ -1111,21 +1121,23 @@ export default function MarketplacePage() {
                         )}
                       </div>
 
-                      <div className="mt-10 pt-8 border-t border-gray-100 flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-emerald-600 font-black text-xs">
-                          <CheckBadgeIcon className="w-5 h-5" /> Verified Earning Opportunity
+                      <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                        <div className="flex items-center gap-1 text-emerald-600 font-black text-[8px] uppercase tracking-tighter">
+                          <CheckBadgeIcon className="w-3 h-3" /> Verified Opportunity
                         </div>
-                        {((typeof showDetailModal?.listedBy === 'object' ? (showDetailModal?.listedBy as any)?._id : showDetailModal?.listedBy) !== (user?.id || (user as any)?._id)) ? (
-                          <div
-                            onClick={() => handleChat(showDetailModal)}
-                            className="flex items-center gap-2 px-8 py-3.5 bg-[#1C1917] text-white rounded-2xl font-black text-sm opacity-90 transition-all hover:bg-black cursor-pointer shadow-xl shadow-black/20"
-                          >
-                            <ChatBubbleLeftEllipsisIcon className="w-5 h-5" />
-                            Chat with Owner
-                          </div>
-                        ) : (
-                          <div className="text-xs font-bold text-gray-400 italic">You listed this project</div>
-                        )}
+                        <div className="flex gap-1.5">
+                          {((typeof showDetailModal?.listedBy === 'object' ? (showDetailModal?.listedBy as any)?._id : showDetailModal?.listedBy) !== (user?.id || (user as any)?._id)) ? (
+                            <div
+                              onClick={() => handleChat(showDetailModal)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#1C1917] text-white rounded-lg font-black text-[9px] uppercase tracking-widest opacity-90 transition-all hover:bg-black cursor-pointer"
+                            >
+                              <ChatBubbleLeftEllipsisIcon className="w-3 h-3" />
+                              Chat
+                            </div>
+                          ) : (
+                            <div className="text-[8px] font-bold text-gray-400 italic">You listed this</div>
+                          )}
+                        </div>
                       </div>
                     </>
                   );
@@ -1141,41 +1153,41 @@ export default function MarketplacePage() {
         {showCreateModal && (
           <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#1C1917]/60 backdrop-blur-md" onClick={() => setShowCreateModal(false)} />
-            <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className="bg-white w-full max-w-xl rounded-t-[2rem] md:rounded-[3rem] shadow-2xl relative z-10 overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="p-6 md:p-10">
-                <div className="flex justify-between items-center mb-6 md:mb-10">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white w-[95%] max-w-md rounded-2xl md:rounded-3xl shadow-2xl relative z-10 overflow-hidden mx-auto my-auto" onClick={e => e.stopPropagation()}>
+              <div className="p-4 md:p-6">
+                <div className="flex justify-between items-center mb-4 md:mb-6">
                   <div>
-                    <h2 className="text-2xl font-black font-serif">
+                    <h2 className="text-lg md:text-xl font-black font-serif">
                       {formData.listingType === 'selling' ? 'Marketplace Listing' : 'Listing Requirement'}
                     </h2>
-                    <p className="text-sm text-gray-400 font-medium">
+                    <p className="text-[10px] md:text-xs text-gray-400 font-medium leading-tight mt-0.5">
                       {formData.listingType === 'selling' ? 'Earn more by opening your projects to others.' : 'Looking for something? Find partners to fulfill your need.'}
                     </p>
                   </div>
-                  <button onClick={() => setShowCreateModal(false)} className="p-3 bg-gray-50 rounded-2xl"><XMarkIcon className="w-6 h-6" /></button>
+                  <button onClick={() => setShowCreateModal(false)} className="p-2 bg-gray-50 rounded-xl"><XMarkIcon className="w-5 h-5" /></button>
                 </div>
 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {formData.listingType === 'selling' ? (
                     <div>
-                      <label className="text-[10px] uppercase font-black text-gray-400 mb-2 block tracking-widest pl-2">Select Unlisted Project</label>
+                      <label className="text-[9px] uppercase font-black text-gray-400 mb-1.5 block tracking-widest pl-1.5">Select Unlisted Project</label>
                       <select
-                        className="w-full px-5 py-4 bg-[#FAF7F5] border-2 border-transparent focus:border-[#B45309]/30 transition-all rounded-[1.5rem] outline-none text-sm font-bold"
+                        className="w-full px-4 py-2.5 bg-[#FAF7F5] border border-transparent focus:border-[#B45309]/30 transition-all rounded-xl outline-none text-[11px] font-bold"
                         value={formData.project}
                         onChange={(e) => setFormData({ ...formData, project: e.target.value })}
                       >
                         <option value="">Choose from your collection...</option>
                         {unlistedProjects.map((p, pIdx) => <option key={p.id || `unlisted-${pIdx}`} value={p.id}>{p.name}</option>)}
                       </select>
-                      {unlistedProjects.length === 0 && <p className="text-[10px] text-[#B45309] font-bold mt-2 pl-2">All your projects are already in the marketplace.</p>}
+                      {unlistedProjects.length === 0 && <p className="text-[9px] text-[#B45309] font-bold mt-1.5 pl-1.5">All projects listed.</p>}
                     </div>
                   ) : (
                     <div>
-                      <label className="text-[10px] uppercase font-black text-gray-400 mb-2 block tracking-widest pl-2">Target Location</label>
+                      <label className="text-[9px] uppercase font-black text-gray-400 mb-1.5 block tracking-widest pl-1.5">Target Location</label>
                       <input
                         type="text"
                         placeholder="e.g. Bandra West, Mumbai"
-                        className="w-full px-5 py-4 bg-[#FAF7F5] border-2 border-transparent focus:border-[#B45309]/30 transition-all rounded-[1.5rem] outline-none text-sm font-bold"
+                        className="w-full px-4 py-2.5 bg-[#FAF7F5] border border-transparent focus:border-[#B45309]/30 transition-all rounded-xl outline-none text-[11px] font-bold"
                         value={formData.location}
                         onChange={(e) => setFormData({ ...formData, location: e.target.value })}
                       />
@@ -1183,35 +1195,35 @@ export default function MarketplacePage() {
                   )}
 
                   <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 mb-2 block tracking-widest pl-2">Expected Deal Value</label>
+                    <label className="text-[9px] uppercase font-black text-gray-400 mb-1.5 block tracking-widest pl-1.5">Expected Deal Value</label>
                     <input
                       type="number"
                       placeholder="e.g. 50,00,000"
-                      className="w-full px-5 py-4 bg-[#FAF7F5] border-2 border-transparent focus:border-[#B45309]/30 transition-all rounded-[1.5rem] outline-none text-sm font-bold"
+                      className="w-full px-4 py-2.5 bg-[#FAF7F5] border border-transparent focus:border-[#B45309]/30 transition-all rounded-xl outline-none text-[11px] font-bold"
                       value={formData.expectedValue}
                       onChange={(e) => setFormData({ ...formData, expectedValue: e.target.value })}
                     />
                   </div>
 
                   {formData.listingType === 'selling' && (
-                    <div className="bg-[#FAF7F5] p-6 rounded-[2rem] border-2 border-transparent hover:border-[#B45309]/10 transition-all">
-                      <div className="flex items-center justify-between mb-4">
-                        <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest pl-2">Commission Offer</label>
-                        <div className="flex bg-white rounded-xl p-1 shadow-sm border border-[#E7E5E4]">
+                    <div className="bg-[#FAF7F5] p-4 rounded-xl border border-transparent hover:border-[#B45309]/10 transition-all">
+                      <div className="flex items-center justify-between mb-2.5">
+                        <label className="text-[8px] md:text-[9px] uppercase font-black text-zinc-400 tracking-widest pl-1">Commission Offer</label>
+                        <div className="flex bg-white rounded-lg p-0.5 shadow-sm border border-[#E7E5E4]">
                           <button
                             onClick={() => setFormData({ ...formData, commissionType: 'percentage' })}
-                            className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${formData.commissionType === 'percentage' ? 'bg-[#B45309] text-white' : 'text-gray-400'}`}
+                            className={`px-2 py-1 text-[8px] font-black rounded-md transition-all ${formData.commissionType === 'percentage' ? 'bg-[#B45309] text-white' : 'text-gray-400'}`}
                           >PERCENT</button>
                           <button
                             onClick={() => setFormData({ ...formData, commissionType: 'fixed' })}
-                            className={`px-3 py-1.5 text-[10px] font-black rounded-lg transition-all ${formData.commissionType === 'fixed' ? 'bg-[#B45309] text-white' : 'text-gray-400'}`}
+                            className={`px-2 py-1 text-[8px] font-black rounded-md transition-all ${formData.commissionType === 'fixed' ? 'bg-[#B45309] text-white' : 'text-gray-400'}`}
                           >FIXED ₹</button>
                         </div>
                       </div>
                       <input
                         type="number"
                         placeholder={formData.commissionType === 'percentage' ? '2.5%' : 'e.g. 50,000'}
-                        className="w-full px-5 py-4 bg-white border border-[#E7E5E4] rounded-2xl outline-none text-lg font-black text-[#B45309]"
+                        className="w-full px-4 py-2.5 bg-white border border-[#E7E5E4] rounded-lg outline-none text-base font-black text-[#B45309]"
                         value={formData.commissionValue}
                         onChange={(e) => setFormData({ ...formData, commissionValue: e.target.value })}
                       />
@@ -1219,13 +1231,13 @@ export default function MarketplacePage() {
                   )}
 
                   <div>
-                    <label className="text-[10px] uppercase font-black text-gray-400 mb-2 block tracking-widest pl-2">
-                      {formData.listingType === 'selling' ? 'Sales pitch (Optional)' : 'Requirement Details (Optional)'}
+                    <label className="text-[9px] uppercase font-black text-zinc-400 mb-1.5 block tracking-widest pl-1.5">
+                      {formData.listingType === 'selling' ? 'Sales pitch' : 'Requirement Details'}
                     </label>
                     <textarea
-                      rows={3}
-                      placeholder={formData.listingType === 'selling' ? 'Why should others help you sell this?...' : 'Mention specific preferences, budget range, or timeline...'}
-                      className="w-full px-5 py-4 bg-[#FAF7F5] border-2 border-transparent focus:border-[#B45309]/30 transition-all rounded-[1.5rem] outline-none text-sm font-bold resize-none"
+                      rows={2}
+                      placeholder={formData.listingType === 'selling' ? 'Why should others help you sell this?...' : 'Specific preferences...'}
+                      className="w-full px-4 py-2.5 bg-[#FAF7F5] border border-transparent focus:border-[#B45309]/30 transition-all rounded-xl outline-none text-[11px] font-bold resize-none"
                       value={formData.description}
                       onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                     />
@@ -1238,7 +1250,7 @@ export default function MarketplacePage() {
                         ? (!formData.project || !formData.commissionValue)
                         : (!formData.location || !formData.expectedValue)
                     }
-                    className="w-full py-5 bg-[#B45309] text-white rounded-[1.5rem] font-black tracking-widest uppercase text-sm shadow-2xl shadow-[#B45309]/30 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
+                    className="w-full py-3.5 bg-[#B45309] text-white rounded-xl font-black tracking-widest uppercase text-xs shadow-xl shadow-[#B45309]/20 active:scale-95 transition-all disabled:opacity-50 disabled:grayscale"
                   >
                     Confirm & {formData.listingType === 'selling' ? 'Publish' : 'Post Requirement'}
                   </button>
