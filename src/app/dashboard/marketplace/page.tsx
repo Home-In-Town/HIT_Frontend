@@ -23,7 +23,8 @@ import {
   InformationCircleIcon,
   ChatBubbleLeftEllipsisIcon,
   NoSymbolIcon,
-  ShareIcon
+  ShareIcon,
+  ChevronRightIcon
 } from '@heroicons/react/24/outline';
 import { CheckBadgeIcon } from '@heroicons/react/24/solid';
 
@@ -91,13 +92,13 @@ function getProjectDetails(item: MarketplaceListing | any) {
   const pricePerSqFt = project.pricing?.pricePerSqFt || project.pricePerSqFt || 0;
 
   // Consistent area
-  const area = 
-      project.configuration?.carpetAreaRange || 
-      project.configuration?.plotSizeRange || 
-      project.carpetAreaRange || 
-      project.plotSizeRange || 
-      project.projectArea ||
-      '';
+  const area =
+    project.configuration?.carpetAreaRange ||
+    project.configuration?.plotSizeRange ||
+    project.carpetAreaRange ||
+    project.plotSizeRange ||
+    project.projectArea ||
+    '';
 
   // Listed By information
   const listedBy = item.listedBy?.name || item.listedBy?.companyName || project.owner?.name || 'Owner';
@@ -181,12 +182,21 @@ export default function MarketplacePage() {
         setProjects(projectsData);
         setAdminActions(actionsData);
       } else {
-        const [listingsData, projectsData] = await Promise.all([
+        const [listingsData, publicProjects, myProjects] = await Promise.all([
           marketplaceApi.getListings(),
+          projectsApi.getAllPublic(),
           projectsApi.getAll()
         ]);
         setListings(listingsData);
-        setProjects(projectsData);
+        
+        // Merge uniquely
+        const merged = [...publicProjects];
+        myProjects.forEach(p => {
+           if (!merged.find(item => String(item.id || (item as any)._id) === String(p.id || (p as any)._id))) {
+             merged.push(p);
+           }
+        });
+        setProjects(merged);
       }
     } catch (err: any) {
       console.error('[Marketplace] Error fetching data:', err);
@@ -220,8 +230,14 @@ export default function MarketplacePage() {
       return projId ? String(projId) : null;
     }).filter(Boolean));
 
-    return projects.filter(p => !listedProjectIds.has(String(p.id)));
-  }, [projects, listings]);
+    const currentUserId = user?.id || (user as any)?._id;
+
+    return projects.filter(p => {
+      const ownerId = typeof p.owner === 'object' ? (p.owner as any)?._id || (p.owner as any)?.id : p.owner;
+      const isMine = ownerId && currentUserId && String(ownerId) === String(currentUserId);
+      return isMine && !listedProjectIds.has(String(p.id));
+    });
+  }, [projects, listings, user]);
 
   const myListedProjects = useMemo(() => {
     return listings.filter(l => {
@@ -236,13 +252,27 @@ export default function MarketplacePage() {
       // 1. Select source
       let sourceItems = [];
       if (activeTab === 'browse') {
-        // Include all projects
-        sourceItems = [...projects];
+        // Start with all published projects
+        const baseProjects = [...projects];
+
+        // Ensure projects referenced in selling listings are included (even if NOT published)
+        // This satisfies "only published and listed" - a listed project is NOT a draft in this context.
+        listings.forEach(l => {
+          if (l.listingType === 'selling' && l.project && typeof l.project === 'object') {
+            const projId = (l.project as any)._id || (l.project as any).id;
+            if (!baseProjects.find(p => String(p._id || p.id) === String(projId))) {
+              baseProjects.push(l.project);
+            }
+          }
+        });
+
+        sourceItems = baseProjects;
+
         // ALSO include stand-alone listings (Requirements) that aren't tied to a project in 'projects'
         const standaloneRequirements = listings.filter(l => {
           if (l.listingType !== 'buying') return false;
           const projId = typeof l.project === 'object' ? (l.project as any)?._id : l.project;
-          return !projId || !projects.find(p => String(p._id || p.id) === String(projId));
+          return !projId || !baseProjects.find(p => String(p._id || p.id) === String(projId));
         });
         sourceItems = [...sourceItems, ...standaloneRequirements];
       } else {
@@ -274,14 +304,21 @@ export default function MarketplacePage() {
       // 3. Filter by Buy/Sell/All (Market Perspective)
       if (activeTab === 'browse') {
         if (activeView === 'Buy') {
-          // Show listings that are for SALE (so users can buy them)
-          processed = processed.filter(item => item.listingType === 'selling');
+          // User: "the listed will show in 'buy' tab"
+          // ONLY show selling listings that are explicitly in the marketplace
+          processed = processed.filter(item => item.isListing && item.listingType === 'selling');
         } else if (activeView === 'Sell') {
           // Show listings that are for PURCHASE (so users can sell to them / requirements)
           processed = processed.filter(item => item.listingType === 'buying');
         } else if (activeView === 'All') {
-          // Show only standard properties/projects, exclude requirements
-          processed = processed.filter(item => item.listingType !== 'buying');
+          // User: "only published projects and listed project... not draft"
+          // Show standard properties (published) + listed properties
+          // Hides: unpublished drafts that aren't listed, and buying requirements
+          processed = processed.filter(item => {
+            const isProperty = item.listingType !== 'buying';
+            const isVisible = item.isPublished || item.isListing;
+            return isProperty && isVisible;
+          });
         }
       }
 
@@ -425,7 +462,7 @@ export default function MarketplacePage() {
     }
     const baseUrl = window.location.origin;
     const shareUrl = `${baseUrl}/visit/${details.slug}`;
-    
+
     navigator.clipboard.writeText(shareUrl)
       .then(() => toast.success("Project link copied!"))
       .catch((err) => {
@@ -442,18 +479,18 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FAFAF9] text-[#1C1917] pb-20">
+    <div className="min-h-screen bg-[#FAFAF9] text-[#1C1917] pb-20 w-full max-w-[100vw] overflow-x-hidden relative">
       {/* Banner */}
-      <div className="bg-[#B45309] text-white py-3 px-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-32 translate-x-32 blur-3xl" />
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-white/20 rounded font-bold backdrop-blur-md">
-              <SparklesIcon className="w-6 h-6 text-white" />
+      <div className="bg-[#B45309] text-white py-1.5 md:py-3 px-4 md:px-6 relative overflow-hidden shrink-0 w-full">
+        <div className="absolute top-0 right-0 w-48 md:w-64 h-48 md:h-64 bg-white/10 rounded-full blur-3xl opacity-50" />
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-3 relative z-10 w-full min-w-0 overflow-hidden">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <div className="p-1 md:p-1.5 bg-white/20 rounded font-bold backdrop-blur-md shrink-0">
+              <SparklesIcon className="w-4 h-4 md:w-6 md:h-6 text-white" />
             </div>
-            <div>
-              <h2 className="text-sm font-bold tracking-tight">Earning Opportunities are Live</h2>
-              <p className="text-[11px] text-white/80 font-medium tracking-tight">Sell properties & connect with builders to earn commissions.</p>
+            <div className="min-w-0 overflow-hidden">
+              <h2 className="text-[10px] md:text-sm font-bold tracking-tight truncate">Earning Opportunities are Live</h2>
+              <p className="text-[8px] md:text-[11px] text-white/80 font-medium tracking-tight truncate">Sell properties & connect with builders to earn commissions.</p>
             </div>
           </div>
           <button
@@ -461,7 +498,7 @@ export default function MarketplacePage() {
               setSellAndEarn(true);
               window.scrollTo({ top: 600, behavior: 'smooth' });
             }}
-            className="px-5 py-1.5 bg-white text-[#B45309] rounded font-bold text-[11px] shadow-sm hover:bg-stone-50 transition-colors"
+            className="px-3 md:px-5 py-1 bg-white text-[#B45309] rounded font-bold text-[9px] md:text-[11px] shadow-sm hover:bg-stone-50 transition-colors shrink-0 whitespace-nowrap"
           >
             Start Earning
           </button>
@@ -469,131 +506,134 @@ export default function MarketplacePage() {
       </div>
 
       {/* Main Container */}
-      <div className="max-w-7xl mx-auto px-6 pt-10 space-y-12">
+      <div className="max-w-[1850px] mx-auto px-2 md:px-6 pt-2 md:pt-4 space-y-4 md:space-y-6">
 
         {/* New Marketplace Header UI from Screenshot */}
-        <section className="flex flex-col md:flex-row items-center justify-between gap-6 pb-2">
+        <section className="flex flex-col md:flex-row items-center justify-between gap-4 md:gap-8 min-h-fit">
           <div className="flex flex-col items-center md:items-start">
-            <h1 className="text-3xl font-bold text-[#1C1917] font-serif tracking-tight">Marketplace</h1>
-            <p className="text-zinc-500 text-xs font-medium">Browse verified listings and opportunities</p>
+            <h1 className="text-2xl md:text-4xl font-black text-[#1C1917] font-serif tracking-tight">Marketplace</h1>
+            <p className="text-zinc-500 text-[10px] md:text-xs font-medium mt-0.5">Browse verified listings and opportunities</p>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <div className="flex bg-zinc-100 p-1 rounded-xl border border-zinc-200">
+          <div className="flex items-center justify-center gap-1.5 md:gap-4 overflow-x-auto no-scrollbar w-full max-w-full md:w-auto pb-1 md:pb-0 px-1">
+            <div className="flex bg-[#FAF9F8] p-0.5 rounded-lg md:p-0.5 md:rounded-lg border border-[#E7E5E4] shadow-sm shrink-0">
               <button
                 onClick={() => setActiveTab('browse')}
-                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'browse' ? 'bg-white text-[#1C1917] shadow-sm' : 'text-zinc-500 hover:text-[#B45309]'}`}
+                className={`px-2.5 md:px-4 py-1.5 md:py-1.5 rounded-md md:rounded-md text-[10px] md:text-[11px] font-bold transition-all ${activeTab === 'browse' ? 'bg-white text-[#1C1917] shadow-sm' : 'text-zinc-500 hover:text-[#B45309]'}`}
               >
                 Browse
               </button>
               <button
                 onClick={() => setActiveTab('listings')}
-                className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'listings' ? 'bg-white text-[#1C1917] shadow-sm' : 'text-zinc-500 hover:text-[#B45309]'}`}
+                className={`px-2.5 md:px-4 py-1.5 md:py-1.5 rounded-md md:rounded-md text-[10px] md:text-[11px] font-bold transition-all ${activeTab === 'listings' ? 'bg-white text-[#1C1917] shadow-sm' : 'text-zinc-500 hover:text-[#B45309]'}`}
               >
-                My Listings
+                <span className="hidden xs:inline">My </span>Listings
               </button>
               {isAdmin && (
                 <button
                   onClick={() => setActiveTab('admin')}
-                  className={`px-5 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'admin' ? 'bg-white text-[#1C1917] shadow-sm' : 'text-zinc-500 hover:text-[#B45309]'}`}
+                  className={`px-2.5 md:px-4 py-1.5 md:py-1.5 rounded-md md:rounded-md text-[10px] md:text-[11px] font-bold transition-all ${activeTab === 'admin' ? 'bg-white text-[#1C1917] shadow-sm border border-[#E7E5E4]' : 'text-zinc-500 hover:text-[#B45309]'}`}
                 >
                   Admin
                 </button>
               )}
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  setFormData({ project: '', listingType: 'selling', commissionType: 'percentage', commissionValue: '2.5', description: '', expectedValue: '', location: '' });
-                  setShowCreateModal(true);
-                }}
-                className="px-5 py-2.5 bg-[#B45309] text-white rounded-xl font-bold text-xs shadow-sm hover:bg-[#92400E] active:scale-95 transition-all flex items-center gap-2"
-              >
-                <PlusIcon className="w-4 h-4" />
-                Publish
-              </button>
-              <button
-                onClick={() => {
-                  setFormData({ project: '', listingType: 'buying', commissionType: 'percentage', commissionValue: '0', description: '', expectedValue: '', location: '' });
-                  setShowCreateModal(true);
-                }}
-                className="px-5 py-2.5 bg-[#1C1917] text-white rounded-xl font-bold text-xs shadow-sm hover:bg-black active:scale-95 transition-all flex items-center gap-2"
-              >
-                <BanknotesIcon className="w-4 h-4" />
-                Requirement
-              </button>
-            </div>
+            <button
+              onClick={() => {
+                setFormData({ project: '', listingType: 'selling', commissionType: 'percentage', commissionValue: '2.5', description: '', expectedValue: '', location: '' });
+                setShowCreateModal(true);
+              }}
+              className="px-2.5 md:px-5 py-1.5 md:py-2 bg-[#B45309] text-white rounded-lg md:rounded-lg font-bold text-[10px] md:text-[11px] shadow-lg shadow-orange-900/10 hover:bg-[#92400E] active:scale-95 transition-all flex items-center gap-1 md:gap-1.5 shrink-0"
+            >
+              <PlusIcon className="w-3.5 md:w-4 h-3.5 md:h-4" />
+              Publish
+            </button>
+            <button
+              onClick={() => {
+                setFormData({ project: '', listingType: 'buying', commissionType: 'percentage', commissionValue: '0', description: '', expectedValue: '', location: '' });
+                setShowCreateModal(true);
+              }}
+              className="px-2.5 md:px-5 py-1.5 md:py-2 bg-[#1C1917] text-white rounded-lg md:rounded-lg font-bold text-[10px] md:text-[11px] shadow-lg shadow-black/10 hover:bg-black active:scale-95 transition-all flex items-center gap-1 md:gap-1.5 shrink-0"
+            >
+              <BanknotesIcon className="w-3.5 md:w-4 h-3.5 md:h-4" />
+              Requirement
+            </button>
           </div>
         </section>
 
         {/* Filter Row - Only for Browse Tab */}
         {activeTab === 'browse' && (
-          <section className="bg-white p-4 rounded-2xl shadow-sm border border-zinc-200 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex bg-zinc-50 p-1 rounded-xl border border-zinc-200 w-full md:w-auto">
-              {['All', 'Buy', 'Sell'].map((view) => (
-                <button
-                  key={view}
-                  onClick={() => setActiveView(view as any)}
-                  className={`px-5 py-2 rounded-lg text-[10px] font-bold tracking-wider uppercase transition-all ${activeView === view ? 'bg-white text-[#B45309] shadow-sm border border-zinc-200' : 'text-zinc-500 hover:text-[#1C1917]'}`}
-                >
-                  {view}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex-1 w-full relative">
-              <MagnifyingGlassIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Search projects..."
-                className="w-full pl-10 pr-4 py-2 bg-zinc-50 border-transparent rounded-xl text-xs focus:ring-1 focus:ring-[#B45309]/30 transition-all outline-none"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            <div className="flex items-center gap-3 w-full md:w-auto">
-              <div className="relative group">
-                <select
-                  value={selectedCity}
-                  onChange={(e) => setSelectedCity(e.target.value)}
-                  className="appearance-none pl-4 pr-10 py-2 bg-white border border-zinc-200 rounded-xl text-xs font-semibold focus:ring-1 focus:ring-[#B45309]/30 outline-none w-full md:w-40 transition-all"
-                >
-                  {cities.map(city => <option key={city} value={city}>{city}</option>)}
-                </select>
-                <ChevronDownIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-400 pointer-events-none group-hover:text-[#B45309] transition-colors" />
+          <section className="bg-white/80 backdrop-blur-xl p-1.5 md:p-2 rounded-2xl md:rounded-[1.25rem] border border-[#E7E5E4] shadow-xl shadow-orange-900/5 -mt-1 md:-mt-4 mx-auto max-w-5xl relative z-10">
+            <div className="flex flex-col md:flex-row items-center gap-1.5 md:gap-3">
+              {/* Layout Switcher */}
+              <div className="flex bg-[#FAF9F8] p-0.5 rounded-lg border border-[#E7E5E4] w-full md:w-auto shadow-inner h-fit">
+                {['All', 'Buy', 'Sell'].map((view) => (
+                  <button
+                    key={view}
+                    onClick={() => setActiveView(view as any)}
+                    className={`flex-1 md:flex-none px-4 md:px-6 py-1.5 md:py-2 rounded-md text-[10px] font-black tracking-widest transition-all ${activeView === view ? 'bg-white text-[#B45309] shadow-sm border border-[#E7E5E4]' : 'text-zinc-400 hover:text-[#1C1917]'}`}
+                  >
+                    {view.toUpperCase()}
+                  </button>
+                ))}
               </div>
 
-              <label className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-xl cursor-pointer hover:border-[#B45309]/30 transition-all group">
-                <div className="relative w-5 h-5">
-                  <input
-                    type="checkbox"
-                    className="peer sr-only"
-                    checked={sellAndEarn}
-                    onChange={() => setSellAndEarn(!sellAndEarn)}
-                  />
-                  <div className="w-5 h-5 bg-zinc-100 rounded group-hover:bg-zinc-200 peer-checked:bg-[#B45309] transition-colors flex items-center justify-center">
-                    <CheckCircleIcon className="w-4 h-4 text-white scale-0 peer-checked:scale-100 transition-all duration-200" />
-                  </div>
+              {/* Search Bar */}
+              <div className="flex-1 w-full relative group">
+                <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 md:w-4.5 h-4 md:h-4.5 text-zinc-300 group-focus-within:text-[#B45309] transition-colors" />
+                <input
+                  type="text"
+                  placeholder="Search projects..."
+                  className="w-full pl-9 md:pl-10 pr-4 py-2 md:py-2.5 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-xs md:text-sm focus:ring-2 focus:ring-[#B45309]/5 focus:border-[#B45309] transition-all outline-none placeholder:text-zinc-300 font-medium"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+
+              {/* City & Toggle Row */}
+              <div className="flex flex-row items-center gap-1.5 w-full md:w-auto h-fit">
+                <div className="relative group flex-1">
+                  <select
+                    value={selectedCity}
+                    onChange={(e) => setSelectedCity(e.target.value)}
+                    className="appearance-none pl-3 pr-8 py-2 md:py-2.5 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-[10px] md:text-xs font-bold focus:ring-2 focus:ring-[#B45309]/5 focus:border-[#B45309] outline-none w-full md:w-36 transition-all hover:bg-white cursor-pointer"
+                  >
+                    {['All Cities', 'Nagpur', 'Pune', 'Mumbai'].map(city => <option key={city} value={city}>{city}</option>)}
+                  </select>
+                  <ChevronDownIcon className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-300 pointer-events-none" />
                 </div>
-                <span className="text-xs font-bold text-zinc-700 peer-checked:text-[#B45309] transition-colors select-none">Earn</span>
-              </label>
+
+                <label className="flex items-center gap-2 px-3 py-2 md:py-2.5 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg cursor-pointer hover:border-[#B45309]/30 transition-all group shrink-0 shadow-sm active:scale-95">
+                  <div className="relative w-3.5 h-3.5">
+                    <input
+                      type="checkbox"
+                      className="peer sr-only"
+                      checked={sellAndEarn}
+                      onChange={() => setSellAndEarn(!sellAndEarn)}
+                    />
+                    <div className="w-3.5 h-3.5 bg-white rounded flex items-center justify-center border border-[#E7E5E4] peer-checked:bg-[#B45309] peer-checked:border-[#B45309] transition-all">
+                      <CheckCircleIcon className="w-2.5 h-2.5 text-white scale-0 peer-checked:scale-100 transition-all" />
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-zinc-400 peer-checked:text-[#B45309] transition-colors select-none tracking-widest">Earn</span>
+                </label>
+              </div>
             </div>
           </section>
         )}
 
         {/* Section 1: All Projects (Opportunity Grid) */}
         {activeTab === 'browse' && (
-          <section className="space-y-6">
+          <section className="space-y-2 md:space-y-3">
             <div>
-              <h2 className="text-2xl font-black text-[#1C1917] font-serif leading-tight">Verified Opportunities</h2>
-              <p className="text-gray-500 mt-2 font-medium">
+              <h2 className="text-xl md:text-2xl font-black text-[#1C1917] font-serif leading-tight">Verified Opportunities</h2>
+              <p className="text-gray-500 mt-0 md:mt-1 text-[10px] md:text-xs font-medium max-w-2xl">
                 {sellAndEarn ? 'Verified properties with referral commissions enabled.' : 'Discover all prime real estate projects in your region.'}
               </p>
             </div>
 
-            <div className={activeView === 'Sell' ? "space-y-4" : "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"}>
+            <div className={activeView === 'Sell' ? "space-y-3" : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4"}>
               <AnimatePresence mode="popLayout">
                 {filteredItems.map((item, idx) => {
                   const details = getProjectDetails(item);
@@ -607,8 +647,8 @@ export default function MarketplacePage() {
                       exit={{ opacity: 0, scale: 0.9 }}
                       transition={{ delay: idx * 0.05 }}
                       className={activeView === 'Sell'
-                        ? `group bg-white rounded-[1.5rem] border border-[#E7E5E4] p-4 transition-all flex items-center gap-6 ${details.type === 'requirement' ? 'cursor-not-allowed opacity-80' : 'hover:shadow-xl hover:border-[#B45309]/20 cursor-pointer'}`
-                        : "group bg-white rounded-[2.5rem] border border-[#E7E5E4] overflow-hidden hover:shadow-2xl hover:shadow-black/5 hover:-translate-y-1 transition-all duration-300 flex flex-col relative"
+                        ? `group bg-white rounded-xl border border-[#E7E5E4] p-3 transition-all flex items-center gap-4 ${details.type === 'requirement' ? 'cursor-not-allowed opacity-80' : 'hover:shadow-[0_20px_40px_-12px_rgba(180,83,9,0.12)] hover:border-[#B45309]/30 cursor-pointer'}`
+                        : "group bg-white rounded-xl border border-[#E7E5E4] overflow-hidden hover:shadow-[0_40px_80px_-15px_rgba(28,25,23,0.1)] hover:-translate-y-1 transition-all duration-700 flex flex-row md:flex-col relative"
                       }
                       onClick={() => {
                         if (details.type === 'requirement') {
@@ -617,18 +657,17 @@ export default function MarketplacePage() {
                           setShowDetailModal(item as MarketplaceListing);
                         }
                       }}
-                      title={details.type === 'requirement' && activeView === 'Sell' ? "Chat coming soon" : ""}
                     >
                       {activeView === 'Sell' ? (
                         <>
                           <div className="flex-1">
-                            <h4 className="font-bold text-sm text-zinc-900 leading-tight">{details.name}</h4>
-                            <p className="text-[10px] text-zinc-500 font-medium mt-1 uppercase tracking-wider">{details.location} • {details.city}</p>
+                            <h4 className="font-bold text-sm text-[#1C1917] leading-tight group-hover:text-[#B45309] transition-colors">{details.name}</h4>
+                            <p className="text-[10px] text-zinc-400 font-bold mt-1 uppercase tracking-widest">{details.location} • {details.city}</p>
                           </div>
                           <div className="text-right flex flex-col items-end gap-1">
-                            <span className="text-xs font-black text-zinc-900">{formatPrice(details.price)}</span>
+                            <span className="text-sm font-black text-[#B45309]">{formatPrice(details.price)}</span>
                             {isListing && item.listingType !== 'buying' && (
-                              <span className="text-[9px] font-bold text-[#B45309] bg-[#B45309]/10 px-2 py-0.5 rounded leading-none shrink-0">
+                              <span className="text-[9px] font-black text-white bg-[#B45309] px-2 py-0.5 rounded-lg leading-none shrink-0 shadow-sm">
                                 {item.commissionType === 'percentage' ? `${item.commissionValue}%` : `₹${item.commissionValue.toLocaleString()}`}
                               </span>
                             )}
@@ -636,150 +675,127 @@ export default function MarketplacePage() {
                           {details.slug && (
                             <button
                               onClick={(e) => handleShareProject(e, details)}
-                              className="w-10 h-10 rounded-full flex items-center justify-center shrink-0 bg-[#FAF7F5] text-[#B45309] hover:bg-[#B45309] hover:text-white transition-all border border-[#E7E5E4] active:scale-95"
+                              className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 bg-[#FAF9F8] text-[#B45309] hover:bg-[#B45309] hover:text-white transition-all border border-[#E7E5E4] active:scale-95 shadow-sm"
                               title="Copy Visit Link"
                             >
                               <ShareIcon className="w-5 h-5" />
                             </button>
                           )}
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors ${details.type === 'requirement' ? 'bg-zinc-100 text-zinc-400' : 'bg-[#FAF7F5] text-[#B45309] group-hover:bg-[#B45309] group-hover:text-white'}`}>
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 transition-all ${details.type === 'requirement' ? 'bg-zinc-50 text-zinc-300 border border-zinc-100' : 'bg-[#FAF9F8] text-[#B45309] border border-[#E7E5E4] group-hover:bg-[#B45309] group-hover:text-white group-hover:border-[#B45309]'}`}>
                             {details.type === 'requirement' ? <ChatBubbleLeftEllipsisIcon className="w-5 h-5" /> : <ArrowUpRightIcon className="w-5 h-5" />}
                           </div>
                         </>
                       ) : (
-                        // Original Card Layout
+                        // Redesigned Heritage Modern Card Layout - Responsive List/Card
                         <>
-                          <div className="h-56 overflow-hidden relative">
+                          {/* Image Container - Width Expanded on Mobile */}
+                          <div className="w-[110px] xs:w-1/4 md:w-auto h-auto md:h-[135px] overflow-hidden relative m-1 md:m-1.5 rounded-lg shrink-0">
                             {details.media ? (
-                              <img src={details.media} alt={details.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                              <img
+                                src={details.media}
+                                alt={details.name}
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000 ease-out"
+                              />
                             ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-[#FAF7F5] to-[#E7E5E4] flex items-center justify-center">
-                                <BanknotesIcon className="w-16 h-16 text-gray-300 opacity-50" />
+                              <div className="w-full h-full bg-[#FAF9F8] flex items-center justify-center">
+                                <BanknotesIcon className="w-12 h-12 md:w-16 md:h-16 text-[#B45309]/5" />
                               </div>
                             )}
 
-                            <div className="absolute top-4 left-4 flex gap-2">
-                              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black tracking-widest uppercase backdrop-blur-md border 
-                               ${(item as any).listingType === 'buying' ? 'bg-indigo-600/90 text-white border-indigo-500/50' :
-                                  (isListing ? 'bg-emerald-500/90 text-white border-emerald-400/50' : 'bg-white/90 text-gray-400 border-white/50')}`}
+                            {/* Badges - Simplified for Mobile */}
+                            <div className="absolute top-1.5 left-1.5 md:top-4 md:left-4">
+                              <span className={`px-1.5 py-0.5 md:px-4 md:py-1.5 rounded-full text-[6px] md:text-[8px] font-black tracking-widest md:tracking-[0.2em] uppercase backdrop-blur-md border border-white/30 shadow-sm
+                                ${details.type === 'requirement' ? 'bg-indigo-600/80 text-white' :
+                                  (isListing ? 'bg-[#10B981] text-white' : 'bg-white/80 text-[#1C1917]')}`}
                               >
-                                {(item as any).listingType === 'buying' ? 'Requirement' : (isListing ? 'Listed' : 'Standard')}
+                                {details.type === 'requirement' ? 'Req' : (isListing ? 'LISTED' : 'STD')}
                               </span>
                             </div>
 
                             {isListing && (item as any).listingType !== 'buying' && (
-                              <div className="absolute top-4 right-4 animate-bounce">
-                                <div className="bg-white/90 backdrop-blur-md p-1.5 rounded-xl border border-white/50 text-[#B45309] font-bold text-xs flex items-center gap-1 shadow-lg">
-                                  <SparklesIcon className="w-3.5 h-3.5" />
+                              <div className="absolute top-2 right-2 md:top-4 md:right-4 hidden xs:block">
+                                <div className="bg-[#B45309]/90 backdrop-blur-md px-1.5 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border border-white/20 text-white font-black text-[7px] md:text-[9px] tracking-widest flex items-center gap-1 shadow-lg">
+                                  <SparklesIcon className="w-2 md:w-2.5 h-2 md:h-2.5" />
                                   {(item as any).commissionType === 'percentage' ? `${(item as any).commissionValue || 0}%` : `₹${((item as any).commissionValue || 0).toLocaleString()}`}
                                 </div>
                               </div>
                             )}
-
-                            <div className="absolute bottom-4 left-4 flex flex-col items-start">
-                              <span className="text-[10px] font-black text-white/60 mb-1 uppercase tracking-widest leading-none">
-                                {isListing ? 'Expected Value' : 'Starting Price'}
-                              </span>
-                              <div className="bg-black/40 backdrop-blur-md px-4 py-1.5 rounded-2xl text-white font-black text-sm border border-white/10 leading-none">
-                                {formatPrice(details.price)}
-                              </div>
-                            </div>
                           </div>
 
-                          <div className="p-6 flex-1 flex flex-col">
-                            <div className="mb-4">
-                              <div className="flex items-center justify-between mb-2">
-                                <h3 className="text-lg font-black text-[#1C1917] leading-none group-hover:text-[#B45309] transition-colors">{details.name}</h3>
-                                {details.type && (
-                                  <span className="text-[10px] bg-gray-100 px-2 py-0.5 rounded text-gray-500 font-bold uppercase">{details.type}</span>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 text-gray-400 text-xs font-semibold">
-                                <MapPinIcon className="w-4 h-4" />
-                                {[details.location, details.city].filter(Boolean).join(', ')}
-                              </div>
-                            </div>
-
-                            {/* Metadata: Listed By */}
-                            <div className="mb-6 flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-stone-100 flex items-center justify-center text-[10px] font-bold text-stone-500 border border-stone-200 uppercase">
-                                  {details.listedBy[0]}
-                                </div>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] font-black text-stone-700 leading-none">{details.listedBy}</span>
-                                  <span className="text-[8px] font-bold text-stone-400 uppercase tracking-widest">{details.role}</span>
+                          <div className="py-1 px-2.5 md:px-3 md:pb-3 flex-1 flex flex-col min-w-0">
+                            {/* Title & Top Actions Row */}
+                            <div className="flex items-start justify-between gap-2 mb-1.5 md:mb-2">
+                              <div className="min-w-0 flex-1">
+                                <h3 className="text-base md:text-sm font-black text-[#1C1917] font-serif leading-none tracking-tight group-hover:text-[#B45309] transition-colors mb-1 md:mb-1 line-clamp-1">
+                                  {details.name}
+                                </h3>
+                                <div className="text-sm md:text-xs font-black text-[#B45309] tracking-tight leading-none truncate">
+                                  {formatPrice(details.price)}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1.5 px-3 py-1 bg-stone-50 rounded-full border border-stone-100 text-[10px] font-black text-stone-400">
-                                <EyeIcon className="w-3 h-3" />
-                                {(item as any).viewsCount || 0}
-                              </div>
-                            </div>
 
-                            <div className="mt-3 flex flex-col gap-0.5 px-0.5">
-                              <p className="text-[9px] uppercase tracking-tighter text-gray-400 font-bold">Total Area</p>
-                              <p className="text-xs font-black text-[#57534E]">{details.area || 'Price & Area TBA'}</p>
-                            </div>
-
-                            <div className="mt-auto pt-4 border-t border-[#F5F5F4] flex items-center justify-between">
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-0.5 shrink-0 mt-0.5">
                                 {details.slug && (
                                   <button
-                                    onClick={(e) => handleShareProject(e, details)}
-                                    title="Copy Visit Link"
-                                    className="p-2.5 rounded-2xl bg-[#FAF7F5] text-[#B45309] hover:bg-[#B45309] hover:text-white transition-all border border-[#E7E5E4] active:scale-95"
+                                    onClick={(e) => { e.stopPropagation(); handleShareProject(e, details); }}
+                                    className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
                                   >
-                                    <ShareIcon className="w-4 h-4" />
+                                    <ShareIcon className="w-2.5 h-2.5 md:w-3 md:h-3" />
                                   </button>
                                 )}
-                                {details.type !== 'requirement' && (
-                                  <button
-                                    disabled
-                                    onClick={(e) => e.stopPropagation()}
-                                    title="Chat coming soon"
-                                    className="p-2.5 rounded-2xl bg-[#FAF7F5] text-[#B45309] opacity-50 cursor-not-allowed border border-[#E7E5E4]"
-                                  >
-                                    <ChatBubbleLeftEllipsisIcon className="w-4 h-4" />
-                                  </button>
-                                )}
+                                <button
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
+                                >
+                                  <ChatBubbleLeftEllipsisIcon className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Metadata Row */}
+                            <div className="flex items-center flex-nowrap gap-x-1 text-[#1C1917]/60 text-[8px] md:text-[9px] font-medium tracking-tight mb-1.5 md:mb-2 overflow-hidden whitespace-nowrap">
+                              <span className="capitalize shrink-0">{details.type || 'Flat'}</span>
+                              <span className="text-zinc-200 shrink-0">|</span>
+                              <div className="truncate flex-1 min-w-0">
+                                {(details.location.split(',').find((part: string) => !part.includes('+')) || details.location.split(',')[0]).trim()}, {details.city.split(',')[0].trim()}
+                              </div>
+                              <span className="text-zinc-200 shrink-0">|</span>
+                              <span className="shrink-0">{details.area || 'TBA'}</span>
+                            </div>
+
+                            {/* Bottom Actions: Builder & View Button */}
+                            <div className="mt-auto flex items-center justify-between gap-2 border-t border-[#E7E5E4]/40 pt-2">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <div className="w-6 h-6 md:w-8 md:h-8 rounded-full overflow-hidden bg-[#FAF9F8] border border-[#E7E5E4] shrink-0">
+                                  <img
+                                    src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${details.listedBy}`}
+                                    alt={details.listedBy}
+                                    className="w-full h-full object-cover grayscale opacity-80"
+                                  />
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[6px] font-bold text-zinc-400 leading-none mb-0.5">Builder</span>
+                                  <span className="text-[8px] font-black text-[#1C1917] leading-none uppercase tracking-wide truncate max-w-[60px] md:max-w-none">{details.listedBy}</span>
+                                </div>
                               </div>
 
-                              {isListing ? (
-                                <div className="relative group/btn">
-                                  <div className={`absolute -inset-1 bg-[#B45309] rounded-2xl blur opacity-0 ${details.type !== 'requirement' ? 'group-hover/btn:opacity-20' : ''} transition-all`} />
-                                  <button
-                                    disabled={details.type === 'requirement'}
-                                    onClick={(e) => {
-                                      if (details.type === 'requirement') {
-                                        e.stopPropagation();
-                                      }
-                                    }}
-                                    className={`relative flex items-center gap-2 px-6 py-2.5 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all ${details.type === 'requirement' ? 'bg-zinc-100 text-zinc-400' : 'bg-[#B45309] text-white hover:bg-[#92400E] active:scale-95 shadow-md shadow-orange-900/10'}`}
-                                  >
-                                    {details.type === 'requirement' ? 'Requirement' : 'Details'}
-                                    {details.type !== 'requirement' && <ArrowUpRightIcon className="w-4 h-4" />}
-                                  </button>
-                                </div>
-                              ) : details.slug ? (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (isListing && details.type !== 'requirement') {
+                                    setShowDetailModal(item as MarketplaceListing);
+                                  } else if (details.slug) {
                                     window.open(`/visit/${details.slug}`, '_blank');
-                                  }}
-                                  className="flex items-center gap-2 px-6 h-10 rounded-2xl bg-zinc-50 border border-zinc-200 text-zinc-500 text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 hover:text-zinc-900 active:scale-95 transition-all outline-none"
-                                >
-                                  PREVIEW
-                                  <ArrowUpRightIcon className="w-4 h-4" />
-                                </button>
-                              ) : (
-                                <div className="px-5 py-2.5 bg-zinc-50 rounded-2xl border border-zinc-100 flex items-center gap-2">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-zinc-300" />
-                                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">
-                                    Unlisted
-                                  </span>
-                                </div>
-                              )}
+                                  }
+                                }}
+                                className={`flex-1 max-w-[90px] flex items-center justify-center gap-1 px-2.5 py-1.5 md:py-1.5 rounded-md text-[8px] md:text-[9px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm
+                                  ${isListing && details.type !== 'requirement'
+                                    ? 'bg-[#B45309] text-white hover:bg-[#92400E]'
+                                    : 'bg-white border border-[#E7E5E4] text-[#1C1917] hover:bg-zinc-50'}`}
+                              >
+                                {isListing && details.type !== 'requirement' ? 'VIEW' : 'VISIT'}
+                                <ChevronRightIcon className="w-2.5 h-2.5 ml-0.5" />
+                              </button>
                             </div>
                           </div>
                         </>
@@ -794,30 +810,30 @@ export default function MarketplacePage() {
 
         {/* Section 3: Admin Marketplace View */}
         {activeTab === 'admin' && isAdmin && (
-          <section className="space-y-8 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-3xl font-black text-[#1C1917] font-serif leading-tight">Admin Claims Center</h2>
-                <p className="text-gray-500 mt-2 font-medium">Review and manage all marketplace referrals and claims.</p>
+          <section className="space-y-4 md:space-y-10 animate-in fade-in slide-in-from-bottom-5 duration-500 pb-20">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="text-center md:text-left">
+                <h2 className="text-xl md:text-2xl font-black text-[#1C1917] font-serif leading-tight">Admin Claims Center</h2>
+                <p className="text-gray-500 mt-1 md:mt-1.5 text-[10px] md:text-xs font-medium">Review and manage all marketplace referrals and claims.</p>
               </div>
-              <div className="flex gap-2 bg-[#FAF7F5] p-1.5 rounded-3xl border border-[#E7E5E4]">
-                <div className="px-6 py-3 bg-white rounded-2xl shadow-sm border border-[#E7E5E4] text-center">
-                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mb-1">Total Admin Claims</p>
-                  <p className="text-xl font-black text-[#B45309]">{adminActions.length}</p>
+              <div className="flex gap-2 bg-[#FAF7F5] p-1 md:p-1.5 rounded-2xl md:rounded-3xl border border-[#E7E5E4]">
+                <div className="px-4 md:px-6 py-2 md:py-3 bg-white rounded-xl md:rounded-2xl shadow-sm border border-[#E7E5E4] text-center">
+                  <p className="text-[8px] md:text-[10px] font-black uppercase text-gray-400 tracking-widest mb-0.5 md:mb-1">Total Admin Claims</p>
+                  <p className="text-lg md:text-xl font-black text-[#B45309]">{adminActions.length}</p>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-[3rem] border border-[#E7E5E4] overflow-hidden shadow-2xl shadow-black/5">
+            <div className="bg-white rounded-2xl md:rounded-[3rem] border border-[#E7E5E4] overflow-hidden shadow-2xl shadow-black/5">
               <div className="overflow-x-auto">
                 <table className="w-full text-left">
                   <thead>
                     <tr className="bg-[#FAF7F5] border-b border-[#E7E5E4]">
-                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-widest text-gray-400">Project</th>
-                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-widest text-gray-400">Collaborator</th>
-                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-widest text-gray-400">Action Type</th>
-                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-widest text-gray-400">Commission Status</th>
-                      <th className="px-8 py-6 text-[11px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                      <th className="px-4 md:px-8 py-3 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-widest text-gray-400">Project</th>
+                      <th className="px-4 md:px-8 py-3 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-widest text-gray-400">Collaborator</th>
+                      <th className="px-4 md:px-8 py-3 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-widest text-gray-400">Action Type</th>
+                      <th className="px-4 md:px-8 py-3 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-widest text-gray-400">Commission Status</th>
+                      <th className="px-4 md:px-8 py-3 md:py-6 text-[9px] md:text-[11px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E7E5E4]">
@@ -869,20 +885,20 @@ export default function MarketplacePage() {
                           <td className="px-8 py-7">
                             <div className="flex items-center gap-2">
                               <div className={`w-2 h-2 rounded-full ${status === 'approved' ? 'bg-emerald-500' :
-                                  status === 'paid' ? 'bg-blue-500' :
-                                    status === 'rejected' ? 'bg-rose-500' :
-                                      'bg-amber-400 animate-pulse'
+                                status === 'paid' ? 'bg-blue-500' :
+                                  status === 'rejected' ? 'bg-rose-500' :
+                                    'bg-amber-400 animate-pulse'
                                 }`} />
                               <span className={`text-[11px] font-black uppercase tracking-widest ${status === 'approved' ? 'text-emerald-600' :
-                                  status === 'paid' ? 'text-blue-600' :
-                                    status === 'rejected' ? 'text-rose-600' :
-                                      'text-amber-600'
+                                status === 'paid' ? 'text-blue-600' :
+                                  status === 'rejected' ? 'text-rose-600' :
+                                    'text-amber-600'
                                 }`}>
                                 {status}
                               </span>
                             </div>
                           </td>
-                          <td className="px-8 py-7 text-right">
+                          <td className="px-4 md:px-8 py-4 md:py-7 text-right">
                             {updatingActionId === action._id ? (
                               <div className="inline-flex h-10 items-center px-4 bg-[#FAF7F5] rounded-xl text-[10px] font-black text-gray-400 animate-pulse">
                                 UPDATING...
@@ -920,18 +936,16 @@ export default function MarketplacePage() {
 
         {/* Section 2: Manage My Listings */}
         {activeTab === 'listings' && (
-          <section className="space-y-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-black text-[#1C1917] font-serif">Marketplace Manager</h2>
-                <p className="text-gray-500 font-medium">Track your listings and approve commission payouts.</p>
-              </div>
+          <section className="space-y-2 md:space-y-4">
+            <div className="flex flex-col items-center text-center">
+              <h2 className="text-xl md:text-2xl font-black text-[#1C1917] font-serif">My Listings</h2>
+              <p className="text-gray-500 text-[10px] md:text-xs font-medium mt-0.5">Track your listings and approve commission payouts.</p>
             </div>
 
             {myListedProjects.length === 0 ? (
-              <div className="bg-white border-2 border-dashed border-[#E7E5E4] rounded-[2.5rem] p-12 text-center space-y-4">
-                <div className="w-20 h-20 bg-[#FAF7F5] rounded-3xl mx-auto flex items-center justify-center">
-                  <TagIcon className="w-10 h-10 text-gray-300" />
+              <div className="bg-white border-2 border-dashed border-[#E7E5E4] rounded-2xl md:rounded-[2.5rem] p-6 md:p-16 text-center space-y-4 md:space-y-6">
+                <div className="w-14 h-14 md:w-24 md:h-24 bg-[#FAF7F5] rounded-2xl md:rounded-[2rem] mx-auto flex items-center justify-center">
+                  <TagIcon className="w-7 h-7 md:w-12 md:h-12 text-gray-300" />
                 </div>
                 <div className="max-w-xs mx-auto">
                   <h3 className="text-lg font-bold">No listed projects found</h3>
@@ -945,13 +959,13 @@ export default function MarketplacePage() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8">
                 {myListedProjects.map((l, idx) => {
                   const d = getProjectDetails(l);
                   return (
-                    <div key={(l as any)._id || `my-listing-${idx}`} className="bg-white p-4 rounded-2xl border border-zinc-200 hover:border-[#B45309]/30 transition-all flex gap-5">
-                      <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-zinc-50 border border-zinc-100">
-                        {d.media ? <img src={d.media} className="w-full h-full object-cover" /> : <BanknotesIcon className="w-full h-full p-5 text-zinc-200" />}
+                    <div key={(l as any)._id || `my-listing-${idx}`} className="bg-white p-3 md:p-5 rounded-2xl border border-[#E7E5E4] hover:shadow-xl hover:shadow-black/5 transition-all flex gap-4 md:gap-6">
+                      <div className="w-16 h-16 md:w-24 md:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-[#FAF9F8] border border-[#E7E5E4]">
+                        {d.media ? <img src={d.media} className="w-full h-full object-cover" /> : <BanknotesIcon className="w-full h-full p-4 md:p-6 text-[#E7E5E4]" />}
                       </div>
                       <div className="flex-1 flex flex-col justify-between">
                         <div>
@@ -992,22 +1006,22 @@ export default function MarketplacePage() {
       {/* Detail Modal */}
       <AnimatePresence>
         {showDetailModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#1C1917]/80 backdrop-blur-2xl"
+              className="absolute inset-0 bg-[#1C1917]/80 backdrop-blur-xl"
               onClick={() => setShowDetailModal(null)}
             />
             <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 30 }}
+              initial={{ opacity: 0, scale: 0.95, y: 100 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 30 }}
-              className="bg-white w-full max-w-4xl max-h-[90vh] rounded-[3rem] overflow-hidden shadow-2xl relative z-10 flex flex-col lg:flex-row"
+              exit={{ opacity: 0, scale: 0.95, y: 100 }}
+              className="bg-white w-full max-w-4xl max-h-[95vh] md:max-h-[90vh] rounded-t-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl relative z-10 flex flex-col md:flex-row"
               onClick={e => e.stopPropagation()}
             >
-              <div className="w-full lg:w-2/5 relative h-64 lg:h-auto bg-[#B45309]/10">
+              <div className="w-full md:w-2/5 relative h-56 md:h-auto bg-[#B45309]/10">
                 {getProjectDetails(showDetailModal).media ? (
                   <img src={getProjectDetails(showDetailModal).media!} className="w-full h-full object-cover" />
                 ) : (
@@ -1020,15 +1034,15 @@ export default function MarketplacePage() {
                 </div>
               </div>
 
-              <div className="w-full lg:w-3/5 p-10 flex flex-col">
+              <div className="w-full md:w-3/5 p-6 md:p-10 flex flex-col">
                 {(() => {
                   const details = getProjectDetails(showDetailModal);
                   return (
                     <>
                       <div className="flex justify-between items-start mb-8">
-                        <div>
-                          <h2 className="text-3xl font-black font-serif">{details.name}</h2>
-                          <p className="text-gray-400 font-bold flex items-center gap-1.5 mt-2">
+                        <div className="flex-1">
+                          <h2 className="text-xl md:text-3xl font-black font-serif leading-tight">{details.name}</h2>
+                          <p className="text-gray-400 text-xs font-bold flex items-center gap-1.5 mt-1.5">
                             <MapPinIcon className="w-4 h-4" /> {details.location}, {details.city}
                           </p>
                         </div>
@@ -1102,7 +1116,7 @@ export default function MarketplacePage() {
                           <CheckBadgeIcon className="w-5 h-5" /> Verified Earning Opportunity
                         </div>
                         {((typeof showDetailModal?.listedBy === 'object' ? (showDetailModal?.listedBy as any)?._id : showDetailModal?.listedBy) !== (user?.id || (user as any)?._id)) ? (
-                          <div 
+                          <div
                             onClick={() => handleChat(showDetailModal)}
                             className="flex items-center gap-2 px-8 py-3.5 bg-[#1C1917] text-white rounded-2xl font-black text-sm opacity-90 transition-all hover:bg-black cursor-pointer shadow-xl shadow-black/20"
                           >
@@ -1125,11 +1139,11 @@ export default function MarketplacePage() {
       {/* Create Modal */}
       <AnimatePresence>
         {showCreateModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+          <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center p-0 md:p-6">
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-[#1C1917]/60 backdrop-blur-md" onClick={() => setShowCreateModal(false)} />
-            <motion.div initial={{ opacity: 0, y: 50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="bg-white w-full max-w-xl rounded-[3rem] shadow-2xl relative z-10 overflow-hidden" onClick={e => e.stopPropagation()}>
-              <div className="p-10">
-                <div className="flex justify-between items-center mb-10">
+            <motion.div initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 100 }} className="bg-white w-full max-w-xl rounded-t-[2rem] md:rounded-[3rem] shadow-2xl relative z-10 overflow-hidden" onClick={e => e.stopPropagation()}>
+              <div className="p-6 md:p-10">
+                <div className="flex justify-between items-center mb-6 md:mb-10">
                   <div>
                     <h2 className="text-2xl font-black font-serif">
                       {formData.listingType === 'selling' ? 'Marketplace Listing' : 'Listing Requirement'}
