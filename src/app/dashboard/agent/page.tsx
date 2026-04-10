@@ -4,8 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { usersApi, getLeadGenUrl } from '@/lib/api';
-import toast from 'react-hot-toast';
+import { getLeadGenUrl } from '@/lib/api';
 import { Users, Zap, FilePlus, PlusCircle } from 'lucide-react';
 import CrmPipeline from '@/components/dashboard/CrmPipeline';
 
@@ -23,15 +22,9 @@ export default function AgentDashboardPage() {
     setLoading(false);
   }, [user, authLoading, router]);
 
-  async function handleGenerateLead() {
-    try {
-      const { token } = await usersApi.getSsoToken();
-      const leadGenUrl = getLeadGenUrl();
-      window.location.href = `${leadGenUrl}/sso?token=${token}`;
-    } catch (error) {
-      console.error('SSO Failed:', error);
-      toast.error('Failed to initiate secure handover');
-    }
+  function handleGenerateLead() {
+    const leadGenUrl = getLeadGenUrl();
+    window.location.href = leadGenUrl;
   }
 
   if (authLoading || loading || !user) {
