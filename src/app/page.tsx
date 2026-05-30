@@ -475,8 +475,8 @@ export default function Home() {
                 <span className="font-serif font-bold text-2xl tracking-tighter">HomeInTown</span>
               </div>
               <p className="text-[#A8A29E] max-w-sm mb-6 leading-relaxed text-sm">
-                The complete sales suite for Indian real estate. 
-                Create project pages, qualify leads with AI, and close deals faster — all from one platform.
+                Home In Town is a real estate lead generation and CRM platform operated by Anikit and Team. 
+                Create project pages, qualify leads with AI, and close deals faster - all from one platform.
               </p>
             </div>
             <div>
@@ -499,7 +499,7 @@ export default function Home() {
             </div>
           </div>
           <div className="pt-8 border-t border-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-[#78716C] text-xs font-bold uppercase tracking-widest">
-            <p>© 2026 HomeInTown. Built for Indian Real Estate.</p>
+            <p>© 2026 HomeInTown. Owned and Operated by ANIKIT and Team.</p>
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
               All Systems Operational
