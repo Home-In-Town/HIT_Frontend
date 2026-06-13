@@ -148,11 +148,16 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
 
     media: {
       // Only include media if it's a valid {url, key} object (not a blob:/data: string)
+      // Do NOT send empty arrays — that would wipe media already saved via proxy-upload
       ...(project.coverImage && typeof project.coverImage === 'object' && { coverImage: project.coverImage }),
-      ...(project.galleryImages?.length && { galleryImages: project.galleryImages.filter((img: any) => typeof img === 'object' && img?.url) }),
-      ...(project.videos?.length && { videos: project.videos.filter((vid: any) => typeof vid === 'object' && vid?.url) }),
+      ...(project.layoutImage && typeof project.layoutImage === 'object' && { layoutImage: project.layoutImage }),
+      ...(project.galleryImages?.length && {
+        galleryImages: project.galleryImages.filter((img: any) => typeof img === 'object' && img?.url)
+      }),
+      ...(project.videos?.length && {
+        videos: project.videos.filter((vid: any) => typeof vid === 'object' && vid?.url)
+      }),
       ...(project.brochureUrl && typeof project.brochureUrl === 'object' && { brochurePdf: project.brochureUrl }),
-      ...(project.layoutImage && typeof project.layoutImage === 'object' && { layoutImage: project.layoutImage })
     },
 
     cta: {
@@ -1338,5 +1343,217 @@ export const notificationsApi = {
       body: JSON.stringify({ notificationIds: ids }),
     });
     await handleResponse(response);
+  },
+};
+
+/* ----------------------------------
+   CRM Bridge Types
+-----------------------------------*/
+
+export interface CrmStatus {
+  linked: boolean;
+  oneEmployeeOwnerId?: string;
+  connectedEmail?: string;
+  connectedPhone?: string;
+  degraded?: boolean;
+}
+
+export interface CrmLead {
+  id: string;
+  first_name: string;
+  last_name?: string;
+  phone_number: string;
+  email?: string;
+  status: 'HOT' | 'WARM' | 'COLD' | 'CREATED';
+  score: number;
+  source: string;
+  linkActivity: {
+    visitCount: number;
+    lastVisitAt?: string;
+    ctaClicks: Array<{ type: string; timestamp: string; projectId: string }>;
+  };
+  // Full lead detail fields (only present in getLeadById response)
+  callHistory?: Array<{
+    callId?: string;
+    callNumber: number;
+    startTime?: string;
+    endTime?: string;
+    duration?: number;
+    transcript?: string;
+    summary?: unknown;
+    sentiment?: string;
+    interest?: string;
+    budget?: string;
+    timeline?: string;
+    status?: string;
+  }>;
+  whatsappData?: {
+    status?: string;
+    sentAt?: string;
+    lastReply?: string;
+    replyAt?: string;
+    conversationStage?: string;
+  };
+  voiceCallData?: {
+    status?: string;
+    startTime?: string;
+    endTime?: string;
+    duration?: number;
+    transcript?: string;
+    callSummary?: unknown;
+  };
+  aiCallResult?: {
+    interest?: string;
+    budget?: string;
+    timeline?: string;
+    sentiment?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CrmAnalytics {
+  total: number;
+  hot: number;
+  warm: number;
+  cold: number;
+  engagementRate: number;
+  avgScore: number;
+  recentActivity: Array<Pick<CrmLead, 'id' | 'first_name' | 'last_name' | 'status' | 'score' | 'updatedAt'>>;
+}
+
+export interface CrmLeadsParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  search?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface CrmLeadsResponse {
+  leads: CrmLead[];
+  total: number;
+  page: number;
+  pages: number;
+}
+
+/* ----------------------------------
+   CRM Bridge API
+-----------------------------------*/
+
+export const crmBridgeApi = {
+  async getStatus(): Promise<CrmStatus> {
+    const response = await fetch(`${API_URL}/crm-bridge/status`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<CrmStatus>(response);
+  },
+
+  async link(phoneOrEmail: string): Promise<{
+    linked: boolean;
+    ownerEmail?: string;
+    ownerPhone?: string;
+    alreadyLinked?: boolean;
+    switched?: boolean;
+  }> {
+    const response = await fetch(`${API_URL}/crm-bridge/link`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneOrEmail }),
+    });
+    return handleResponse(response);
+  },
+
+  async unlink(): Promise<{ unlinked: boolean; partialUnlink?: boolean }> {
+    const response = await fetch(`${API_URL}/crm-bridge/unlink`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getLeads(params?: CrmLeadsParams): Promise<CrmLeadsResponse> {
+    const query = new URLSearchParams();
+    if (params?.page)      query.set('page', String(params.page));
+    if (params?.limit)     query.set('limit', String(params.limit));
+    if (params?.status)    query.set('status', params.status);
+    if (params?.search)    query.set('search', params.search);
+    if (params?.startDate) query.set('startDate', params.startDate);
+    if (params?.endDate)   query.set('endDate', params.endDate);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_URL}/crm-bridge/leads${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<CrmLeadsResponse>(response);
+  },
+
+  async getLeadById(leadId: string): Promise<CrmLead> {
+    const response = await fetch(`${API_URL}/crm-bridge/leads/${encodeURIComponent(leadId)}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<CrmLead>(response);
+  },
+
+  async getAnalytics(params?: { startDate?: string; endDate?: string }): Promise<CrmAnalytics> {
+    const query = new URLSearchParams();
+    if (params?.startDate) query.set('startDate', params.startDate);
+    if (params?.endDate)   query.set('endDate', params.endDate);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_URL}/crm-bridge/analytics${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<CrmAnalytics>(response);
+  },
+
+  async getSsoToken(redirectPath: string): Promise<{ token: string; expiresIn: number }> {
+    const response = await fetch(`${API_URL}/crm-bridge/sso-token`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ redirectPath }),
+    });
+    return handleResponse<{ token: string; expiresIn: number }>(response);
+  },
+
+  async getRedirectBase(): Promise<string> {
+    try {
+      const response = await fetch(`${API_URL}/users/crm-redirect-base`, {
+        ...COMMON_FETCH_OPTIONS,
+        headers: getAuthHeaders(),
+      });
+      const data = await handleResponse<{ redirectBase: string }>(response);
+      return data.redirectBase;
+    } catch {
+      return '';
+    }
+  },
+};
+
+/* ----------------------------------
+   Profile API
+-----------------------------------*/
+
+export const profileApi = {
+  async update(data: {
+    name?: string;
+    email?: string;
+    companyName?: string;
+  }): Promise<AuthUser> {
+    const response = await fetch(`${API_URL}/users/profile`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = await handleResponse<{ user: any }>(response);
+    return transformUserBackendToFrontend(result.user);
   },
 };
