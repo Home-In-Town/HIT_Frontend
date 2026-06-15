@@ -192,6 +192,18 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                               Copy Project Link
                             </button>
 
+                          {project.isPublished && project.slug && (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                window.open(`/visit/${project.slug}`, '_blank');
+                              }}
+                              className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                            >
+                              Visit Project ↗
+                            </button>
+                          )}
+
                           <div className="border-t border-[#E7E5E4] my-1"></div>
                             <button
                               onClick={() => {

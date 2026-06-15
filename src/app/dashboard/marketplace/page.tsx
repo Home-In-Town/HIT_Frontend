@@ -1049,7 +1049,7 @@ export default function MarketplacePage() {
                         <div className="flex items-center gap-1.5">
                           {details.slug && (
                             <button
-                              onClick={() => window.open(`/projects/${details.slug}`, '_blank')}
+                              onClick={() => window.open(`/visit/${details.slug}`, '_blank')}
                               className="px-3 py-1.5 bg-[#FAF7F5] text-[#1C1917] border border-[#E7E5E4] rounded-lg font-black text-[9px] uppercase tracking-widest hover:bg-white transition-all active:scale-95 shadow-sm"
                             >
                               Visit Project

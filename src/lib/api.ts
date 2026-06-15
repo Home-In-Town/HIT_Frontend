@@ -1522,16 +1522,35 @@ export const crmBridgeApi = {
     return handleResponse<{ token: string; expiresIn: number }>(response);
   },
 
+  async autoLink(): Promise<{
+    linked: boolean;
+    autoLinked?: boolean;
+    alreadyLinked?: boolean;
+    ownerEmail?: string;
+    ownerPhone?: string;
+    oneEmployeeOwnerId?: string;
+    connectedEmail?: string;
+    connectedPhone?: string;
+    degraded?: boolean;
+  }> {
+    const response = await fetch(`${API_URL}/crm-bridge/auto-link`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
   async getRedirectBase(): Promise<string> {
     try {
-      const response = await fetch(`${API_URL}/users/crm-redirect-base`, {
+      const response = await fetch(`${API_URL}/crm-bridge/redirect-base`, {
         ...COMMON_FETCH_OPTIONS,
         headers: getAuthHeaders(),
       });
       const data = await handleResponse<{ redirectBase: string }>(response);
       return data.redirectBase;
     } catch {
-      return '';
+      return 'https://lead-filteration-backend-624770114041.asia-south1.run.app';
     }
   },
 };

@@ -104,6 +104,26 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
               </button>
              )}
              <div className="flex gap-1 ml-auto">
+                {project.isPublished && project.slug && (
+                  <button
+                    onClick={() => window.open(`/visit/${project.slug}`, '_blank')}
+                    className="p-2 text-[#A8A29E] hover:text-[#B45309] hover:bg-[#B45309]/5 rounded-lg transition-all"
+                    title="Visit Project"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </button>
+                )}
+                <button
+                  onClick={() => onCopyLink(project.trackableLink || `/visit/${project.slug}`)}
+                  className="p-2 text-[#A8A29E] hover:text-[#B45309] hover:bg-[#B45309]/5 rounded-lg transition-all"
+                  title="Copy Link"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                </button>
                 <button
                   onClick={() => onDelete(project)}
                   className="p-2 text-[#A8A29E] hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"

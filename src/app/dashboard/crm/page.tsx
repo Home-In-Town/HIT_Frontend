@@ -13,26 +13,48 @@ export default function CrmPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [pageState, setPageState] = useState<CrmPageState>('loading');
+  const [autoLinkAttempted, setAutoLinkAttempted] = useState(false);
 
   useEffect(() => {
-    // Role guard: only admin, builder, agent may access this page
     if (!user) return;
 
+    // Role guard
     if (user.role !== 'admin' && user.role !== 'builder' && user.role !== 'agent') {
       router.replace('/dashboard');
       return;
     }
 
-    // Fetch CRM link status on mount
-    crmBridgeApi.getStatus()
-      .then((status) => {
-        setPageState(status.linked ? 'linked' : 'unlinked');
-      })
-      .catch(() => {
-        // On error default to unlinked so user can attempt to connect
+    const init = async () => {
+      try {
+        const status = await crmBridgeApi.getStatus();
+
+        if (status.linked) {
+          setPageState('linked');
+          return;
+        }
+
+        // Not linked — try auto-link by phone/email before showing connect card
+        if (!autoLinkAttempted) {
+          setAutoLinkAttempted(true);
+          try {
+            const autoResult = await crmBridgeApi.autoLink();
+            if (autoResult.linked) {
+              setPageState('linked');
+              return;
+            }
+          } catch {
+            // Auto-link failed (no match or conflict) — show connect card
+          }
+        }
+
         setPageState('unlinked');
-      });
-  }, [user, router]);
+      } catch {
+        setPageState('unlinked');
+      }
+    };
+
+    init();
+  }, [user, router, autoLinkAttempted]);
 
   // Loading skeleton
   if (pageState === 'loading') {
@@ -49,7 +71,7 @@ export default function CrmPage() {
     );
   }
 
-  // Unlinked state: show connect card
+  // Unlinked state
   if (pageState === 'unlinked') {
     return (
       <div className="p-6 lg:p-8">
@@ -58,7 +80,7 @@ export default function CrmPage() {
     );
   }
 
-  // Linked state: show full CRM dashboard
+  // Linked state
   return (
     <div className="p-6 lg:p-8">
       <CrmDashboard />
