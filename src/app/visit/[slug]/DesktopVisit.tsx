@@ -136,7 +136,7 @@ export default function DesktopVisit({
     return value;
   };
 
-  const isPlot = project.type === "plot";
+  const isPlot = project.propertyType === "Residential Plot" || project.propertyType === "Commercial Plot / Land" || project.type === "plot";
 
 const flatDetails = [
     { label: "Carpet Area", value: project.carpetAreaRange, icon: Home },   
@@ -231,7 +231,21 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
                 <span className="px-3 py-1 text-xs bg-[#5F7F33] rounded-full  text-white">
                   {project.projectStatus}
                 </span>
-              )}            
+              )}
+
+              {/* Category */}
+              {project.category && (
+                <span className="px-3 py-1 text-xs bg-[#B45309] rounded-full text-white">
+                  {project.category}
+                </span>
+              )}
+
+              {/* Property Type */}
+              {project.propertyType && (
+                <span className="px-3 py-1 text-xs bg-gray-600 rounded-full text-white">
+                  {project.propertyType}
+                </span>
+              )}
 
             </div>
 
@@ -421,7 +435,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
                       />
 
                       <span className="absolute top-2 left-2 bg-[#3E5F16] text-white text-[9px] md:text-xs font-semibold px-2 py-0.5 md:px-3 md:py-1 rounded-full">
-                        {project.type === "plot" ? "Plot" : "New Launch"}
+                        {isPlot ? "Plot" : "New Launch"}
                       </span>
                     </div>
 
@@ -468,7 +482,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
               className="mt-5 rounded-xl bg-white p-4 shadow-sm"
             >
               <p className="mb-3 text-sm font-semibold text-gray-900">
-                {project.type === "plot" ? "Plot Booking Status" : "Flat Booking Status"}
+                {isPlot ? "Plot Booking Status" : "Flat Booking Status"}
               </p>
 
               <div className="space-y-3 text-xs">
@@ -485,10 +499,10 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
                 {/* Units */}
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">
-                    {project.type === "plot" ? "Plots" : "Units"}
+                    {isPlot ? "Plots" : "Units"}
                   </span>
                   <span className="font-medium text-gray-800">
-                    {project.type === "plot" ? "8 vacant / 20 total" : "12 vacant / 30 total"}
+                    {isPlot ? "8 vacant / 20 total" : "12 vacant / 30 total"}
                   </span>
                 </div>
 
@@ -496,7 +510,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
                 <div>
                   <div className="flex justify-between mb-1 text-gray-600">
                     <span>Booking Progress</span>
-                    <span>{project.type === "plot" ? "60% Sold" : "60% Sold"}</span>
+                    <span>{isPlot ? "60% Sold" : "60% Sold"}</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-gray-200 overflow-hidden">
                     <div
@@ -508,14 +522,14 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
 
                 {/* Note */}
                 <div className="rounded-md bg-gray-50 p-2 text-gray-600">
-                  {project.type === "plot"
+                  {isPlot
                     ? "Limited premium plots available. Early booking recommended."
                     : "Only a few premium flats remain. Price lock available."}
                 </div>
 
                 {/* CTA */}
                 <p className="text-gray-500">
-                  Contact sales team to reserve this {project.type === "plot" ? "plot" : "flat"}.
+                  Contact sales team to reserve this {isPlot ? "plot" : "flat"}.
                 </p>
               </div>
             </div>
@@ -831,7 +845,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
   infoRow('Project Name',   project.name);
   infoRow('Location',       `${project.location}, ${project.city}`);
   infoRow('Status',         formatStatus(project.projectStatus), C.green);
-  if (project.type)               infoRow('Property Type',  project.type.charAt(0).toUpperCase() + project.type.slice(1));
+  if (project.type)               infoRow('Property Type',  project.propertyType || (project.type.charAt(0).toUpperCase() + project.type.slice(1)));
   if (project.bhkOptions?.length) infoRow('BHK Options',    project.bhkOptions.join(' / '));
   if (project.floorRange)         infoRow('Total Floors',   project.floorRange);
   if (project.carpetAreaRange)    infoRow('Carpet Area',    project.carpetAreaRange);

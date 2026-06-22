@@ -451,7 +451,7 @@ const CTAButtons = (
   </div>
 );
 
-const isPlot = project.type === "plot";
+const isPlot = project.propertyType === "Residential Plot" || project.propertyType === "Commercial Plot / Land" || project.type === "plot";
 type FloorPlan = {
   title: string;
   area: string;
@@ -1640,7 +1640,7 @@ const floorPlans: FloorPlan[] = isPlot
            
                   {/* PLOT DETAILS */}
                   <div ref={sectionRefs.details} id="details">
-                  {project.type === 'plot' && (
+                  {isPlot && (
                     <div className="mt-4  p-4">
                         <p className="mb-2 text-sm font-semibold">Plot Details</p>
                         <div className="text-sm space-y-1 text-gray-700">
