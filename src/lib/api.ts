@@ -78,6 +78,8 @@ export function transformBackendToFrontend(backendProject: any): Project {
     latitude: backendProject.latitude,
     longitude: backendProject.longitude,
     googleMapLink: backendProject.googleMapLink || '',
+    category: backendProject.category || '',
+    propertyType: backendProject.propertyType || '',
     reraApproved: backendProject.reraApproved || false,
     reraNumber: backendProject.reraNumber || '',
     projectStatus: backendProject.projectStatus || 'pre-launch',
@@ -122,6 +124,10 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
     latitude: project.latitude,
     longitude: project.longitude,
     googleMapLink: project.googleMapLink,
+
+    // Classification
+    category: project.category,
+    propertyType: project.propertyType,
 
     reraApproved: project.reraApproved,
     reraNumber: project.reraNumber,
