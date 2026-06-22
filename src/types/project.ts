@@ -26,6 +26,10 @@ export interface Project {
   longitude?: number;
   googleMapLink: string;
 
+  // Classification
+  category?: string;
+  propertyType?: string;
+
   // Legal & Trust
   reraApproved: boolean;
   reraNumber?: string;

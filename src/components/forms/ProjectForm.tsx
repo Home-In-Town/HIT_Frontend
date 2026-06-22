@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Project, ProjectFormData, AMENITIES, ProjectType, ProjectStatus } from '@/types/project';
+import { Project, ProjectFormData, AMENITIES, ProjectStatus } from '@/types/project';
 import { projectsApi, mediaApi} from '@/lib/api';
+import { PROPERTY_CATEGORIES, CATEGORY_PROPERTY_TYPES, PropertyCategory } from '@/lib/propertyConfig';
 import toast from 'react-hot-toast';
 import { useRef } from 'react';
 
@@ -19,6 +20,8 @@ const validateFileSize = (file: File, maxKB: number) => {
 const DEFAULT_FORM_DATA: ProjectFormData = {
   name: '',
   type: 'flat',
+  category: '',
+  propertyType: '',
   city: '',
   location: '',
   latitude: 0,
@@ -142,7 +145,8 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
   // Section 1
   if (!formData.name?.trim()) errors.name = 'Project name is required';
-  if (!formData.type) errors.type = 'Project type is required';
+  if (!formData.category) errors.category = 'Category is required';
+  if (!formData.propertyType) errors.propertyType = 'Property type is required';
   if (!formData.city?.trim()) errors.city = 'City is required';
   if (!formData.location?.trim()) errors.location = 'Location is required';
   if (!formData.googleMapLink?.trim()) errors.googleMapLink = 'Google Map Link is required';
@@ -158,8 +162,8 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   // Section 3
   if (!formData.startingPrice) errors.startingPrice = 'Starting price is required';
 
-  // Section 4
-  if (formData.type === 'flat' && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
+  // Section 4 - only validate BHK when Configuration section is visible (non-plot property types)
+  if (formData.propertyType && !['Residential Plot', 'Commercial Plot / Land'].includes(formData.propertyType) && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
     errors.bhkOptions = 'Select at least one BHK option';
   }
 
@@ -495,36 +499,73 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             refCallback={(el) => (fieldRefs.current.name = el)}
             onChange={(v) => updateField('name', v)}
           />
-          
+
+          {/* Category Dropdown */}
           <div>
-            <label className="block text-sm font-medium text-[#57534E] mb-1.5">
-              Project Type <span className="text-red-500">*</span>
+            <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+              Category <span className="text-red-500">*</span>
             </label>
-            <div className="flex gap-4">
-              {(['flat', 'plot'] as ProjectType[]).map((type) => (
-                <label
-                  key={type}
-                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
-                    formData.type === type
-                      ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
-                      : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="type"
-                    value={type}
-                    checked={formData.type === type}
-                    onChange={(e) => updateField('type', e.target.value as ProjectType)}
-                    className="sr-only"
-                  />
-                  {type === 'flat' ? '🏢 Apartment' : '🏡 Plot'}
-                </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={(e) => {
+                const newCategory = e.target.value;
+                setFormData((prev) => ({
+                  ...prev,
+                  category: newCategory,
+                  propertyType: '',
+                }));
+              }}
+              ref={(el) => { fieldRefs.current.category = el }}
+              className={`w-full px-4 py-2.5 bg-white rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] transition-shadow
+                focus:outline-none focus:ring-2 focus:border-transparent
+                ${
+                  formErrors.category
+                    ? 'border border-red-500 ring-1 ring-red-500 focus:ring-red-500'
+                    : 'border border-[#D6D3D1] focus:ring-[#B45309]'
+                }
+              `}
+            >
+              <option value="" disabled>Select category</option>
+              {PROPERTY_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
               ))}
-            </div>
-            {formErrors.type && (
-              <p className="text-sm text-red-600 mt-1">
-                {formErrors.type}
+            </select>
+            {formErrors.category && (
+              <p className="mt-1 text-sm text-red-600">
+                {formErrors.category}
+              </p>
+            )}
+          </div>
+
+          {/* Property Type - Chip Selection */}
+          <div className="md:col-span-2" ref={(el) => {fieldRefs.current.propertyType = el}}>
+            <label className="block text-sm font-medium text-[#57534E] mb-2 font-sans">
+              Property Type <span className="text-red-500">*</span>
+            </label>
+            {!formData.category ? (
+              <p className="text-sm text-[#A8A29E] italic">Select a category first</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.map((pType) => (
+                  <button
+                    key={pType}
+                    type="button"
+                    onClick={() => updateField('propertyType', pType)}
+                    className={`px-4 py-2 border rounded-lg text-sm transition-all ${
+                      formData.propertyType === pType
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    {formData.propertyType === pType ? '✓ ' : ''}{pType}
+                  </button>
+                ))}
+              </div>
+            )}
+            {formErrors.propertyType && (
+              <p className="mt-1 text-sm text-red-600">
+                {formErrors.propertyType}
               </p>
             )}
           </div>
@@ -665,10 +706,164 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
         </div>
       </section>
 
-      {/* Section 3: Pricing Details */}
+      {/* Section 3: Amenities */}
       <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
         <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
           <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">3</span>
+          Amenities
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {AMENITIES.map((amenity) => (
+            <button
+              key={amenity}
+              type="button"
+              onClick={() => handleAmenityToggle(amenity)}
+              className={`p-3 border rounded-lg transition-all text-left text-sm ${
+                formData.amenities.includes(amenity)
+                  ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                  : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+              }`}
+            >
+              {formData.amenities.includes(amenity) ? '✓ ' : ''}{amenity}
+            </button>
+          ))}
+        </div>
+        {formErrors.amenities && (
+          <p className="text-sm text-red-600 mt-2">
+            {formErrors.amenities}
+          </p>
+        )}
+      </section>
+
+      {/* Section 4: Configuration - appears when any property type is selected */}
+      {formData.propertyType && (
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#3F6212] text-white rounded-full flex items-center justify-center text-sm font-sans">4</span>
+          Configuration
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Apartment-specific fields */}
+          {!['Residential Plot', 'Commercial Plot / Land'].includes(formData.propertyType) && (
+          <>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-[#57534E] mb-2">
+                BHK Options
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'].map((bhk) => (
+                  <button
+                    key={bhk}
+                    type="button"
+                    onClick={() => handleBHKToggle(bhk)}
+                    className={`px-4 py-2 border rounded-lg transition-all ${
+                      formData.bhkOptions?.includes(bhk)
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    {bhk}
+                  </button>
+                ))}
+              </div>
+              {formErrors.bhkOptions && (
+                <p className="text-sm text-red-600 mt-2">
+                  {formErrors.bhkOptions}
+                </p>
+              )}
+            </div>
+
+            <InputField
+              label="Carpet Area Range"
+              name="carpetAreaRange"
+              placeholder="e.g., 650 - 1200 sqft"
+              value={formData.carpetAreaRange || ''}
+              onChange={(v) => updateField('carpetAreaRange', v)}
+            />
+
+            <InputField
+              label="Floor Range"
+              name="floorRange"
+              placeholder="e.g., 1-25"
+              value={formData.floorRange || ''}
+              onChange={(v) => updateField('floorRange', v)}
+            />
+          </>
+          )}
+
+          {/* Plot/Land-specific fields */}
+          {['Residential Plot', 'Commercial Plot / Land'].includes(formData.propertyType) && (
+          <>
+            <InputField
+              label="Plot Size Range (sqft)"
+              name="plotSizeRange"
+              placeholder="e.g., 1000 - 2500 sqft"
+              value={formData.plotSizeRange || ''}
+              onChange={(v) => updateField('plotSizeRange', v)}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5">
+                Gated Community
+              </label>
+              <div className="flex gap-4">
+                {[true, false].map((val) => (
+                  <label
+                    key={String(val)}
+                    className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
+                      formData.gatedCommunity === val
+                        ? 'border-green-600 bg-green-50 text-green-700 font-medium'
+                        : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="gatedCommunity"
+                      checked={formData.gatedCommunity === val}
+                      onChange={() => updateField('gatedCommunity', val)}
+                      className="sr-only"
+                    />
+                    {val ? '✓ Yes' : '✗ No'}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </>
+          )}
+
+          {/* Direction - shown for ALL property types */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-[#57534E] mb-2">
+              Direction / Facing
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West'].map(
+                (facing) => (
+                  <button
+                    key={facing}
+                    type="button"
+                    onClick={() => handleFacingToggle(facing)}
+                    className={`px-3 py-2 border rounded-lg text-sm transition-all ${
+                      formData.facingOptions?.includes(facing)
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    {formData.facingOptions?.includes(facing) ? '✓ ' : ''}{facing}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* Section 5: Pricing & Payment */}
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">5</span>
           Pricing & Payment
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -739,154 +934,6 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             </div>
           </div>
         </div>
-      </section>
-
-      {/* Section 4: Property Configuration */}
-      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
-        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
-          <span className="w-8 h-8 bg-[#3F6212] text-white rounded-full flex items-center justify-center text-sm font-sans">4</span>
-          Configuration
-          <span className="ml-2 px-2 py-0.5 bg-[#F5F5F4] text-[#57534E] text-xs rounded border border-[#E7E5E4] font-sans font-normal uppercase tracking-wider">
-            {formData.type === 'flat' ? 'Apartments' : 'Plots'}
-          </span>
-        </h2>
-
-        {formData.type === 'flat' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-[#57534E] mb-2">
-                BHK Options
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {['1BHK', '2BHK', '3BHK', '4BHK', '5BHK', 'Penthouse'].map((bhk) => (
-                  <button
-                    key={bhk}
-                    type="button"
-                    onClick={() => handleBHKToggle(bhk)}
-                    className={`px-4 py-2 border rounded-lg transition-all ${
-                      formData.bhkOptions?.includes(bhk)
-                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
-                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
-                    }`}
-                  >
-                    {bhk}
-                  </button>
-                ))}
-              </div>
-                {formErrors.bhkOptions && (
-                  <p className="text-sm text-red-600 mt-2">
-                    {formErrors.bhkOptions}
-                  </p>
-                )}
-            </div>
-
-            <InputField
-              label="Carpet Area Range"
-              name="carpetAreaRange"
-              placeholder="e.g., 650 - 1200 sqft"
-              value={formData.carpetAreaRange || ''}
-              onChange={(v) => updateField('carpetAreaRange', v)}
-            />
-
-            <InputField
-              label="Floor Range"
-              name="floorRange"
-              placeholder="e.g., 1-25"
-              value={formData.floorRange || ''}
-              onChange={(v) => updateField('floorRange', v)}
-            />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <InputField
-              label="Plot Size Range"
-              name="plotSizeRange"
-              placeholder="e.g., 1000 - 2500 sqft"
-              value={formData.plotSizeRange || ''}
-              onChange={(v) => updateField('plotSizeRange', v)}
-            />
-
-            <div>
-              <label className="block text-sm font-medium text-[#57534E] mb-2">
-                Facing Options
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {['East', 'West', 'North', 'South', 'North-East', 'South-East'].map(
-                  (facing) => (
-                    <button
-                      key={facing}
-                      type="button"
-                      onClick={() => handleFacingToggle(facing)}
-                      className={`px-3 py-1.5 border rounded-lg text-sm transition-all ${
-                        formData.facingOptions?.includes(facing)
-                          ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
-                          : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
-                      }`}
-                    >
-                      {facing}
-                    </button>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#57534E] mb-1.5">
-                Gated Community
-              </label>
-              <div className="flex gap-4">
-                {[true, false].map((val) => (
-                  <label
-                    key={String(val)}
-                    className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
-                      formData.gatedCommunity === val
-                        ? 'border-green-600 bg-green-50 text-green-700 font-medium'
-                        : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="gatedCommunity"
-                      checked={formData.gatedCommunity === val}
-                      onChange={() => updateField('gatedCommunity', val)}
-                      className="sr-only"
-                    />
-                    {val ? '✓ Yes' : '✗ No'}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Section 5: Amenities */}
-      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
-        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
-          <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">5</span>
-          Amenities
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {AMENITIES.map((amenity) => (
-            <button
-              key={amenity}
-              type="button"
-              onClick={() => handleAmenityToggle(amenity)}
-              className={`p-3 border rounded-lg transition-all text-left text-sm ${
-                formData.amenities.includes(amenity)
-                  ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
-                  : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
-              }`}
-            >
-              {formData.amenities.includes(amenity) ? '✓ ' : ''}{amenity}
-            </button>
-          ))}
-        </div>
-        {formErrors.amenities && (
-          <p className="text-sm text-red-600 mt-2">
-            {formErrors.amenities}
-          </p>
-        )}
       </section>
 
      {/* Section 6: Media */}
