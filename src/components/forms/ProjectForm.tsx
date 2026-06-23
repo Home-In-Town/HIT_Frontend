@@ -121,6 +121,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   const VIDEO_MAX_KB = 30 * 1024; // 5 MB per video (MAX)
   const MAX_VIDEOS = 2;
   const [uploading, setUploading] = useState(false);
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
 
   const router = useRouter();
   const [formData, setFormData] = useState<ProjectFormData>({
@@ -713,7 +714,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           Amenities
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {AMENITIES.map((amenity) => (
+          {(showAllAmenities ? AMENITIES : AMENITIES.slice(0, 10)).map((amenity) => (
             <button
               key={amenity}
               type="button"
@@ -728,6 +729,15 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             </button>
           ))}
         </div>
+        {AMENITIES.length > 10 && (
+          <button
+            type="button"
+            onClick={() => setShowAllAmenities(!showAllAmenities)}
+            className="mt-4 text-sm font-medium text-[#B45309] hover:text-[#92400E] transition-colors"
+          >
+            {showAllAmenities ? '− Show less' : `+ See more (${AMENITIES.length - 10} more)`}
+          </button>
+        )}
         {formErrors.amenities && (
           <p className="text-sm text-red-600 mt-2">
             {formErrors.amenities}

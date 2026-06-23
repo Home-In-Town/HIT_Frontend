@@ -5,7 +5,7 @@
  * All components consuming category or property type data should reference this config.
  */
 
-export const PROPERTY_CATEGORIES = ["Residential", "Commercial"] as const;
+export const PROPERTY_CATEGORIES = ["Residential", "Commercial", "Mixed Use"] as const;
 
 export type PropertyCategory = (typeof PROPERTY_CATEGORIES)[number];
 
@@ -18,6 +18,7 @@ export const CATEGORY_PROPERTY_TYPES: Readonly<Record<PropertyCategory, readonly
     "Township",
     "Residential Plot",
     "Farm House",
+    "Farm Land",
     "Studio Apartment",
     "Penthouse",
     "Duplex",
@@ -35,4 +36,15 @@ export const CATEGORY_PROPERTY_TYPES: Readonly<Record<PropertyCategory, readonly
     "Hospitality",
     "Other",
   ] as const),
+  "Mixed Use": Object.freeze([
+  "Residential + Retail",
+  "Residential + Office",
+  "Residential + Commercial Complex",
+  "Mixed-Use Tower",
+  "Mixed-Use Township",
+  "Residential + Hospitality",
+  "Residential + Commercial Plot",
+  "Integrated Development",
+  "Other",
+] as const),
 });
