@@ -6,8 +6,8 @@ export function getLeadGenUrl() {
   return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
 }
 
-import { Project, ProjectFormData, FileData } from '@/types/project';
-export type { Project, ProjectFormData, FileData };
+import { Project, ProjectFormData, FileData, LayoutEntity, Landmark } from '@/types/project';
+export type { Project, ProjectFormData, FileData, LayoutEntity };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
@@ -107,6 +107,7 @@ export function transformBackendToFrontend(backendProject: any): Project {
     trackableLink: backendProject.slug ? `/visit/${backendProject.slug}` : '',
     isPublished: backendProject.status === 'published' || backendProject.isPublished,
     landmarks: backendProject.landmarks || [],
+    layoutEntities: backendProject.layoutEntities || [],
     owner: backendProject.owner ? {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
@@ -430,15 +431,6 @@ export const mediaApi = {
   },
 };
 
-export interface Landmark {
-  placeId: string;
-  name: string;
-  type: string;
-  lat: number;
-  lng: number;
-  address: string;
-}
-
 
 export async function saveProjectLandmarks(projectId: string, landmarks: Landmark[]) {
   const res = await fetch(`${API_URL}/projects/${projectId}/landmarks`, {
@@ -458,6 +450,26 @@ export async function saveProjectLandmarks(projectId: string, landmarks: Landmar
 
   const data = await res.json();
   return data.landmarks as Landmark[];
+}
+
+export async function saveLayoutEntities(projectId: string, layoutEntities: LayoutEntity[]) {
+  const res = await fetch(`${API_URL}/projects/${projectId}/layout-entities`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders()
+    },
+    body: JSON.stringify({ layoutEntities }),
+  });
+
+  if (!res.ok) {
+    const errorData = await res.json();
+    throw new Error(errorData.message || 'Failed to save layout entities');
+  }
+
+  const data = await res.json();
+  return data.layoutEntities as LayoutEntity[];
 }
 
 // ==============================

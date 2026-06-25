@@ -11,6 +11,23 @@ export interface Landmark {
   address: string;
   placeId: string;
 }
+
+export interface LayoutEntity {
+  id: string;
+  type: 'project-boundary' | 'subplot' | 'road' | 'ai-boundary';
+  geometryType: 'polygon' | 'polyline';
+  path: { lat: number; lng: number }[];
+  aiBoundaryId?: string;
+  deleted?: boolean;
+  roadType?: 'lane' | 'internal' | 'main';
+  status?: 'available' | 'booked' | 'sold' | 'on-hold';
+  plotNumber?: string;
+  area?: number;
+  facing?: 'north' | 'south' | 'east' | 'west';
+  roadName?: string;
+  saved?: boolean;
+}
+
 export type FileData = {
   url: string;
   key: string;
@@ -62,6 +79,10 @@ export interface Project {
   videos: (string | FileData)[];
   brochureUrl?: string | FileData;
   layoutImage?: string | FileData;
+
+  // Layout entities (map polygons, plots, roads, boundaries)
+  layoutEntities?: LayoutEntity[];
+
   // Sales CTA
   ctaButtonText: string;
   whatsappNumber: string;

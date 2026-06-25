@@ -11,10 +11,9 @@ import {
   GroundOverlay,
 } from '@react-google-maps/api';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { mediaApi, projectsApi, saveProjectLandmarks } from '@/lib/api';
+import { mediaApi, projectsApi, saveProjectLandmarks, saveLayoutEntities } from '@/lib/api';
 import { Landmark, Project } from '@/types/project';
 import SearchFiltersPanel from "./SearchFiltersPanel";
-// import { DrawingManager } from '@react-google-maps/api';
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import AILayoutConfigModal from '../ui/AILayoutConfigModal';
@@ -23,11 +22,6 @@ import html2canvas from "html2canvas";
 type CustomOverlay = google.maps.OverlayView & {
   div?: HTMLDivElement;
 };
-type MapOverlay =
-  | google.maps.Polygon
-  | google.maps.Rectangle
-  | google.maps.Circle
-  | google.maps.Polyline;
 
 type Props = {
   projectId:string;
@@ -211,8 +205,6 @@ const ProjectMap = forwardRef(
   ) => {
   // 🔹 Always run hooks first
   const mapRef = useRef<google.maps.Map | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const drawingManagerRef = useRef<any>(null);
 const getNeighborhoodIcon = (type: string): google.maps.Icon => {
   const iconPaths: Record<string, string> = {
     hospital: "M10 2h4v6h6v4h-6v6h-4v-6H4V8h6z",
@@ -437,70 +429,165 @@ useEffect(() => {
   }
 }, [drawingType]);
 
-  // Imperative DrawingManager — replaces the deprecated @react-google-maps/api wrapper.
-  // Loads the 'drawing' library on-demand so it is never requested at page load
-  // (which caused the v3.65 deprecation error).
+  // ─── Custom Drawing System (replaces deprecated DrawingManager v3.65+) ───
+  const [drawingPoints, setDrawingPoints] = useState<google.maps.LatLngLiteral[]>([]);
+  const [rectStart, setRectStart] = useState<google.maps.LatLngLiteral | null>(null);
+  const [rectPreview, setRectPreview] = useState<google.maps.LatLngLiteral | null>(null);
+  const rectCommittedRef = useRef(false);
+  const isDrawing = !!drawingMode;
+
+  // Preview path for live rendering
+  const previewPolygonPath = useMemo(() => {
+    if (drawingMode === 'rectangle' && rectStart && rectPreview) {
+      return [
+        { lat: rectStart.lat, lng: rectStart.lng },
+        { lat: rectStart.lat, lng: rectPreview.lng },
+        { lat: rectPreview.lat, lng: rectPreview.lng },
+        { lat: rectPreview.lat, lng: rectStart.lng },
+      ];
+    }
+    if (drawingMode === 'polygon' && drawingPoints.length >= 2) {
+      return drawingPoints;
+    }
+    return null;
+  }, [drawingMode, drawingPoints, rectStart, rectPreview]);
+
+  // Handle map clicks for drawing
+  const handleMapClickForDrawing = useCallback((e: google.maps.MapMouseEvent) => {
+    if (!drawingMode || !e.latLng) return;
+
+    const point = { lat: e.latLng.lat(), lng: e.latLng.lng() };
+
+    if (drawingMode === 'polygon') {
+      setDrawingPoints(prev => [...prev, point]);
+    } else if (drawingMode === 'rectangle') {
+      if (!rectStart) {
+        setRectStart(point);
+      } else if (!rectCommittedRef.current) {
+        // Second click — commit the rectangle
+        rectCommittedRef.current = true;
+        setRectPreview(point);
+      }
+    }
+  }, [drawingMode, rectStart]);
+
+  // Track mouse movement for live rectangle preview
+  const handleMapMouseMove = useCallback((e: google.maps.MapMouseEvent) => {
+    if (drawingMode === 'rectangle' && rectStart && !rectCommittedRef.current && e.latLng) {
+      setRectPreview({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+    }
+  }, [drawingMode, rectStart]);
+
+  // Finish drawing — creates entity from collected points
+  const finishDrawing = useCallback(() => {
+    let path: google.maps.LatLngLiteral[] = [];
+
+    if (drawingMode === 'polygon') {
+      if (drawingPoints.length < 3) return;
+      path = drawingPoints;
+    } else if (drawingMode === 'rectangle') {
+      if (!rectStart || !rectPreview) return;
+      path = [
+        { lat: rectStart.lat, lng: rectStart.lng },
+        { lat: rectStart.lat, lng: rectPreview.lng },
+        { lat: rectPreview.lat, lng: rectPreview.lng },
+        { lat: rectPreview.lat, lng: rectStart.lng },
+      ];
+    }
+
+    if (path.length < 3) return;
+
+    const id = crypto.randomUUID();
+    const entityType = currentDrawingType;
+
+    // Road entity
+    if (entityType === "road") {
+      const newEntity: MapEntity = {
+        id,
+        type: "road",
+        geometryType: "polygon",
+        path,
+        roadName: "",
+        roadType: "internal",
+        saved: false,
+      };
+      updateEntities([...mapEntities, newEntity]);
+      setEditingPlotId(id);
+      resetDrawingState();
+      return;
+    }
+
+    // Subplot / boundary entity
+    let area: number | undefined;
+    let plotNumber: string | undefined;
+
+    if (entityType === "subplot") {
+      area = google.maps.geometry.spherical.computeArea(
+        path.map(p => new google.maps.LatLng(p))
+      );
+      const subplotCount = mapEntities.filter(e => e.type === "subplot").length + 1;
+      plotNumber = String(subplotCount);
+    }
+
+    const newEntity: MapEntity = {
+      id,
+      type: entityType,
+      geometryType: "polygon",
+      path,
+      status: entityType === "subplot" ? "available" : undefined,
+      area,
+      plotNumber,
+      saved: entityType === "ai-boundary" ? true : false,
+    };
+
+    updateEntities([...mapEntities, newEntity]);
+
+    if (entityType === "ai-boundary") {
+      setCurrentDrawingType("ai-boundary");
+    }
+
+    setDrawMenuOpen(false);
+    resetDrawingState();
+  }, [drawingMode, drawingPoints, rectStart, rectPreview, currentDrawingType, mapEntities]);
+
+  // Auto-finish rectangle on second click
   useEffect(() => {
-    if (!isLoaded || !mapRef.current) return;
+    if (drawingMode === 'rectangle' && rectCommittedRef.current && rectStart && rectPreview) {
+      const timer = setTimeout(() => finishDrawing(), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [drawingMode, rectStart, rectPreview, finishDrawing]);
 
-    const setupDrawingManager = async () => {
-      // Destroy any existing instance before creating a new one
-      if (drawingManagerRef.current) {
-        drawingManagerRef.current.setMap(null);
-        google.maps.event.clearInstanceListeners(drawingManagerRef.current);
-        drawingManagerRef.current = null;
-      }
+  // Cancel drawing — discard all points
+  const cancelDrawing = useCallback(() => {
+    resetDrawingState();
+  }, []);
 
-      // If no drawing mode is requested, nothing to do
-      if (!drawingMode) return;
+  // Undo last point (polygon mode)
+  const undoLastPoint = useCallback(() => {
+    if (drawingMode === 'polygon') {
+      setDrawingPoints(prev => prev.slice(0, -1));
+    } else if (drawingMode === 'rectangle') {
+      setRectStart(null);
+      setRectPreview(null);
+      rectCommittedRef.current = false;
+    }
+  }, [drawingMode]);
 
-      // Dynamically import the drawing library (supported in v3.65+)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { DrawingManager } = await (google.maps as any).importLibrary('drawing') as { DrawingManager: any };
+  // Reset internal drawing state
+  const resetDrawingState = () => {
+    setDrawingPoints([]);
+    setRectStart(null);
+    setRectPreview(null);
+    rectCommittedRef.current = false;
+  };
 
-      const dm = new DrawingManager({
-        drawingMode: drawingMode,
-        drawingControl: false,
-        map: mapRef.current,
-        polygonOptions: {
-          fillColor: '#2563eb',
-          fillOpacity: 0.2,
-          strokeWeight: 2,
-          editable: true,
-          clickable: true,
-        },
-        rectangleOptions: {
-          fillColor: '#2563eb',
-          fillOpacity: 0.2,
-          editable: true,
-        },
-        circleOptions: {
-          fillColor: '#2563eb',
-          fillOpacity: 0.2,
-          editable: true,
-        },
-        polylineOptions: {
-          strokeWeight: 3,
-          editable: true,
-        },
-      });
-
-      dm.addListener('overlaycomplete', onOverlayComplete);
-      drawingManagerRef.current = dm;
-    };
-
-    setupDrawingManager();
-
-    return () => {
-      if (drawingManagerRef.current) {
-        drawingManagerRef.current.setMap(null);
-        google.maps.event.clearInstanceListeners(drawingManagerRef.current);
-        drawingManagerRef.current = null;
-      }
-    };
-    // onOverlayComplete is defined inline — intentionally not in deps to avoid recreation loop
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoaded, drawingMode]);
+  // Clear drawing state when drawingMode is turned off externally
+  useEffect(() => {
+    if (!drawingMode) {
+      resetDrawingState();
+    }
+  }, [drawingMode]);
   const filterProjectsInView = useCallback(() => {
      if (isFocusMode && focusedProject) {
       setVisibleProjects([focusedProject]);
@@ -557,6 +644,21 @@ useEffect(() => {
   };
 
   loadSavedLandmarks();
+}, [projectId]);
+useEffect(() => {
+  if (!projectId) return;
+
+  const loadSavedLayoutEntities = async () => {
+    try {
+      const project = await projectsApi.getById(projectId);
+      if (!project?.layoutEntities || !Array.isArray(project.layoutEntities)) return;
+      setMapEntities(project.layoutEntities);
+    } catch (err) {
+      console.error("Failed to load layout entities", err);
+    }
+  };
+
+  loadSavedLayoutEntities();
 }, [projectId]);
 useEffect(() => {
   if (selectedLandmarks.length > 0) {
@@ -1054,6 +1156,23 @@ const captureLayoutImage = async () => {
       scale: 2,
       backgroundColor: null,
       logging: false,
+      imageTimeout: 5000,
+      onclone: (clonedDoc) => {
+        // Remove cross-origin images that can't be loaded due to missing CORS headers
+        // This prevents html2canvas from failing on R2/external images
+        const images = clonedDoc.querySelectorAll("img");
+        images.forEach((img) => {
+          try {
+            const url = new URL(img.src);
+            if (url.origin !== window.location.origin) {
+              // Hide the image so it doesn't taint the canvas
+              img.style.visibility = "hidden";
+            }
+          } catch {
+            // skip data: URLs or invalid URLs
+          }
+        });
+      },
     });
     const blob = await new Promise<Blob | null>((resolve) =>
       canvas.toBlob(resolve, "image/png")
@@ -1130,10 +1249,26 @@ const deleteLayoutImage = async () => {
 };
   // 🔹 Expose functions via ref
   useImperativeHandle(ref, () => ({
+    saveAllEntities: async () => {
+      if (!projectId) return;
+      try {
+        const entitiesToSave = mapEntities
+          .filter(e => !e.deleted && e.type != null)
+          .map(e => ({
+            ...e,
+            type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary',
+          }));
+        await saveLayoutEntities(projectId, entitiesToSave);
+        return true;
+      } catch (err) {
+        console.error("Failed to save layout entities", err);
+        throw err;
+      }
+    },
     deleteLayoutImage,
     captureLayoutImage,
     deleteSelectedPlot,
-    saveAiLayout: () => {
+    saveAiLayout: async () => {
 
     const latestAiBoundary = [...mapEntities]
       .reverse()
@@ -1154,6 +1289,16 @@ const deleteLayoutImage = async () => {
     });
 
     updateEntities(updated);
+
+    // Persist to database
+    try {
+      const entitiesToSave = updated
+        .filter(e => !e.deleted && e.type != null)
+        .map(e => ({ ...e, type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' }));
+      await saveLayoutEntities(projectId, entitiesToSave);
+    } catch (err) {
+      console.error("Failed to persist layout entities", err);
+    }
 
     // exit edit mode
     setAiEditMode(false);
@@ -1231,12 +1376,21 @@ const deleteLayoutImage = async () => {
         );
       },
 
-    confirmPlot: (id: string) => {
-        updateEntities(
-          mapEntities.map(e =>
-            e.id === id ? { ...e, saved: true } : e
-          )
+    confirmPlot: async (id: string) => {
+        const updated = mapEntities.map(e =>
+          e.id === id ? { ...e, saved: true } : e
         );
+        updateEntities(updated);
+
+        // Persist to database
+        try {
+          const entitiesToSave = updated
+            .filter(e => !e.deleted && e.type != null)
+            .map(e => ({ ...e, type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' }));
+          await saveLayoutEntities(projectId, entitiesToSave);
+        } catch (err) {
+          console.error("Failed to persist layout entities", err);
+        }
       },
     editPlot: (id: string) => {
       updateEntities(
@@ -1264,13 +1418,21 @@ editBoundary: () => {
     const boundary = mapEntities.find(e => e.type === "project-boundary");
     if (!boundary) return;
 
-    updateEntities(
-      mapEntities.map(e =>
-        e.id === boundary.id ? { ...e, saved: true } : e
-      )
+    const updated = mapEntities.map(e =>
+      e.id === boundary.id ? { ...e, saved: true } : e
     );
 
-    console.log("Boundary saved locally:", boundary);
+    updateEntities(updated);
+
+    // Persist to database
+    try {
+      const entitiesToSave = updated
+        .filter(e => !e.deleted && e.type != null)
+        .map(e => ({ ...e, type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' }));
+      await saveLayoutEntities(projectId, entitiesToSave);
+    } catch (err) {
+      console.error("Failed to persist layout entities", err);
+    }
   },
   undo: () => {
     if (history.length === 0) return;
@@ -1769,143 +1931,6 @@ const updatePlotField = (id: string, field: string, value: any) => {
   );
 };
 
-const onOverlayComplete = (e: { type: string; overlay: google.maps.MVCObject & { getPath?: () => google.maps.MVCArray<google.maps.LatLng>; getBounds?: () => google.maps.LatLngBounds | null; setMap: (map: google.maps.Map | null) => void } }) => {
-  const id = crypto.randomUUID();
-
-  if (e.type === "polygon") {
-      const poly = e.overlay as google.maps.Polygon;
-      const path = poly.getPath().getArray().map(p => ({
-        lat: p.lat(),
-        lng: p.lng(),
-      }));
-
-      const entityType = currentDrawingType;
-      
-       
-      if (entityType === "road") {
-        const newEntity: MapEntity = {
-          id,
-          type: "road",
-          geometryType: "polygon",
-          path,
-          roadName: "",
-          roadType: "internal",
-          saved: false, // important
-        };
-
-        updateEntities([...mapEntities, newEntity]);
-
-        setEditingPlotId(id); // open editor UI
-        poly.setMap(null);
-        return;
-      }
-      //subplot
-      let area: number | undefined;
-      let plotNumber: string | undefined;
-
-      if (entityType === "subplot") {
-        area = google.maps.geometry.spherical.computeArea(
-          path.map(p => new google.maps.LatLng(p))
-        );
-
-        const subplotCount =
-          mapEntities.filter(e => e.type === "subplot").length + 1;
-
-        // default number (user can change later)
-        plotNumber = String(subplotCount);
-      }
-    
-      const newEntity: MapEntity = {
-        id,
-        type: entityType,
-        geometryType: "polygon",
-        path,
-        status: entityType === "subplot" ? "available" : undefined,
-        area,
-        plotNumber,
-        saved: entityType === "ai-boundary" ? true : false,
-      };
-     updateEntities([...mapEntities, newEntity]);
-
-      e.overlay.setMap(null);
-      if (entityType === "ai-boundary") {
-        setCurrentDrawingType("ai-boundary");
-      }
-      setDrawMenuOpen(false);
-    }
-   
-    if (e.type === "rectangle") {
-    const rect = e.overlay as google.maps.Rectangle;
-    const bounds = rect.getBounds();
-    if (!bounds) return;
-
-    const ne = bounds.getNorthEast();
-    const sw = bounds.getSouthWest();
-
-    const path = [
-      { lat: ne.lat(), lng: sw.lng() }, // NW
-      { lat: ne.lat(), lng: ne.lng() }, // NE
-      { lat: sw.lat(), lng: ne.lng() }, // SE
-      { lat: sw.lat(), lng: sw.lng() }, // SW
-    ];
-
-    const entityType = currentDrawingType;
-
-    // =========================
-    // ROAD RECTANGLE
-    // =========================
-    if (entityType === "road") {
-      const newEntity: MapEntity = {
-        id,
-        type: "road",
-        geometryType: "polygon",
-        path,
-        roadName: "",
-        roadType: "internal",
-        saved: false,
-      };
-
-      updateEntities([...mapEntities, newEntity]);
-      setEditingPlotId(id);
-
-      rect.setMap(null);
-      return;
-    }
-
-    // =========================
-    // SUBPLOT RECTANGLE
-    // =========================
-    let area: number | undefined;
-    let plotNumber: string | undefined;
-
-    if (entityType === "subplot") {
-      area = google.maps.geometry.spherical.computeArea(
-        path.map(p => new google.maps.LatLng(p))
-      );
-
-      const subplotCount =
-        mapEntities.filter(e => e.type === "subplot").length + 1;
-
-      plotNumber = `${subplotCount}`;
-    }
-
-    const newEntity: MapEntity = {
-      id,
-      type: entityType,
-      geometryType: "polygon",
-      path,
-      status: entityType === "subplot" ? "available" : undefined,
-      area,
-      plotNumber,
-      saved: false,
-    };
-
-    updateEntities([...mapEntities, newEntity]);
-
-    rect.setMap(null);
-  }
-};
-
 const isBoundarySaved = mapEntities.some(
   (e) => e.type === "project-boundary" && e.saved
 );
@@ -2030,7 +2055,14 @@ const showProjectUI =
   mapContainerStyle={containerStyle}
   center={mapCenter}
   zoom={16}
-  onClick={() => setSelectedPlotId(null)}
+  onClick={(e) => {
+    if (isDrawing && e.latLng) {
+      handleMapClickForDrawing(e);
+    } else {
+      setSelectedPlotId(null);
+    }
+  }}
+  onMouseMove={isDrawing ? handleMapMouseMove : undefined}
   onLoad={(map: google.maps.Map) => {
     mapRef.current = map;
     setMapZoom(map.getZoom() || 16);
@@ -2219,36 +2251,144 @@ const showProjectUI =
                 <DirectionsRenderer directions={directions} options={{ suppressMarkers: true }} />
               )}
 
-            {/* <DrawingManager
-                
-              drawingMode={aiEditMode ? null : drawingMode || null}
-              onOverlayComplete={onOverlayComplete}
+            {/* ─── Custom Drawing Preview & Controls ─── */}
+            {isDrawing && previewPolygonPath && previewPolygonPath.length >= 2 && (
+              <Polygon
+                paths={previewPolygonPath}
                 options={{
-                  drawingControl: false, // we use custom UI
-                  polygonOptions: {
-                    fillColor: '#2563eb',
-                    fillOpacity: 0.2,
-                    strokeWeight: 2,
-                    editable: true,
-                    clickable: true,
-                  },
-                  rectangleOptions: {
-                    fillColor: '#2563eb',
-                    fillOpacity: 0.2,
-                    editable: true,
-                  },
-                  circleOptions: {
-                    fillColor: '#2563eb',
-                    fillOpacity: 0.2,
-                    editable: true,
-                  },
-                  polylineOptions: {
-                    strokeWeight: 3,
-                    editable: true,
-                  },
+                  fillColor: '#2563eb',
+                  fillOpacity: 0.15,
+                  strokeColor: '#2563eb',
+                  strokeWeight: 2,
+                  strokeOpacity: 0.8,
+                  clickable: false,
+                  zIndex: 9999,
                 }}
-               
-            /> */}
+              />
+            )}
+
+            {/* Vertex markers for polygon drawing */}
+            {isDrawing && drawingMode === 'polygon' && drawingPoints.map((pt, idx) => (
+              <OverlayView
+                key={`draw-pt-${idx}`}
+                position={pt}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              >
+                <div
+                  style={{
+                    width: '10px',
+                    height: '10px',
+                    background: idx === 0 ? '#16a34a' : '#2563eb',
+                    border: '2px solid white',
+                    borderRadius: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                    cursor: 'pointer',
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Click first point to close polygon (if enough points)
+                    if (idx === 0 && drawingPoints.length >= 3) {
+                      finishDrawing();
+                    }
+                  }}
+                />
+              </OverlayView>
+            ))}
+
+            {/* Drawing Controls Overlay */}
+            {isDrawing && drawingMode === 'polygon' && drawingPoints.length > 0 && (
+              <OverlayView
+                position={drawingPoints[drawingPoints.length - 1]}
+                mapPaneName={OverlayView.FLOAT_PANE}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    gap: '4px',
+                    transform: 'translate(-50%, 16px)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {drawingPoints.length >= 3 && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); finishDrawing(); }}
+                      style={{
+                        background: '#16a34a',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        padding: '4px 10px',
+                        fontSize: '11px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                      }}
+                    >
+                      Finish
+                    </button>
+                  )}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); undoLastPoint(); }}
+                    style={{
+                      background: '#f59e0b',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    Undo
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); cancelDrawing(); }}
+                    style={{
+                      background: '#ef4444',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(0,0,0,0.3)',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </OverlayView>
+            )}
+
+            {/* Drawing mode indicator */}
+            {isDrawing && drawingPoints.length === 0 && !rectStart && (
+              <OverlayView
+                position={mapCenter}
+                mapPaneName={OverlayView.FLOAT_PANE}
+              >
+                <div
+                  style={{
+                    background: 'rgba(0,0,0,0.75)',
+                    color: 'white',
+                    padding: '6px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    transform: 'translate(-50%, -50%)',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {drawingMode === 'polygon'
+                    ? 'Click to place points. Click first point or "Finish" to complete.'
+                    : 'Click two corners to draw a rectangle.'}
+                </div>
+              </OverlayView>
+            )}
               {selectedPlot && selectedPlot.type === "road" && !selectedPlot.saved && (
                 <OverlayView
                   position={getPolygonCenter(selectedPlot.path)}
