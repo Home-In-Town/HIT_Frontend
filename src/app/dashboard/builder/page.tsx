@@ -45,7 +45,7 @@ export default function BuilderDashboardPage() {
               Welcome, <span className="text-[#B45309]">{user.name}</span>
             </h1>
             <p className="mt-1 text-[#57534E] font-mono text-[10px] font-bold uppercase tracking-widest bg-[#FAF7F2] inline-block px-2.5 py-1 rounded-lg border border-[#E7E5E4]">
-              Builder Overview — Relationship & Pipeline Management
+              Builder Overview - Relationship & Pipeline Management
             </p>
           </div>
 
@@ -71,7 +71,7 @@ export default function BuilderDashboardPage() {
                 <ShoppingBag className="w-6 h-6" />
               </div>
               <div className="flex-1">
-                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">sell & earn</h3>
+                <h3 className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors leading-tight">Sell & Earn</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-0.5 font-bold uppercase tracking-widest">Marketplace</p>
               </div>
             </Link>
