@@ -307,27 +307,33 @@ const latestAiBoundary = useMemo(() => {
 }, [mapEntities]);
 const router = useRouter();
 const [layoutImage, setLayoutImage] = useState<string | null>(null);
+const { isLoaded } = useJsApiLoader({
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
+    libraries: MAP_LIBRARIES,
+  });
  const layoutBounds = useMemo<google.maps.LatLngBoundsLiteral | null>(() => {
-    const boundary = mapEntities.find(
-      e => e.type === "project-boundary" && e.saved
-    );
+  if (!isLoaded) return null;
 
-    if (!boundary) return null;
+  const boundary = mapEntities.find(
+    e => e.type === "project-boundary" && e.saved
+  );
 
-    const bounds = new google.maps.LatLngBounds();
+  if (!boundary) return null;
 
-    boundary.path.forEach(p => bounds.extend(p));
+  const bounds = new google.maps.LatLngBounds();
 
-    const ne = bounds.getNorthEast();
-    const sw = bounds.getSouthWest();
+  boundary.path.forEach(p => bounds.extend(p));
 
-    return {
-      north: ne.lat(),
-      south: sw.lat(),
-      east: ne.lng(),
-      west: sw.lng(),
-    };
-  }, [mapEntities]);
+  const ne = bounds.getNorthEast();
+  const sw = bounds.getSouthWest();
+
+  return {
+    north: ne.lat(),
+    south: sw.lat(),
+    east: ne.lng(),
+    west: sw.lng(),
+  };
+}, [isLoaded, mapEntities]);
 const [selectedPropertyTypes, setSelectedPropertyTypes] = useState<string[]>(["flat", "plot"]);
 const [mapZoom, setMapZoom] = useState(16);
 const [availableLandmarks, setAvailableLandmarks] = useState<Landmark[]>([]);
@@ -372,10 +378,7 @@ const landmarkLabelsRef = useRef<google.maps.OverlayView[]>([]);
   useRef<google.maps.places.PlaceResult | null>(null);
 
   const is3D = useRef(false);
-  const { isLoaded } = useJsApiLoader({
-    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!,
-    libraries: MAP_LIBRARIES,
-  });
+  
 
 useEffect(() => {
   projectsApi.getAllPublic().then((data) => {
