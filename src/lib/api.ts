@@ -1574,6 +1574,209 @@ export const crmBridgeApi = {
 };
 
 /* ----------------------------------
+   Group Chat API (Module 1: Smart Chat + Auto-Match)
+-----------------------------------*/
+
+export interface GroupRoom {
+  _id: string;
+  name: string;
+  roomType: 'project' | 'area';
+  project?: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number } };
+  area?: { city: string; location: string };
+  createdBy: { _id: string; name: string };
+  members: Array<{ user: { _id: string; name: string; role: string; companyName?: string }; role: string; joinedAt: string }>;
+  description: string;
+  active: boolean;
+  lastActivity: string;
+  createdAt: string;
+}
+
+export interface InventoryCard {
+  project?: string;
+  bhkOptions: string[];
+  priceRange: { min: number; max: number };
+  area: string;
+  city: string;
+  possessionStatus: string;
+  bankLoanAvailable: boolean;
+  commissionPercent: number;
+  description: string;
+}
+
+export interface RequirementCard {
+  bhkType: string;
+  budget: number; // in lakhs
+  area: string;
+  city: string;
+  possessionNeeded: string;
+  loanRequired: boolean;
+  urgency: 'normal' | 'urgent' | 'very_urgent';
+  clientNotes: string;
+}
+
+export interface MatchResult {
+  project: {
+    _id: string;
+    projectName: string;
+    city?: string;
+    location?: string;
+    pricing?: { startingPrice?: number; bankLoanAvailable?: boolean };
+    configuration?: { bhkOptions?: string[] };
+    owner?: { _id: string; name: string; companyName?: string; verificationStatus?: { builder: string } };
+    slug?: string;
+    media?: { coverImage?: { url: string } };
+  };
+  score: number;
+  matchedOn: string[];
+}
+
+export interface GroupMessage {
+  _id: string;
+  room: string;
+  sender: { _id: string; name: string; role: string; companyName?: string };
+  messageType: 'text' | 'inventory_card' | 'requirement_card' | 'system';
+  content: string;
+  inventoryCard?: InventoryCard;
+  requirementCard?: RequirementCard;
+  matchResults?: MatchResult[];
+  createdAt: string;
+}
+
+export interface DealRoom {
+  _id: string;
+  agent: { _id: string; name: string; role: string; companyName?: string; phone?: string };
+  builder: { _id: string; name: string; role: string; companyName?: string; phone?: string };
+  project: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number }; media?: { coverImage?: { url: string } }; slug?: string };
+  clientBudget: number;
+  projectPrice: number;
+  commissionPercent: number;
+  commissionAmount: number;
+  status: 'initiated' | 'in_discussion' | 'site_visit_scheduled' | 'negotiation' | 'closed_won' | 'closed_lost';
+  chatSession?: string;
+  notes: Array<{ content: string; addedBy: { _id: string; name: string }; addedAt: string }>;
+  statusHistory: Array<{ from: string; to: string; changedBy: string; changedAt: string }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const groupChatApi = {
+  // ── Rooms ──────────────────────────────────────────────
+  async createRoom(data: {
+    name: string;
+    roomType: 'project' | 'area';
+    projectId?: string;
+    area?: { city: string; location: string };
+    description?: string;
+  }): Promise<GroupRoom> {
+    const response = await fetch(`${API_URL}/group-chat/rooms`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await handleResponse<{ room: GroupRoom }>(response);
+    return result.room;
+  },
+
+  async getRooms(params?: { type?: string; search?: string }): Promise<{ myRooms: GroupRoom[]; discoverRooms: GroupRoom[] }> {
+    const query = new URLSearchParams();
+    if (params?.type) query.set('type', params.type);
+    if (params?.search) query.set('search', params.search);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_URL}/group-chat/rooms${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async joinRoom(roomId: string): Promise<GroupRoom> {
+    const response = await fetch(`${API_URL}/group-chat/rooms/${roomId}/join`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const result = await handleResponse<{ room: GroupRoom }>(response);
+    return result.room;
+  },
+
+  async leaveRoom(roomId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/group-chat/rooms/${roomId}/leave`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    await handleResponse(response);
+  },
+
+  // ── Messages ───────────────────────────────────────────
+  async getMessages(roomId: string, page = 1): Promise<GroupMessage[]> {
+    const response = await fetch(`${API_URL}/group-chat/rooms/${roomId}/messages?page=${page}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ messages: GroupMessage[] }>(response);
+    return data.messages;
+  },
+
+  async postMessage(roomId: string, data: {
+    messageType: 'text' | 'inventory_card' | 'requirement_card';
+    content?: string;
+    inventoryCard?: InventoryCard;
+    requirementCard?: RequirementCard;
+  }): Promise<GroupMessage> {
+    const response = await fetch(`${API_URL}/group-chat/rooms/${roomId}/messages`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await handleResponse<{ message: GroupMessage }>(response);
+    return result.message;
+  },
+
+  // ── Deal Rooms ─────────────────────────────────────────
+  async showInterest(data: {
+    projectId: string;
+    messageId?: string;
+    roomId?: string;
+  }): Promise<{ dealRoom: DealRoom; chatSession: string; message: string }> {
+    const response = await fetch(`${API_URL}/group-chat/interested`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  async getDeals(status?: string): Promise<DealRoom[]> {
+    const params = status ? `?status=${status}` : '';
+    const response = await fetch(`${API_URL}/group-chat/deals${params}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ deals: DealRoom[] }>(response);
+    return data.deals;
+  },
+
+  async updateDealStatus(dealId: string, data: {
+    status: string;
+    note?: string;
+    commissionPercent?: number;
+  }): Promise<DealRoom> {
+    const response = await fetch(`${API_URL}/group-chat/deals/${dealId}/status`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await handleResponse<{ deal: DealRoom }>(response);
+    return result.deal;
+  },
+};
+
+/* ----------------------------------
    Profile API
 -----------------------------------*/
 

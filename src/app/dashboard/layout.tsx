@@ -269,6 +269,23 @@ const orgPath = user
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Chat</span>}
               </Link>
 
+              {/* Group Chat — Smart Match */}
+              <Link
+                href="/dashboard/group-chat"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/group-chat')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Group Chat" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Group Chat</span>}
+              </Link>
+
               {/* CRM — admin/builder/agent only */}
               <Link
                 href="/dashboard/crm"

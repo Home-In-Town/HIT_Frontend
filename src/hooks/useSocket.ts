@@ -95,6 +95,51 @@ export function useSocket() {
     };
   }, []);
 
+  // ── Group Chat Socket Methods ──────────────────────────
+
+  const joinGroup = useCallback((roomId: string) => {
+    socketRef.current?.emit('join_group', roomId);
+  }, []);
+
+  const leaveGroup = useCallback((roomId: string) => {
+    socketRef.current?.emit('leave_group', roomId);
+  }, []);
+
+  const sendGroupMessage = useCallback((data: {
+    roomId: string;
+    messageType: 'text' | 'inventory_card' | 'requirement_card';
+    content?: string;
+    inventoryCard?: any;
+    requirementCard?: any;
+  }) => {
+    socketRef.current?.emit('group_send_message', data);
+  }, []);
+
+  const sendGroupTyping = useCallback((roomId: string, isTyping: boolean) => {
+    socketRef.current?.emit('group_typing', { roomId, isTyping });
+  }, []);
+
+  const onGroupMessage = useCallback((handler: (msg: any) => void) => {
+    socketRef.current?.on('group_message', handler);
+    return () => {
+      socketRef.current?.off('group_message', handler);
+    };
+  }, []);
+
+  const onGroupTyping = useCallback((handler: (data: { userId: string; name: string; isTyping: boolean }) => void) => {
+    socketRef.current?.on('group_user_typing', handler);
+    return () => {
+      socketRef.current?.off('group_user_typing', handler);
+    };
+  }, []);
+
+  const onMatchResults = useCallback((handler: (data: { messageId: string; roomId: string; matches: any[] }) => void) => {
+    socketRef.current?.on('match_results', handler);
+    return () => {
+      socketRef.current?.off('match_results', handler);
+    };
+  }, []);
+
   return {
     socket: socketRef.current,
     isConnected,
@@ -107,5 +152,13 @@ export function useSocket() {
     onNotification,
     onTyping,
     onMessagesRead,
+    // Group chat
+    joinGroup,
+    leaveGroup,
+    sendGroupMessage,
+    sendGroupTyping,
+    onGroupMessage,
+    onGroupTyping,
+    onMatchResults,
   };
 }
