@@ -163,22 +163,6 @@ const orgPath = user
 
           {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'agent') && (
             <>
-              <Link
-                href="/dashboard/projects"
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                  isActive('/dashboard/projects') 
-                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm' 
-                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
-                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
-                title={isCollapsed ? "Projects" : ""}
-              >
-                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Projects</span>}
-              </Link>
-
               <Link 
                 href="/dashboard/analytics"
                 onClick={() => setSidebarOpen(false)}
