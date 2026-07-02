@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -18,7 +18,6 @@ import {
   ArrowUpRight,
   Sparkles,
   MapPin,
-  IndianRupee,
   ChevronUp,
   Share2,
   Download,
@@ -239,7 +238,7 @@ export default function BuilderDashboardPage() {
         doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(28, 25, 23);
         doc.text('Amenities', m, y); y += 7;
         doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
-        doc.text(property.amenities.slice(0, 10).join('  •  '), m, y);
+        doc.text(property.amenities.slice(0, 10).join('  â€¢  '), m, y);
         y += 10;
       }
 
@@ -277,9 +276,9 @@ export default function BuilderDashboardPage() {
 
   const formatPrice = (price: number) => {
     if (!price) return 'Price on Request';
-    if (price >= 10000000) return `₹${(price / 10000000).toFixed(2)} Cr`;
-    if (price >= 100000) return `₹${(price / 100000).toFixed(1)} Lac`;
-    return `₹${price.toLocaleString('en-IN')}`;
+    if (price >= 10000000) return `\u20B9${(price / 10000000).toFixed(2)} Cr`;
+    if (price >= 100000) return `\u20B9${(price / 100000).toFixed(1)} Lac`;
+    return `\u20B9${price.toLocaleString('en-IN')}`;
   };
 
   const greeting = (() => {
@@ -339,209 +338,105 @@ export default function BuilderDashboardPage() {
             </div>
             <div className="flex gap-3">
               <div className="text-center">
-                <p className="text-white text-base font-black font-serif">{statsLoading ? '–' : stats.totalViews}</p>
+                <p className="text-white text-base font-black font-serif">{statsLoading ? 'â€“' : stats.totalViews}</p>
                 <p className="text-stone-500 text-[8px] font-bold uppercase">Views</p>
               </div>
               <div className="text-center">
-                <p className="text-white text-base font-black font-serif">{statsLoading ? '–' : stats.totalLeads}</p>
+                <p className="text-white text-base font-black font-serif">{statsLoading ? 'â€“' : stats.totalLeads}</p>
                 <p className="text-stone-500 text-[8px] font-bold uppercase">Leads</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Property Reels - Vertical Snap Scroll */}
-        <div className="flex-1 overflow-y-scroll snap-y snap-mandatory mt-3 mb-0 px-3 pb-20 space-y-3 scrollbar-hide">
+        {/* Property Reels - shows 3 at a time, scrollable */}
+        <div className="flex-1 overflow-y-scroll snap-y snap-mandatory mt-3 px-3 pb-20 scrollbar-hide">
           {properties.length === 0 && !statsLoading && (
             <div className="h-full flex items-center justify-center">
               <p className="text-sm text-zinc-400">No properties to show</p>
             </div>
           )}
-          {properties.map((property) => (
+          {properties.map((property, idx) => (
             <div
               key={property.id}
-              className="snap-start shrink-0 bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden"
-              style={{ minHeight: 'calc(100dvh - 230px)' }}
+              className="snap-start bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden flex flex-row mb-2"
+              style={{ height: 'calc((100dvh - 250px) / 3)' }}
             >
               {/* Image */}
-              <div className="relative h-[55%] min-h-[180px] bg-zinc-100">
+              <div className="relative w-[120px] shrink-0 h-full">
                 {property.coverImage ? (
-                  <img
-                    src={property.coverImage}
-                    alt={property.name}
-                    className="w-full h-full object-cover"
-                  />
+                  <img src={property.coverImage} alt={property.name} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-zinc-100 to-zinc-50">
-                    <IndianRupee className="w-16 h-16 text-zinc-200" />
+                  <div className="w-full h-full bg-gradient-to-br from-[#B45309]/5 to-zinc-100 flex items-center justify-center">
+                    <span className="text-2xl text-zinc-300 font-black">{'\u20B9'}</span>
                   </div>
                 )}
-                {/* Status badge */}
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                  <span className="px-2 py-1 bg-black/60 backdrop-blur-sm text-white rounded-lg text-[9px] font-bold uppercase tracking-wide">
-                    {property.type}
-                  </span>
-                  {property.reraApproved && (
-                    <span className="px-2 py-1 bg-green-500/90 backdrop-blur-sm text-white rounded-lg text-[9px] font-bold">
-                      RERA ✓
-                    </span>
-                  )}
-                </div>
-                {/* Price overlay */}
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent pt-10 pb-3 px-4">
-                  <p className="text-white text-xl font-black font-serif tracking-tight">{formatPrice(property.price)}</p>
-                  {property.pricePerSqFt > 0 && (
-                    <p className="text-white/70 text-[10px] font-medium">₹{property.pricePerSqFt.toLocaleString('en-IN')}/sq.ft</p>
-                  )}
-                </div>
+                <span className="absolute top-2 left-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm text-white rounded text-[8px] font-bold uppercase">{property.type}</span>
               </div>
 
-              {/* Details */}
-              <div className="p-4 flex flex-col gap-2">
-                <h3 className="text-base font-black text-[#1C1917] font-serif leading-tight">{property.name}</h3>
-
-                <div className="flex items-center gap-1 text-zinc-500">
-                  <MapPin className="w-3 h-3 shrink-0" />
-                  <span className="text-xs font-medium truncate">{property.location ? `${property.location.split(',')[0]}, ` : ''}{property.city.split(',')[0]}</span>
+              {/* Content */}
+              <div className="flex-1 p-3 flex flex-col min-w-0 justify-between">
+                {/* Row 1: Name + Price */}
+                <div className="flex items-start justify-between gap-1">
+                  <h3 className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight line-clamp-1 flex-1">{property.name}</h3>
+                  <span className="text-[13px] font-black text-[#B45309] shrink-0">{formatPrice(property.price)}</span>
                 </div>
 
-                {/* Tags */}
-                <div className="flex items-center flex-wrap gap-1.5 mt-1">
-                  {property.bhkOptions.length > 0 && (
-                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold border border-blue-100">
-                      {property.bhkOptions.slice(0, 2).join(' / ')}
-                    </span>
+                {/* Row 2: Location + Rate */}
+                <div className="flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1 text-zinc-500 min-w-0">
+                    <MapPin className="w-3 h-3 shrink-0" />
+                    <span className="text-[10px] font-medium truncate">{property.location ? `${property.location.split(',')[0]}, ` : ''}{property.city.split(',')[0]}</span>
+                  </div>
+                  {property.pricePerSqFt > 0 && (
+                    <span className="text-[9px] text-zinc-400 font-semibold shrink-0">{'\u20B9'}{property.pricePerSqFt.toLocaleString('en-IN')}/sqft</span>
+                  )}
+                </div>
+
+                {/* Row 3: Tags */}
+                <div className="flex items-center flex-wrap gap-1">
+                  {property.bhkOptions && property.bhkOptions.length > 0 && (
+                    <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[8px] font-bold border border-blue-100">{property.bhkOptions.slice(0, 2).join(', ')}</span>
                   )}
                   {property.area && (
-                    <span className="px-2 py-0.5 bg-zinc-50 text-zinc-600 rounded-md text-[10px] font-bold border border-zinc-100">
-                      {property.area}
-                    </span>
+                    <span className="px-1.5 py-0.5 bg-zinc-50 text-zinc-600 rounded text-[8px] font-bold border border-zinc-100">{property.area}</span>
                   )}
-                  {property.projectStatus && (
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                      property.projectStatus === 'ready-to-move'
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100'
-                        : property.projectStatus === 'under-construction'
-                        ? 'bg-orange-50 text-orange-700 border-orange-100'
-                        : 'bg-purple-50 text-purple-700 border-purple-100'
-                    }`}>
-                      {property.projectStatus === 'ready-to-move' ? 'Ready to Move' : property.projectStatus === 'under-construction' ? 'Under Construction' : 'Pre-Launch'}
+                  {property.reraApproved && (
+                    <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded text-[8px] font-bold border border-green-100">RERA</span>
+                  )}
+                  {property.gatedCommunity && (
+                    <span className="px-1.5 py-0.5 bg-purple-50 text-purple-700 rounded text-[8px] font-bold border border-purple-100">Gated</span>
+                  )}
+                  {property.bankLoanAvailable && (
+                    <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[8px] font-bold border border-emerald-100">Loan</span>
+                  )}
+                  {property.projectStatus && property.projectStatus !== 'pre-launch' && (
+                    <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold border ${property.projectStatus === 'ready-to-move' ? 'bg-sky-50 text-sky-700 border-sky-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
+                      {property.projectStatus === 'ready-to-move' ? 'Ready' : 'UC'}
                     </span>
                   )}
                 </div>
 
-                {/* View button */}
-                {property.slug && (
-                  <Link
-                    href={`/visit/${property.slug}`}
-                    className="mt-2 flex items-center justify-center gap-1.5 w-full py-2.5 bg-[#1C1917] text-white rounded-xl text-xs font-bold active:scale-[0.98] transition-transform"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    View Property
-                  </Link>
-                )}
-
-                {/* Share, PDF, QR buttons */}
-                {property.slug && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <button
-                      onClick={() => handleShare(property.slug, property.name)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-[10px] font-bold text-[#57534E] active:scale-95 transition-transform"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      Share
-                    </button>
-                    <button
-                      onClick={() => handleDownloadPDF(property)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-[10px] font-bold text-[#57534E] active:scale-95 transition-transform"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      PDF
-                    </button>
-                    <button
-                      onClick={() => handleGenerateQR(property.slug, property.name)}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-[10px] font-bold text-[#57534E] active:scale-95 transition-transform"
-                    >
-                      <QrCode className="w-3.5 h-3.5" />
-                      QR Code
-                    </button>
-                  </div>
-                )}
-
-                {/* Additional Property Info */}
-                <div className="mt-3 pt-3 border-t border-zinc-100 space-y-2.5">
-                  {/* Highlights Row */}
-                  <div className="flex items-center flex-wrap gap-1.5">
-                    {property.gatedCommunity && (
-                      <span className="px-2 py-0.5 bg-purple-50 text-purple-700 rounded-md text-[9px] font-bold border border-purple-100">
-                        Gated Community
-                      </span>
-                    )}
-                    {property.bankLoanAvailable && (
-                      <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-md text-[9px] font-bold border border-emerald-100">
-                        Bank Loan Available
-                      </span>
-                    )}
-                    {property.floorRange && (
-                      <span className="px-2 py-0.5 bg-zinc-50 text-zinc-600 rounded-md text-[9px] font-bold border border-zinc-100">
-                        Floor: {property.floorRange}
-                      </span>
-                    )}
-                    {property.facingOptions && property.facingOptions.length > 0 && (
-                      <span className="px-2 py-0.5 bg-sky-50 text-sky-700 rounded-md text-[9px] font-bold border border-sky-100">
-                        {property.facingOptions.slice(0, 2).join(', ')} Facing
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Price Range */}
-                  {property.priceRange && (
-                    <div className="flex items-center gap-2">
-                      <IndianRupee className="w-3 h-3 text-zinc-400" />
-                      <span className="text-[10px] text-zinc-500 font-medium">Range: <span className="text-zinc-700 font-bold">{property.priceRange}</span></span>
-                    </div>
+                {/* Row 4: Actions */}
+                <div className="flex items-center gap-1.5">
+                  {property.slug && (
+                    <Link href={`/visit/${property.slug}`} className="flex items-center gap-1 px-2.5 py-1.5 bg-[#1C1917] text-white rounded-lg text-[9px] font-bold active:scale-95 transition-transform">
+                      <Eye className="w-3 h-3" />View
+                    </Link>
                   )}
-
-                  {/* Amenities */}
-                  {property.amenities && property.amenities.length > 0 && (
-                    <div>
-                      <p className="text-[9px] font-bold text-zinc-400 uppercase tracking-widest mb-1">Amenities</p>
-                      <div className="flex flex-wrap gap-1">
-                        {property.amenities.slice(0, 6).map((amenity, i) => (
-                          <span key={i} className="px-1.5 py-0.5 bg-amber-50 text-amber-800 rounded text-[8px] font-semibold border border-amber-100">
-                            {amenity}
-                          </span>
-                        ))}
-                        {property.amenities.length > 6 && (
-                          <span className="px-1.5 py-0.5 bg-zinc-50 text-zinc-500 rounded text-[8px] font-semibold border border-zinc-100">
-                            +{property.amenities.length - 6} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                  {property.slug && (
+                    <button onClick={() => handleShare(property.slug, property.name)} className="p-1.5 bg-[#FAF7F2] border border-[#E7E5E4] rounded-lg active:scale-95"><Share2 className="w-3.5 h-3.5 text-[#57534E]" /></button>
                   )}
-
-                  {/* Builder */}
-                  {property.ownerName && (
-                    <div className="flex items-center gap-2 pt-1">
-                      <div className="w-5 h-5 bg-[#B45309]/10 rounded-full flex items-center justify-center">
-                        <Users className="w-2.5 h-2.5 text-[#B45309]" />
-                      </div>
-                      <span className="text-[10px] text-zinc-500 font-medium">By <span className="text-zinc-700 font-bold">{property.ownerName}</span></span>
-                    </div>
+                  {property.slug && (
+                    <button onClick={() => handleDownloadPDF(property)} className="p-1.5 bg-[#FAF7F2] border border-[#E7E5E4] rounded-lg active:scale-95"><Download className="w-3.5 h-3.5 text-[#57534E]" /></button>
+                  )}
+                  {property.slug && (
+                    <button onClick={() => handleGenerateQR(property.slug, property.name)} className="p-1.5 bg-[#FAF7F2] border border-[#E7E5E4] rounded-lg active:scale-95"><QrCode className="w-3.5 h-3.5 text-[#57534E]" /></button>
                   )}
                 </div>
               </div>
             </div>
           ))}
-
-          {/* Scroll hint */}
-          {properties.length > 1 && (
-            <div className="flex items-center justify-center py-2 text-zinc-300">
-              <ChevronUp className="w-4 h-4 animate-bounce" />
-              <span className="text-[9px] font-bold uppercase tracking-widest ml-1">Scroll for more</span>
-            </div>
-          )}
         </div>
 
         {/* Fixed Bottom Navigation */}
