@@ -547,15 +547,15 @@ export default function BuilderDashboardPage() {
         {/* Fixed Bottom Navigation */}
         <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-2 py-2 safe-area-pb">
           <div className="grid grid-cols-4 gap-1">
-            <button
-              onClick={handleGenerateLead}
+            <Link
+              href="#"
               className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
             >
               <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
                 <Zap className="w-4 h-4 text-[#B45309]" />
               </div>
               <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
-            </button>
+            </Link>
             <Link
               href="/dashboard/marketplace"
               className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
