@@ -80,14 +80,17 @@ const orgPath = user
       )}
 
       <aside className={`
-        fixed left-0 top-0 h-full bg-white border-r border-[#E7E5E4] p-3 z-50 shadow-2xl shadow-[#B45309]/5
+        fixed left-0 h-full bg-white border-r border-[#E7E5E4] p-3 z-50 shadow-2xl shadow-[#B45309]/5
         transform transition-all duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
         ${isCollapsed ? 'lg:w-20' : 'lg:w-64'}
         flex flex-col
+        top-14 lg:top-0
+        h-[calc(100dvh-3.5rem)] lg:h-full
       `}>
-        <div className={`flex items-center ${isCollapsed ? 'flex-col gap-4 text-center' : 'justify-between'} mb-8 px-2 mt-2 lg:mt-0 transition-all duration-300`}>
+        {/* Logo — desktop only, hidden on mobile since mobile has its own header */}
+        <div className={`hidden lg:flex items-center ${isCollapsed ? 'flex-col gap-4 text-center' : 'justify-between'} mb-8 px-2 mt-2 transition-all duration-300`}>
           <Link
             href="/"
             className={`flex items-center gap-3 group cursor-pointer overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-full'}`}
@@ -104,7 +107,7 @@ const orgPath = user
           
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className={`hidden lg:flex p-2 rounded-xl border border-transparent hover:border-[#B45309]/10 hover:bg-[#FAF7F2] text-gray-400 hover:text-[#B45309] transition-all duration-300 ${isCollapsed ? 'mt-2' : ''}`}
+            className={`p-2 rounded-xl border border-transparent hover:border-[#B45309]/10 hover:bg-[#FAF7F2] text-gray-400 hover:text-[#B45309] transition-all duration-300 ${isCollapsed ? 'mt-2' : ''}`}
             title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
           >
             {isCollapsed ? (
@@ -120,7 +123,7 @@ const orgPath = user
         </div>
 
         
-        <nav className="space-y-1 flex-1">
+        <nav className="space-y-1 flex-1 overflow-y-auto">
           {!isCollapsed && (
             <div className="px-2 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap transition-all duration-300">
               Overview
@@ -310,7 +313,7 @@ const orgPath = user
 
         </nav>
         
-        <div className="border-t border-gray-200 pt-4 pb-2">
+        <div className="border-t border-gray-200 pt-4 pb-2 lg:pb-2 pb-20">
           <button
             onClick={() => {
               logout();
