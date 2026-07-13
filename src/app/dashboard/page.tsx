@@ -13,7 +13,7 @@ export default function DashboardPage() {
     if (isLoading) return;
 
     if (!user) {
-      router.replace('/login');
+      router.replace('/dashboard-login');
       return;
     }
 
@@ -22,11 +22,14 @@ export default function DashboardPage() {
       case 'admin':
         router.replace('/dashboard/admin');
         break;
-      case 'builder':
+      case 'builder':   // "Captain" in the UI
         router.replace('/dashboard/builder');
         break;
       case 'agent':
         router.replace('/dashboard/agent');
+        break;
+      case 'user':      // Read-only overview
+        router.replace('/dashboard/user');
         break;
       case 'employee':
         if (user.isEmployerConfirmed) {
@@ -39,7 +42,7 @@ export default function DashboardPage() {
         router.replace('/dashboard/pending');
         break;
       default:
-        router.replace('/login');
+        router.replace('/dashboard-login');
     }
   }, [user, status, router, isLoading]);
 

@@ -568,9 +568,10 @@ export default function Home() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const dashboardHref = status === 'authenticated' ? '/dashboard' : '/login';
-  const ctaLabel = status === 'authenticated' ? 'Go to Dashboard' : 'Create Your Project Page';
-  const navCtaLabel = status === 'authenticated' ? 'Dashboard' : 'Login';
+  // Always go to role-select — it handles logout + card display before any login
+  const dashboardHref = '/role-select';
+  const ctaLabel = 'Go to Dashboard';
+  const navCtaLabel = 'Dashboard';
 
   const navLinks = [
     { href: '#how-it-works', label: 'How It Works' },
@@ -1110,7 +1111,7 @@ export default function Home() {
               filter every enquiry before it reaches their sales team.
             </p>
             <Link
-              href="/login"
+              href="/role-select"
               className="inline-flex items-center gap-2 px-8 py-4 bg-white text-[#B45309] font-bold rounded-2xl hover:bg-[#FAF7F2] transition-all shadow-2xl hover:-translate-y-1 hover:shadow-white/20 group"
             >
               Get Started - It&apos;s Free
