@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { profileApi, crmBridgeApi, projectsApi, ApiError, CrmStatus, AuthUser } from '@/lib/api';
+import { profileApi, crmBridgeApi, projectsApi, ApiError, CrmStatus, AuthUser, mediaApi } from '@/lib/api';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                               */
@@ -114,6 +114,8 @@ export default function ProfilePage() {
   const [profileSuccess, setProfileSuccess] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('');
 
   /* ---------- Section 2: CRM Integration state ---------- */
   const [crmStatus, setCrmStatus] = useState<CrmStatus | null>(null);
@@ -142,6 +144,7 @@ export default function ProfilePage() {
       setProfileName(user.name ?? '');
       setProfileEmail(user.email ?? '');
       setProfileCompany(user.companyName ?? '');
+      setLogoUrl(user.businessLogoUrl ?? '');
     }
   }, [user]);
 
@@ -189,6 +192,7 @@ export default function ProfilePage() {
         name: profileName.trim() || undefined,
         email: profileEmail.trim() || undefined,
         companyName: profileCompany.trim() || undefined,
+        ...(user.role === 'captain' && { businessLogoUrl: logoUrl || undefined }),
       });
       setUser(updated);
       setProfileSuccess(true);
@@ -202,6 +206,29 @@ export default function ProfilePage() {
       }
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  async function handleLogoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      alert('Logo must be JPEG, PNG, or WebP');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Logo must be 5 MB or smaller');
+      return;
+    }
+    try {
+      setLogoUploading(true);
+      const result = await mediaApi.uploadAndSave({ file, projectId: 'captain-logo', type: 'cover' });
+      setLogoUrl(result.url);
+    } catch {
+      alert('Logo upload failed — please try again');
+    } finally {
+      setLogoUploading(false);
     }
   }
 
@@ -406,6 +433,29 @@ export default function ProfilePage() {
                     className="w-full px-4 py-2.5 rounded-xl border border-[#E7E5E4] bg-[#FAF7F2] text-sm text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/30 focus:border-[#B45309] transition"
                   />
                 </div>
+                {user.role === 'captain' && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-widest text-[#57534E] mb-1.5">
+                      Business Logo
+                    </label>
+                    <div className="flex items-center gap-3">
+                      {logoUrl && (
+                        <img src={logoUrl} alt="Business logo" className="w-10 h-10 rounded-xl object-cover border border-[#E7E5E4]" />
+                      )}
+                      <div className="flex-1">
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          disabled={logoUploading}
+                          onChange={handleLogoUpload}
+                          className="w-full text-sm text-[#57534E] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-semibold file:bg-[#B45309]/10 file:text-[#B45309] hover:file:bg-[#B45309]/20 transition-all"
+                        />
+                        {logoUploading && <p className="text-xs text-[#B45309] mt-1">Uploading...</p>}
+                        {logoUrl && !logoUploading && <p className="text-xs text-green-600 mt-1">✓ Logo ready</p>}
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-widest text-[#57534E] mb-1.5">
                     Phone Number

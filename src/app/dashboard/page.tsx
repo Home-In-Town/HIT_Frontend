@@ -38,6 +38,9 @@ export default function DashboardPage() {
       case 'unassigned':
         router.replace('/dashboard/pending');
         break;
+      case 'captain':
+        router.replace('/dashboard/captain');
+        break;
       default:
         router.replace('/login');
     }
