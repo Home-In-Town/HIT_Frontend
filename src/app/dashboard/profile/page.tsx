@@ -184,6 +184,11 @@ export default function ProfilePage() {
 
   async function handleProfileSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!user) {
+    setProfileError("User not found.");
+    return;
+    }
     setProfileSaving(true);
     setProfileError(null);
     setProfileSuccess(false);
