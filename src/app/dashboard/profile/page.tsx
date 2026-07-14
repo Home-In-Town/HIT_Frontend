@@ -228,7 +228,7 @@ export default function ProfilePage() {
     }
     try {
       setLogoUploading(true);
-      const result = await mediaApi.uploadAndSave({ file, projectId: 'captain-logo', type: 'cover' });
+      const result = await mediaApi.uploadLogo(file);
       setLogoUrl(result.url);
     } catch {
       alert('Logo upload failed — please try again');

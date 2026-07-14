@@ -126,7 +126,20 @@ export default function CaptainDashboardPage() {
             priceRange: p.priceRange || p.pricing?.totalPriceRange || '',
             ownerName: p.owner?.name || '',
           }));
-        setProperties(cards);
+
+        const captainCity = (user?.businessCity || '').toLowerCase().trim();
+        if (captainCity) {
+          const nearby = cards.filter(c => {
+            const city = c.city.toLowerCase().trim();
+            const loc  = c.location.toLowerCase().trim();
+            return city.includes(captainCity) || captainCity.includes(city) || loc.includes(captainCity);
+          });
+          const nearbySet = new Set(nearby.map(c => c.id));
+          const rest = cards.filter(c => !nearbySet.has(c.id));
+          setProperties([...nearby, ...rest]);
+        } else {
+          setProperties(cards);
+        }
       } catch {
         // Silently fail
       } finally {
@@ -238,7 +251,7 @@ export default function CaptainDashboardPage() {
         doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(28, 25, 23);
         doc.text('Amenities', m, y); y += 7;
         doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
-        doc.text(property.amenities.slice(0, 10).join('  â€¢  '), m, y);
+        doc.text(property.amenities.slice(0, 10).join('  \u2022  '), m, y);
         y += 10;
       }
 
@@ -260,10 +273,7 @@ export default function CaptainDashboardPage() {
 
   function handleGenerateQR(slug: string, name: string) {
     const url = `${window.location.origin}/visit/${slug}`;
-    // Open QR code using a public API
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
-    
-    // Create a temporary link to download the QR code
     const link = document.createElement('a');
     link.href = qrUrl;
     link.download = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_QR.png`;
@@ -313,10 +323,22 @@ export default function CaptainDashboardPage() {
               >
                 <Menu className="w-5 h-5" />
               </button>
-              <Link href="/" className="flex items-center gap-1.5">
-                <div className="w-6 h-6 bg-[#B45309] rounded-md flex items-center justify-center text-white font-bold text-xs shadow-sm">H</div>
-                <span className="text-sm font-bold text-[#2A2A2A] font-serif">HomeInTown</span>
-              </Link>
+              {user?.businessLogoUrl ? (
+                <div className="flex items-center gap-1.5">
+                  <img src={user.businessLogoUrl} alt={user.companyName || 'Logo'} className="w-6 h-6 rounded-md object-cover shadow-sm" />
+                  <span className="text-sm font-bold text-[#2A2A2A] font-serif truncate max-w-[120px]">{user.companyName || 'HomeInTown'}</span>
+                </div>
+              ) : user?.companyName ? (
+                <div className="flex items-center gap-1.5">
+                  <div className="w-6 h-6 bg-[#B45309] rounded-md flex items-center justify-center text-white font-bold text-xs shadow-sm">{user.companyName.charAt(0).toUpperCase()}</div>
+                  <span className="text-sm font-bold text-[#2A2A2A] font-serif truncate max-w-[120px]">{user.companyName}</span>
+                </div>
+              ) : (
+                <Link href="/" className="flex items-center gap-1.5">
+                  <div className="w-6 h-6 bg-[#B45309] rounded-md flex items-center justify-center text-white font-bold text-xs shadow-sm">H</div>
+                  <span className="text-sm font-bold text-[#2A2A2A] font-serif">HomeInTown</span>
+                </Link>
+              )}
             </div>
             <Link
               href="/dashboard/projects/new"
@@ -338,11 +360,11 @@ export default function CaptainDashboardPage() {
             </div>
             <div className="flex gap-3">
               <div className="text-center">
-                <p className="text-white text-base font-black font-serif">{statsLoading ? 'â€"' : stats.totalViews}</p>
+                <p className="text-white text-base font-black font-serif">{statsLoading ? '\u2013' : stats.totalViews}</p>
                 <p className="text-stone-500 text-[8px] font-bold uppercase">Views</p>
               </div>
               <div className="text-center">
-                <p className="text-white text-base font-black font-serif">{statsLoading ? 'â€"' : stats.totalLeads}</p>
+                <p className="text-white text-base font-black font-serif">{statsLoading ? '\u2013' : stats.totalLeads}</p>
                 <p className="text-stone-500 text-[8px] font-bold uppercase">Leads</p>
               </div>
             </div>
@@ -456,7 +478,7 @@ export default function CaptainDashboardPage() {
                   )}
                 </div>
 
-                {/* Bottom row: View+Chat+Call on left, Share+PDF+QR on right */}
+                {/* Bottom row: View+Chat+Call */}
                 <div className="flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1">
                     {property.slug && (
@@ -486,7 +508,9 @@ export default function CaptainDashboardPage() {
 
         {/* Fixed Bottom Navigation */}
         <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-2 py-2 safe-area-pb">
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid grid-cols-2 gap-1">
+
+            {false && (
             <Link
               href="#"
               className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
@@ -496,6 +520,8 @@ export default function CaptainDashboardPage() {
               </div>
               <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
             </Link>
+            )}
+
             <Link
               href="/dashboard/marketplace"
               className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
@@ -517,6 +543,9 @@ export default function CaptainDashboardPage() {
               )}
               <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">CRM</span>
             </Link>
+
+            {false && (
+
             <Link
               href="https://www.oneemployee.in/"
               className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
@@ -526,6 +555,8 @@ export default function CaptainDashboardPage() {
               </div>
               <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Team</span>
             </Link>
+            )}
+            
           </div>
         </div>
       </div>
@@ -598,7 +629,8 @@ export default function CaptainDashboardPage() {
           </div>
 
           {/* 4 Action Cards */}
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            {false && (
             <button onClick={() => window.location.href = "#"} className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden text-left">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
               <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-[#B45309]/5 to-[#B45309]/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
@@ -614,6 +646,7 @@ export default function CaptainDashboardPage() {
                 </div>
               </div>
             </button>
+            )}
 
             <Link href="/dashboard/marketplace" className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
@@ -622,7 +655,7 @@ export default function CaptainDashboardPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-sm">
                   <ShoppingBag className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Sell & Earn</h3>
+                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Sell &amp; Earn</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Marketplace</p>
                 <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
                   <span className="text-[10px] font-bold">Open</span>
@@ -649,6 +682,7 @@ export default function CaptainDashboardPage() {
               </div>
             </Link>
 
+            {false && (    
             <Link href="/dashboard/employees" className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
               <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-[#B45309]/5 to-[#B45309]/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
@@ -664,6 +698,7 @@ export default function CaptainDashboardPage() {
                 </div>
               </div>
             </Link>
+            )}
           </div>
 
           {/* CRM Banner */}

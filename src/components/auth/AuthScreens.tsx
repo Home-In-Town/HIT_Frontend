@@ -284,7 +284,7 @@ export default function AuthScreens() {
 
       try {
         setLogoUploading(true);
-        const result = await mediaApi.uploadAndSave({ file, projectId: 'captain-logo', type: 'cover' });
+        const result = await mediaApi.uploadLogo(file);
         setBusinessLogoUrl(result.url);
       } catch {
         toast.error('Logo upload failed — you can proceed without it');
