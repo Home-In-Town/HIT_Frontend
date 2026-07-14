@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { authApi, employeeApi } from '@/lib/api';
+import { authApi, employeeApi, mediaApi } from '@/lib/api';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
@@ -21,11 +21,20 @@ export default function AuthScreens() {
     const [mpin, setMpin] = useState('');
     const [confirmMpin, setConfirmMpin] = useState('');
     const [otpCode, setOtpCode] = useState('');
-    const [role, setRole] = useState<'user' | 'employee'>('user');
+    const [role, setRole] = useState<'user' | 'employee' | 'captain'>('user');
     
     // Flow tracking
     const [isResetFlow, setIsResetFlow] = useState(false);
     const [forgotPhone, setForgotPhone] = useState('');
+
+    // Captain registration fields
+    const [companyName, setCompanyName] = useState('');
+    const [businessAddress, setBusinessAddress] = useState('');
+    const [businessCity, setBusinessCity] = useState('');
+    const [businessState, setBusinessState] = useState('');
+    const [businessPinCode, setBusinessPinCode] = useState('');
+    const [businessLogoUrl, setBusinessLogoUrl] = useState('');
+    const [logoUploading, setLogoUploading] = useState(false);
 
     const { checkAuth } = useAuth();
     const router = useRouter();
@@ -40,6 +49,12 @@ export default function AuthScreens() {
         setOtpCode('');
         setName('');
         setEmail('');
+        setCompanyName('');
+        setBusinessAddress('');
+        setBusinessCity('');
+        setBusinessState('');
+        setBusinessPinCode('');
+        setBusinessLogoUrl('');
     };
 
     // ========================================
@@ -128,11 +143,39 @@ export default function AuthScreens() {
         }
         if (mpin !== confirmMpin) return toast.error("MPINs do not match");
         
+        if (role === 'captain' && !companyName.trim()) {
+          toast.error('Company name is required for captain registration');
+          return;
+        }
+
         try {
             setLoading(true);
             const formattedPhone = formatPhone(phone);
             setPhone(formattedPhone);
-            await authApi.register({ name, phone: formattedPhone, mpin, email, role });
+            const regResult = await authApi.register({
+              name,
+              phone: formattedPhone,
+              mpin,
+              email,
+              role,
+              ...(role === 'captain' && {
+                companyName: companyName.trim(),
+                businessAddress: businessAddress.trim() || undefined,
+                businessCity: businessCity.trim() || undefined,
+                businessState: businessState.trim() || undefined,
+                businessPinCode: businessPinCode || undefined,
+                businessLogoUrl: businessLogoUrl || undefined,
+              }),
+            });
+
+            // DEV BYPASS: if server auto-verified, skip OTP screen
+            if ((regResult as any).bypassed) {
+                toast.success("Registered successfully!");
+                await checkAuth();
+                router.push('/dashboard');
+                return;
+            }
+
             toast.success("OTP sent successfully");
             setIsResetFlow(false);
             setScreen('otp');
@@ -222,6 +265,32 @@ export default function AuthScreens() {
         } finally {
             setLoading(false);
         }
+    };
+
+    // ─── Logo Upload Handler ───
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        toast.error('Logo must be a JPEG, PNG, or WebP image');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Logo must be 5 MB or smaller');
+        return;
+      }
+
+      try {
+        setLogoUploading(true);
+        const result = await mediaApi.uploadAndSave({ file, projectId: 'captain-logo', type: 'cover' });
+        setBusinessLogoUrl(result.url);
+      } catch {
+        toast.error('Logo upload failed — you can proceed without it');
+      } finally {
+        setLogoUploading(false);
+      }
     };
 
     // ─── Shared Input Styles ───
@@ -385,7 +454,80 @@ export default function AuthScreens() {
                             >
                                 Field Workforce
                             </button>
+                            <button
+                              type="button"
+                              onClick={() => setRole('captain')}
+                              className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'captain' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
+                            >
+                              Builder / Captain
+                            </button>
                         </div>
+
+                        {role === 'captain' && (
+                          <div className="space-y-3">
+                            {/* Company Name (required) */}
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder="Company Name *"
+                                value={companyName}
+                                onChange={(e) => setCompanyName(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                              />
+                            </div>
+
+                            {/* Business Logo Upload */}
+                            <div>
+                              <label className="block text-xs font-semibold text-[#57534E] mb-1 pl-1">Business Logo (optional)</label>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                disabled={logoUploading}
+                                onChange={handleLogoUpload}
+                                className="w-full text-sm text-[#57534E] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-semibold file:bg-[#B45309]/10 file:text-[#B45309] hover:file:bg-[#B45309]/20 transition-all"
+                              />
+                              {logoUploading && <p className="text-xs text-[#B45309] mt-1 pl-1">Uploading logo...</p>}
+                              {businessLogoUrl && !logoUploading && <p className="text-xs text-green-600 mt-1 pl-1">✓ Logo uploaded</p>}
+                            </div>
+
+                            {/* Business Address */}
+                            <input
+                              type="text"
+                              placeholder="Business Address (optional)"
+                              value={businessAddress}
+                              onChange={(e) => setBusinessAddress(e.target.value)}
+                              className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                            />
+
+                            {/* City + State side by side */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                placeholder="City (optional)"
+                                value={businessCity}
+                                onChange={(e) => setBusinessCity(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                              />
+                              <input
+                                type="text"
+                                placeholder="State (optional)"
+                                value={businessState}
+                                onChange={(e) => setBusinessState(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                              />
+                            </div>
+
+                            {/* PIN Code */}
+                            <input
+                              type="text"
+                              placeholder="PIN Code (optional, 6 digits)"
+                              value={businessPinCode}
+                              maxLength={6}
+                              onChange={(e) => setBusinessPinCode(e.target.value.replace(/\D/g, ''))}
+                              className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all font-mono"
+                            />
+                          </div>
+                        )}
 
                         {/* MPIN / Confirm */}
                         <div className="grid grid-cols-2 gap-4">

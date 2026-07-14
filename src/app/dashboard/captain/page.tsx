@@ -48,7 +48,7 @@ interface ProjectCard {
   ownerName: string;
 }
 
-export default function AdminDashboardPage() {
+export default function CaptainDashboardPage() {
   const { user, status } = useAuth();
   const authLoading = status === 'loading';
   const router = useRouter();
@@ -66,7 +66,7 @@ export default function AdminDashboardPage() {
   const [properties, setProperties] = useState<ProjectCard[]>([]);
 
   useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'admin')) {
+    if (!authLoading && (!user || user.role !== 'captain')) {
       router.push('/login');
       return;
     }

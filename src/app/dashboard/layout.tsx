@@ -48,10 +48,23 @@ const orgPath = user
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-[#E7E5E4] px-4 py-3 shadow-sm shadow-[#B45309]/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-3 group">
-            <div className="w-8 h-8 bg-[#B45309] rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-[#B45309]/20">H</div>
-            <span className="text-lg font-bold text-[#2A2A2A] font-serif tracking-tight">HomeInTown</span>
-            </Link>
+            {user?.role === 'captain' && user?.businessLogoUrl ? (
+              <Link href="/" className="flex items-center gap-3 group">
+                <img
+                  src={user.businessLogoUrl}
+                  alt={user.companyName || 'Company Logo'}
+                  className="w-8 h-8 rounded-lg object-cover shadow-lg"
+                />
+                <span className="text-lg font-bold text-[#2A2A2A] font-serif tracking-tight">
+                  {user.companyName || 'HomeInTown'}
+                </span>
+              </Link>
+            ) : (
+              <Link href="/" className="flex items-center gap-3 group">
+                <div className="w-8 h-8 bg-[#B45309] rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-[#B45309]/20">H</div>
+                <span className="text-lg font-bold text-[#2A2A2A] font-serif tracking-tight">HomeInTown</span>
+              </Link>
+            )}
           </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -95,13 +108,30 @@ const orgPath = user
             href="/"
             className={`flex items-center gap-3 group cursor-pointer overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-10 h-10' : 'w-full'}`}
           >
-            <div className="flex-shrink-0 w-10 h-10 bg-[#B45309] rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-[#B45309]/20 transition-transform duration-300 hover:scale-105">
-              H
-            </div>
-            {!isCollapsed && (
-              <span className="text-xl font-bold text-[#2A2A2A] font-serif tracking-tight group-hover:opacity-80 whitespace-nowrap opacity-100 transition-opacity duration-300">
-                HomeInTown
-              </span>
+            {user?.role === 'captain' && user?.businessLogoUrl ? (
+              <>
+                <img
+                  src={user.businessLogoUrl}
+                  alt={user.companyName || 'Company Logo'}
+                  className="flex-shrink-0 w-10 h-10 rounded-xl object-cover shadow-lg transition-transform duration-300 hover:scale-105"
+                />
+                {!isCollapsed && (
+                  <span className="text-xl font-bold text-[#2A2A2A] font-serif tracking-tight group-hover:opacity-80 whitespace-nowrap opacity-100 transition-opacity duration-300">
+                    {user.companyName || 'HomeInTown'}
+                  </span>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex-shrink-0 w-10 h-10 bg-[#B45309] rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-[#B45309]/20 transition-transform duration-300 hover:scale-105">
+                  H
+                </div>
+                {!isCollapsed && (
+                  <span className="text-xl font-bold text-[#2A2A2A] font-serif tracking-tight group-hover:opacity-80 whitespace-nowrap opacity-100 transition-opacity duration-300">
+                    HomeInTown
+                  </span>
+                )}
+              </>
             )}
           </Link>
           
@@ -234,6 +264,42 @@ const orgPath = user
               </svg>
               {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Archive</span>}
             </Link>
+          )}
+
+          {user?.role === 'captain' && (
+            <>
+              <Link
+                href="/dashboard/marketplace"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/marketplace')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Marketplace" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Marketplace</span>}
+              </Link>
+
+              <Link
+                href="/dashboard/crm"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/crm')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "CRM" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">CRM</span>}
+              </Link>
+            </>
           )}
 
           {/* Chat Link */}

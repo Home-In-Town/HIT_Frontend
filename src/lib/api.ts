@@ -569,7 +569,7 @@ export interface AuthUser {
   _id?: string;
   name: string;
   email?: string;
-  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee';
+  role: 'admin' | 'builder' | 'agent' | 'unassigned' | 'user' | 'employee' | 'captain';
   companyName?: string;
   phone: string;
   isActive: boolean;
@@ -577,6 +577,8 @@ export interface AuthUser {
   isEmployerConfirmed?: boolean;
   employerId?: string | { id?: string; _id?: string; name: string; phone?: string; role?: string };
   isAlreadyAssigned?: boolean;
+  businessLogoUrl?: string;
+  businessAddress?: string;
 }    
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -738,7 +740,19 @@ export const usersApi = {
 export const authApi = {
 
   // Start Registration
-  async register(data: { name: string; phone: string; mpin: string; email?: string; role?: string }): Promise<{ message: string }> {
+  async register(data: {
+    name: string;
+    phone: string;
+    mpin: string;
+    email?: string;
+    role?: string;
+    companyName?: string;
+    businessAddress?: string;
+    businessCity?: string;
+    businessState?: string;
+    businessPinCode?: string;
+    businessLogoUrl?: string;
+  }): Promise<{ message: string }> {
     const response = await fetch(`${API_URL}/auth/register`, {
       ...COMMON_FETCH_OPTIONS,
       method: "POST",
@@ -1785,6 +1799,7 @@ export const profileApi = {
     name?: string;
     email?: string;
     companyName?: string;
+    businessLogoUrl?: string;
   }): Promise<AuthUser> {
     const response = await fetch(`${API_URL}/users/profile`, {
       ...COMMON_FETCH_OPTIONS,
