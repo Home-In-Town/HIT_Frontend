@@ -1530,11 +1530,12 @@ const floorPlans: FloorPlan[] = isPlot
                         >
                           {/* IMAGE */}
                           <div className="relative h-32 w-full">
-                            <Image
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
                               src={plan.image || "/placeholder.jpg"}
                               alt="plan"
-                              fill
-                              className="object-cover"
+                              className="object-cover w-full h-full"
+                              onError={(e) => { (e.target as HTMLImageElement).src = '/placeholder.jpg'; }}
                             />
 
                             <span className="absolute top-2 left-2 bg-[#3E5F16] text-white text-[9px] font-semibold px-2 py-0.5 rounded-full">

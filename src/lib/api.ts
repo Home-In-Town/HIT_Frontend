@@ -399,6 +399,21 @@ export const mediaApi = {
     return handleResponse(res);
   },
 
+  // ================= 7. LOGO UPLOAD (no projectId) =================
+  async uploadLogo(file: File): Promise<{ url: string; key: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch(`${API_URL}/files/upload-logo`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await handleResponse<{ fileUrl: string; fileKey: string }>(res);
+    return { url: data.fileUrl, key: data.fileKey };
+  },
+
   // ================= 6. REPLACE (proxy-based) =================
   async replaceFile(params: {
     projectId: string;
@@ -579,6 +594,8 @@ export interface AuthUser {
   isAlreadyAssigned?: boolean;
   businessLogoUrl?: string;
   businessAddress?: string;
+  businessCity?: string;
+  businessState?: string;
 }    
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
