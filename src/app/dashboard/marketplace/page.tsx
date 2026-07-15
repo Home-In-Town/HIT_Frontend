@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { marketplaceApi, projectsApi, MarketplaceListing } from '@/lib/api';
+import { marketplaceApi, projectsApi, MarketplaceListing, MarketplaceAction } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -158,6 +158,11 @@ export default function MarketplacePage() {
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
   const [adminActions, setAdminActions] = useState<any[]>([]);
   const [updatingActionId, setUpdatingActionId] = useState<string | null>(null);
+  const [myCommissions, setMyCommissions] = useState<{
+    actions: MarketplaceAction[];
+    totalEarned: number;
+    totalPending: number;
+  } | null>(null);
 
   const isAdmin = user?.role === 'admin';
 
@@ -181,6 +186,16 @@ export default function MarketplacePage() {
       console.error('[Marketplace] Error fetching admin actions:', err);
     }
   }, [isAdmin]);
+
+  const fetchMyCommissions = useCallback(async () => {
+    if (user?.role !== 'captain') return;
+    try {
+      const data = await marketplaceApi.getMyCommissions();
+      setMyCommissions(data);
+    } catch (err) {
+      console.error('[Marketplace] Commission fetch error:', err);
+    }
+  }, [user]);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -210,6 +225,9 @@ export default function MarketplacePage() {
            }
         });
         setProjects(merged);
+        if (user?.role === 'captain') {
+          fetchMyCommissions();
+        }
       }
     } catch (err: any) {
       console.error('[Marketplace] Error fetching data:', err);
@@ -217,7 +235,7 @@ export default function MarketplacePage() {
     } finally {
       setLoading(false);
     }
-  }, [isAdmin]);
+  }, [isAdmin, fetchMyCommissions]);
 
   useEffect(() => {
     fetchAll();
@@ -1361,6 +1379,27 @@ export default function MarketplacePage() {
               <p className="text-gray-500 text-[10px] md:text-xs font-medium mt-0.5">Track your listings and approve commission payouts.</p>
             </div>
 
+            {user?.role === 'captain' && myCommissions && (
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-white p-4 rounded-2xl border border-[#E7E5E4] text-center">
+                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1">Total Earned</p>
+                  <p className="text-lg font-black text-emerald-600">
+                    {myCommissions.totalEarned >= 100000
+                      ? `₹${(myCommissions.totalEarned / 100000).toFixed(2)}L`
+                      : `₹${myCommissions.totalEarned.toLocaleString('en-IN')}`}
+                  </p>
+                </div>
+                <div className="bg-white p-4 rounded-2xl border border-[#E7E5E4] text-center">
+                  <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest mb-1">Pending Approval</p>
+                  <p className="text-lg font-black text-amber-600">
+                    {myCommissions.totalPending >= 100000
+                      ? `₹${(myCommissions.totalPending / 100000).toFixed(2)}L`
+                      : `₹${myCommissions.totalPending.toLocaleString('en-IN')}`}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {myListedProjects.length === 0 ? (
               <div className="bg-white border-2 border-dashed border-[#E7E5E4] rounded-2xl md:rounded-[2.5rem] p-6 md:p-16 text-center space-y-4 md:space-y-6">
                 <div className="w-14 h-14 md:w-24 md:h-24 bg-[#FAF7F5] rounded-2xl md:rounded-[2rem] mx-auto flex items-center justify-center">
@@ -1410,6 +1449,15 @@ export default function MarketplacePage() {
                             </button>
                           )}
                           <button className="hover:underline flex items-center gap-1" onClick={() => setShowDetailModal(l)}>Analytics <ArrowUpRightIcon className="w-2.5 h-2.5" /></button>
+                          {user?.role === 'captain' && l.status === 'Active' && l.listingType === 'selling' && (
+                            <button
+                              onClick={() => handleAction((l as any)._id, 'deal_closed')}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 active:scale-95 transition-all"
+                            >
+                              <CheckCircleIcon className="w-3.5 h-3.5" />
+                              Mark Deal Closed
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
