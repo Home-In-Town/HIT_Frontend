@@ -6,8 +6,8 @@ export function getLeadGenUrl() {
   return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
 }
 
-import { Project, ProjectFormData, FileData, LayoutEntity, Landmark } from '@/types/project';
-export type { Project, ProjectFormData, FileData, LayoutEntity };
+import { Project, ProjectFormData, FileData, LayoutEntity, Landmark, Captain } from '@/types/project';
+export type { Project, ProjectFormData, FileData, LayoutEntity, Captain };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
@@ -290,7 +290,32 @@ export const projectsApi = {
     };
   },
 
-  
+  // Get all available captains
+  async getCaptains(): Promise<Captain[]> {
+    const response = await fetch(`${API_URL}/projects/captains`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any[]>(response);
+    return data.map(c => ({
+      id: String(c._id || c.id),
+      name: c.name || '',
+    }));
+  },
+
+  // Assign or unassign a captain to a project
+  async assignCaptain(projectId: string, captainId: string | null): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/assign-captain`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ captainId }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
 };
 
 export const mediaApi = {
