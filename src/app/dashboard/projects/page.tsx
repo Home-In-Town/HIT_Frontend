@@ -94,6 +94,16 @@ export default function ProjectsPage() {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  // Captain Assignment States
+  const [captainModalOpen, setCaptainModalOpen] = useState(false);
+  const [captainAssignLoading, setCaptainAssignLoading] = useState(false);
+  const [pendingAssignment, setPendingAssignment] = useState<{
+    projectId: string;
+    projectName: string;
+    captainId: string | null;
+    captainName: string | null;
+  } | null>(null);
+
   // Filter State
   const [filters, setFilters] = useState<FilterState>({
     searchQuery: '',
@@ -193,6 +203,41 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleAssignCaptain = async (projectId: string, captainId: string | null, captainName: string | null) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    setPendingAssignment({
+      projectId,
+      projectName: project.name,
+      captainId,
+      captainName,
+    });
+    setCaptainModalOpen(true);
+  };
+
+  const handleConfirmCaptainAssignment = async () => {
+    if (!pendingAssignment) return;
+
+    setCaptainAssignLoading(true);
+    try {
+      const updatedProject = await projectsApi.assignCaptain(pendingAssignment.projectId, pendingAssignment.captainId);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === pendingAssignment.projectId ? updatedProject : p))
+      );
+      toast.success(
+        pendingAssignment.captainName
+          ? `Captain assigned successfully`
+          : `Captain unassigned successfully`
+      );
+    } catch {
+      toast.error('Failed to update captain assignment');
+    } finally {
+      setCaptainAssignLoading(false);
+      setCaptainModalOpen(false);
+      setPendingAssignment(null);
+    }
+  };
+
   if (loading) {
     return (
         <div className="flex items-center justify-center h-screen bg-[#FAF7F2]">
@@ -235,6 +280,7 @@ export default function ProjectsPage() {
                         projects={filteredProjects} 
                         onDelete={handleDeleteClick}
                         onCopyLink={copyLink}
+                        onAssignCaptain={handleAssignCaptain}
                     />
                 ) : (
                     <ProjectGrid 
@@ -255,6 +301,23 @@ export default function ProjectsPage() {
         message={`This will permanently delete "${projectToDelete?.name}". This action cannot be undone.`}
         confirmText="Yes, Delete"
         isLoading={deleteLoading}
+      />
+
+      <ConfirmationModal
+        isOpen={captainModalOpen}
+        onClose={() => {
+          setCaptainModalOpen(false);
+          setPendingAssignment(null);
+        }}
+        onConfirm={handleConfirmCaptainAssignment}
+        title="Confirm Captain Assignment"
+        message={
+          pendingAssignment?.captainName
+            ? `Assign ${pendingAssignment.captainName} to ${pendingAssignment.projectName}?`
+            : `Unassign captain from ${pendingAssignment?.projectName}?`
+        }
+        confirmText="Confirm"
+        isLoading={captainAssignLoading}
       />
     </div>
   );

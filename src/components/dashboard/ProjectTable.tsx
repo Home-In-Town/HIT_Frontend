@@ -1,20 +1,31 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { Project } from '@/types/project';
+import { Project, Captain } from '@/types/project';
 import Link from 'next/link';
 import ProjectAnalyticsCard from '@/components/analytics/ProjectAnalyticsCard';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/authContext';
+import { projectsApi } from '@/lib/api';
+import CaptainCombobox from '@/components/dashboard/CaptainCombobox';
+import toast from 'react-hot-toast';
 
 interface ProjectTableProps {
   projects: Project[];
   onDelete: (project: Project) => void;
   onCopyLink: (link: string) => void;
+  onAssignCaptain?: (projectId: string, captainId: string | null, captainName: string | null) => Promise<void>;
 }
 
-export default function ProjectTable({ projects, onDelete, onCopyLink }: ProjectTableProps) {
+export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignCaptain }: ProjectTableProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [captainComboboxProjectId, setCaptainComboboxProjectId] = useState<string | null>(null);
+  const [captainTriggerEl, setCaptainTriggerEl] = useState<HTMLButtonElement | null>(null);
+  const [captains, setCaptains] = useState<Captain[]>([]);
+  const [captainsLoading, setCaptainsLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -32,6 +43,30 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
     if (price >= 10000000) return `₹${(price / 10000000).toFixed(1)}Cr`;
     if (price >= 100000) return `₹${(price / 100000).toFixed(1)}L`;
     return `₹${price.toLocaleString()}`;
+  };
+
+  const handleCaptainCellClick = async (projectId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    setCaptainTriggerEl(e.currentTarget);
+    setCaptainComboboxProjectId(projectId);
+    setCaptainsLoading(true);
+    try {
+      const data = await projectsApi.getCaptains();
+      setCaptains(data);
+    } catch {
+      toast.error('Failed to load captains');
+      setCaptainComboboxProjectId(null);
+      setCaptainTriggerEl(null);
+    } finally {
+      setCaptainsLoading(false);
+    }
+  };
+
+  const handleCaptainSelect = (captain: Captain | null, projectId: string) => {
+    setCaptainComboboxProjectId(null);
+    setCaptainTriggerEl(null);
+    if (onAssignCaptain) {
+      onAssignCaptain(projectId, captain?.id || null, captain?.name || null);
+    }
   };
 
   const getAdminStatus = (project: Project) => {
@@ -73,6 +108,9 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
               <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Location</th>
               <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Type</th>
               <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Status</th>
+              {isAdmin && (
+                <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Captain</th>
+              )}
               <th scope="col" className="px-6 py-4 text-right text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Price</th>
               <th scope="col" className="relative px-6 py-4">
                 <span className="sr-only">Actions</span>
@@ -129,6 +167,30 @@ export default function ProjectTable({ projects, onDelete, onCopyLink }: Project
                       </span>
                    </div>
                 </td>
+
+                {isAdmin && (
+                  <td className="px-6 py-3.5 whitespace-nowrap">
+                    <button
+                      onClick={(e) => handleCaptainCellClick(project.id, e)}
+                      className={`text-sm font-medium cursor-pointer hover:text-[#B45309] transition-colors ${
+                        project.owner?.name
+                          ? 'text-[#2A2A2A]'
+                          : 'text-[#A8A29E] italic'
+                      }`}
+                    >
+                      {project.owner?.name || 'Unassigned'}
+                    </button>
+                    {captainComboboxProjectId === project.id && (
+                      <CaptainCombobox
+                        captains={captains}
+                        isLoading={captainsLoading}
+                        onSelect={(captain) => handleCaptainSelect(captain, project.id)}
+                        onClose={() => { setCaptainComboboxProjectId(null); setCaptainTriggerEl(null); }}
+                        triggerEl={captainTriggerEl}
+                      />
+                    )}
+                  </td>
+                )}
 
                 <td className="px-6 py-3.5 whitespace-nowrap text-right text-sm font-bold text-[#2A2A2A] font-mono">
                   {formatPrice(project.startingPrice)}

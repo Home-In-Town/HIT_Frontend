@@ -103,6 +103,11 @@ export interface Project {
   };
 }
 
+export interface Captain {
+  id: string;
+  name: string;
+}
+
 export type ProjectFormData = Omit<Project, 'id' | 'slug' | 'trackableLink' | 'createdAt' | 'updatedAt'>;
 
 // Tracking Types

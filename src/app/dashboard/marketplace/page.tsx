@@ -153,6 +153,7 @@ export default function MarketplacePage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState<MarketplaceListing | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
+  const [myOwnProjects, setMyOwnProjects] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'browse' | 'listings' | 'admin'>('browse');
   const [activeView, setActiveView] = useState<'All' | 'Buy' | 'Sell'>('All');
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
@@ -217,6 +218,9 @@ export default function MarketplacePage() {
         ]);
         setListings(listingsData);
         
+        // Store user's own projects directly (backend already scoped by owner)
+        setMyOwnProjects(myProjects);
+
         // Merge uniquely
         const merged = [...publicProjects];
         myProjects.forEach(p => {
@@ -256,19 +260,21 @@ export default function MarketplacePage() {
   }, [projects, listings]);
 
   const unlistedProjects = useMemo(() => {
+    // Build set of project IDs already listed in the marketplace
     const listedProjectIds = new Set(listings.map(l => {
       const projId = typeof l.project === 'object' ? (l.project as any)?._id : l.project;
       return projId ? String(projId) : null;
     }).filter(Boolean));
 
-    const currentUserId = user?.id || (user as any)?._id;
+    // For non-admin: use myOwnProjects directly — backend already filters by owner,
+    // so no owner ID re-check needed. Handles null-owner projects correctly.
+    if (!isAdmin) {
+      return myOwnProjects.filter(p => !listedProjectIds.has(String(p.id)));
+    }
 
-    return projects.filter(p => {
-      const ownerId = typeof p.owner === 'object' ? (p.owner as any)?._id || (p.owner as any)?.id : p.owner;
-      const isMine = ownerId && currentUserId && String(ownerId) === String(currentUserId);
-      return isMine && !listedProjectIds.has(String(p.id));
-    });
-  }, [projects, listings, user]);
+    // Admin: show all projects, no owner filter
+    return projects.filter(p => !listedProjectIds.has(String(p.id)));
+  }, [projects, myOwnProjects, listings, isAdmin]);
 
   const myListedProjects = useMemo(() => {
     return listings.filter(l => {
