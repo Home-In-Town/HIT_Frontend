@@ -564,9 +564,9 @@ export default function MarketplacePage() {
 
           // Dark scrim at bottom
           doc.setFillColor(20, 18, 15);
-          doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 0.7 }));
           doc.rect(0, imgH - 45, pageWidth, 45, 'F');
-          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
 
           // Property name over image
           doc.setTextColor(255, 255, 255);
@@ -584,10 +584,10 @@ export default function MarketplacePage() {
           // Price badge top-right
           const priceStr = pdfPrice(details.price);
           const badgeW = doc.getTextWidth(priceStr) * 1.1 + 14;
-          doc.setGState(new (doc as any).GState({ opacity: 0.95 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 0.95 }));
           doc.setFillColor(180, 83, 9);
           doc.roundedRect(pageWidth - badgeW - 10, 10, badgeW, 11, 2, 2, 'F');
-          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(255, 255, 255);
@@ -816,7 +816,7 @@ export default function MarketplacePage() {
       }
 
       // ========== FOOTER ON ALL PAGES ==========
-      const totalPages = doc.getNumberOfPages();
+      const totalPages = (doc as any).getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         const fY = pageHeight - 7;
