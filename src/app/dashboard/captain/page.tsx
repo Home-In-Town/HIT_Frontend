@@ -329,7 +329,7 @@ export default function CaptainDashboardPage() {
           <div className="relative z-10 flex items-center justify-between">
             <div>
               <p className="text-[#B45309] text-[9px] font-bold uppercase tracking-[0.15em]">{greeting}</p>
-              <h1 className="text-lg font-bold text-white font-serif tracking-tight mt-0.5">{user.name}</h1>
+              <h1 className="text-base font-bold text-white font-serif tracking-tight mt-0.5">{user.name}</h1>
             </div>
             <div className="flex gap-3">
               <div className="text-center">
