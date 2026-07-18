@@ -519,11 +519,17 @@ export default function MarketplacePage() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
 
-      // Helper: load image as base64 (fetch as blob to avoid CORS)
+      // Helper: load image as base64 (proxy R2 URLs to avoid CORS)
+      const R2_HOST = 'pub-daa9113fecb449cfb19044d3d822effd.r2.dev';
       const loadImage = (url: string): Promise<{ data: string; w: number; h: number } | null> => {
         return new Promise(async (resolve) => {
           try {
-            const response = await fetch(url);
+            let fetchUrl = url;
+            if (url.includes(R2_HOST)) {
+              const path = url.split(R2_HOST)[1];
+              fetchUrl = `/r2-assets${path}`;
+            }
+            const response = await fetch(fetchUrl);
             const blob = await response.blob();
             const dataUrl = await new Promise<string>((res) => {
               const reader = new FileReader();
