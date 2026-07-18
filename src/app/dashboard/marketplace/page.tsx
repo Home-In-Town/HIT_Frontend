@@ -519,25 +519,22 @@ export default function MarketplacePage() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
 
-      // Helper: load image as base64
+      // Helper: load image as base64 (fetch as blob to avoid CORS)
       const loadImage = (url: string): Promise<{ data: string; w: number; h: number } | null> => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.naturalWidth;
-              canvas.height = img.naturalHeight;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                resolve({ data: canvas.toDataURL('image/jpeg', 0.85), w: img.naturalWidth, h: img.naturalHeight });
-              } else resolve(null);
-            } catch { resolve(null); }
-          };
-          img.onerror = () => resolve(null);
-          img.src = url;
+        return new Promise(async (resolve) => {
+          try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const dataUrl = await new Promise<string>((res) => {
+              const reader = new FileReader();
+              reader.onloadend = () => res(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            const img = new Image();
+            img.onload = () => resolve({ data: dataUrl, w: img.naturalWidth, h: img.naturalHeight });
+            img.onerror = () => resolve(null);
+            img.src = dataUrl;
+          } catch { resolve(null); }
         });
       };
 
@@ -567,9 +564,9 @@ export default function MarketplacePage() {
 
           // Dark scrim at bottom
           doc.setFillColor(20, 18, 15);
-          doc.setGState(new (doc as any).GState({ opacity: 0.7 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 0.7 }));
           doc.rect(0, imgH - 45, pageWidth, 45, 'F');
-          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
 
           // Property name over image
           doc.setTextColor(255, 255, 255);
@@ -587,10 +584,10 @@ export default function MarketplacePage() {
           // Price badge top-right
           const priceStr = pdfPrice(details.price);
           const badgeW = doc.getTextWidth(priceStr) * 1.1 + 14;
-          doc.setGState(new (doc as any).GState({ opacity: 0.95 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 0.95 }));
           doc.setFillColor(180, 83, 9);
           doc.roundedRect(pageWidth - badgeW - 10, 10, badgeW, 11, 2, 2, 'F');
-          doc.setGState(new (doc as any).GState({ opacity: 1 }));
+          (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.setTextColor(255, 255, 255);
@@ -819,7 +816,7 @@ export default function MarketplacePage() {
       }
 
       // ========== FOOTER ON ALL PAGES ==========
-      const totalPages = doc.getNumberOfPages();
+      const totalPages = (doc as any).getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
         const fY = pageHeight - 7;
@@ -844,7 +841,7 @@ export default function MarketplacePage() {
 
         // URL
         if (details.slug) {
-          const url = `${window.location.origin}/visit/${details.slug}`;
+          const url = `https://www.homeintown.in/visit/${details.slug}`;
           doc.setTextColor(180, 83, 9);
           doc.text(url, pageWidth - margin - doc.getTextWidth(url), fY);
         }

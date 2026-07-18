@@ -164,97 +164,74 @@ export default function BuilderDashboardPage() {
   }
 
   async function handleDownloadPDF(property: ProjectCard) {
-    toast.loading('Generating PDF...', { id: 'pdf' });
+    toast.loading('Generating brochure...', { id: 'pdf' });
     try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pw = doc.internal.pageSize.getWidth();
-      const m = 14;
-      let y = 0;
+      // Fetch full project data for rich PDF content
+      const { projectsApi, shareApi } = await import('@/lib/api');
+      const { generateProjectPdf } = await import('@/utils/generateProjectPdf');
 
-      // Cover image
-      if (property.coverImage) {
-        try {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          await new Promise<void>((res, rej) => { img.onload = () => res(); img.onerror = () => rej(); img.src = property.coverImage!; });
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) { ctx.drawImage(img, 0, 0); const d = canvas.toDataURL('image/jpeg', 0.8); doc.addImage(d, 'JPEG', 0, 0, pw, 100); }
-        } catch { /* skip */ }
-      }
+      const [fullProject, contactInfo] = await Promise.all([
+        projectsApi.getById(property.id).catch(() => null),
+        shareApi.getMyContact().catch(() => null),
+      ]);
 
-      // Dark overlay
-      (doc as any).setGState(new (doc as any).GState({ opacity: 0.65 }));
-      doc.setFillColor(20, 18, 15);
-      doc.rect(0, 60, pw, 40, 'F');
-      (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
+      // Generate share token for tracking
+      const shareResult = await shareApi.generateToken(property.id, 'pdf').catch(() => null);
+      const shareUrl = shareResult?.shareUrl || `https://www.homeintown.in/visit/${property.slug}`;
 
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(22); doc.setFont('helvetica', 'bold');
-      doc.text(property.name, m, 78);
-      doc.setFontSize(10); doc.setFont('helvetica', 'normal');
-      doc.setTextColor(210, 210, 210);
-      doc.text(`${property.location || property.city}`, m, 88);
+      // Build PDF data from full project or fallback to card data
+      const getImageUrl = (img: any): string | null => {
+        if (!img) return null;
+        if (typeof img === 'string') return img;
+        return img?.url || null;
+      };
 
-      // Price badge
-      const priceStr = formatPrice(property.price);
-      doc.setFillColor(180, 83, 9);
-      const bw = doc.getTextWidth(priceStr) + 12;
-      doc.roundedRect(pw - bw - m, 10, bw, 10, 2, 2, 'F');
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(255, 255, 255);
-      doc.text(priceStr, pw - bw - m + 6, 17);
+      const pdfData = {
+        id: property.id,
+        name: property.name,
+        type: property.type,
+        city: property.city,
+        location: property.location,
+        price: property.price,
+        startingPrice: property.price,
+        pricePerSqFt: property.pricePerSqFt,
+        priceRange: property.priceRange,
+        area: property.area,
+        bhkOptions: property.bhkOptions,
+        amenities: property.amenities,
+        coverImage: property.coverImage || getImageUrl(fullProject?.coverImage),
+        galleryImages: fullProject?.galleryImages?.map((img: any) => getImageUrl(img)).filter(Boolean) as string[] || [],
+        layoutImage: fullProject?.layoutImage ? getImageUrl(fullProject.layoutImage) : null,
+        slug: property.slug,
+        reraApproved: property.reraApproved,
+        reraNumber: (fullProject as any)?.reraNumber || '',
+        projectStatus: property.projectStatus,
+        bankLoanAvailable: property.bankLoanAvailable,
+        gatedCommunity: property.gatedCommunity,
+        floorRange: property.floorRange,
+        facingOptions: property.facingOptions,
+        paymentPlan: (fullProject as any)?.paymentPlan || '',
+        landmarks: (fullProject as any)?.landmarks || [],
+      };
 
-      y = 110;
+      // Contact info (fallback if not authenticated or API fails)
+      const contact = contactInfo || {
+        name: user?.name || 'HomeInTown',
+        phone: user?.phone || '',
+        email: null,
+        companyName: user?.companyName || null,
+        businessLogoUrl: null,
+        businessAddress: null,
+        businessCity: null,
+        businessState: null,
+        role: user?.role || 'builder',
+      };
 
-      // Details
-      doc.setFillColor(180, 83, 9); doc.rect(m, y, 25, 0.8, 'F'); y += 7;
-      doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(28, 25, 23);
-      doc.text('Property Overview', m, y); y += 9;
-
-      const details: [string, string][] = [
-        ['TYPE', property.type.charAt(0).toUpperCase() + property.type.slice(1)],
-        ['AREA', property.area || 'On Request'],
-        ['PRICE', formatPrice(property.price)],
-        ['RATE', property.pricePerSqFt ? `Rs. ${property.pricePerSqFt.toLocaleString('en-IN')}/sqft` : 'On Request'],
-        ['LOCATION', `${(property.location || '').split(',')[0]}, ${(property.city || '').split(',')[0]}`],
-        ['BHK', property.bhkOptions.length ? property.bhkOptions.join(', ') : '-'],
-      ];
-      const cw = (pw - m * 2) / 3;
-      details.forEach(([label, val], i) => {
-        const cx = m + (i % 3) * cw;
-        const cy = y + Math.floor(i / 3) * 15;
-        doc.setFontSize(6.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(160, 155, 150);
-        doc.text(label, cx, cy);
-        doc.setFontSize(9.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(28, 25, 23);
-        doc.text(val, cx, cy + 5);
-      });
-      y += Math.ceil(details.length / 3) * 15 + 8;
-
-      // Amenities
-      if (property.amenities && property.amenities.length > 0) {
-        doc.setFillColor(180, 83, 9); doc.rect(m, y, 25, 0.8, 'F'); y += 7;
-        doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(28, 25, 23);
-        doc.text('Amenities', m, y); y += 7;
-        doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(80, 80, 80);
-        doc.text(property.amenities.slice(0, 10).join('  â€¢  '), m, y);
-        y += 10;
-      }
-
-      // Footer
-      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 155, 150);
-      doc.text('HomeInTown | Property Brochure', m, doc.internal.pageSize.getHeight() - 7);
-      if (property.slug) {
-        const url = `${window.location.origin}/visit/${property.slug}`;
-        doc.setTextColor(180, 83, 9);
-        doc.text(url, pw - m - doc.getTextWidth(url), doc.internal.pageSize.getHeight() - 7);
-      }
-
-      doc.save(`${property.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 25)}_Brochure.pdf`);
-      toast.success('PDF downloaded!', { id: 'pdf' });
-    } catch {
-      toast.error('Failed to generate PDF', { id: 'pdf' });
+      await generateProjectPdf(pdfData, contact, shareUrl);
+      toast.success('Brochure downloaded!', { id: 'pdf' });
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      toast.error('Failed to generate brochure', { id: 'pdf' });
     }
   }
 
