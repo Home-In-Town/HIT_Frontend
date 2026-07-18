@@ -48,10 +48,10 @@ function statusLabel(status: string | undefined): string {
 
 async function loadImageAsDataUrl(url: string): Promise<string | null> {
   try {
-    // Proxy R2 URLs through Next.js rewrite to avoid CORS in development
+    // Proxy R2 URLs through Next.js rewrite to avoid CORS issues
     let fetchUrl = url;
     const R2_HOST = 'pub-daa9113fecb449cfb19044d3d822effd.r2.dev';
-    if (typeof window !== 'undefined' && window.location.hostname === 'localhost' && url.includes(R2_HOST)) {
+    if (url.includes(R2_HOST)) {
       const path = url.split(R2_HOST)[1];
       fetchUrl = `/r2-assets${path}`;
     }
