@@ -519,25 +519,22 @@ export default function MarketplacePage() {
       const pageHeight = doc.internal.pageSize.getHeight();
       const margin = 14;
 
-      // Helper: load image as base64
+      // Helper: load image as base64 (fetch as blob to avoid CORS)
       const loadImage = (url: string): Promise<{ data: string; w: number; h: number } | null> => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            try {
-              const canvas = document.createElement('canvas');
-              canvas.width = img.naturalWidth;
-              canvas.height = img.naturalHeight;
-              const ctx = canvas.getContext('2d');
-              if (ctx) {
-                ctx.drawImage(img, 0, 0);
-                resolve({ data: canvas.toDataURL('image/jpeg', 0.85), w: img.naturalWidth, h: img.naturalHeight });
-              } else resolve(null);
-            } catch { resolve(null); }
-          };
-          img.onerror = () => resolve(null);
-          img.src = url;
+        return new Promise(async (resolve) => {
+          try {
+            const response = await fetch(url);
+            const blob = await response.blob();
+            const dataUrl = await new Promise<string>((res) => {
+              const reader = new FileReader();
+              reader.onloadend = () => res(reader.result as string);
+              reader.readAsDataURL(blob);
+            });
+            const img = new Image();
+            img.onload = () => resolve({ data: dataUrl, w: img.naturalWidth, h: img.naturalHeight });
+            img.onerror = () => resolve(null);
+            img.src = dataUrl;
+          } catch { resolve(null); }
         });
       };
 
@@ -844,7 +841,7 @@ export default function MarketplacePage() {
 
         // URL
         if (details.slug) {
-          const url = `${window.location.origin}/visit/${details.slug}`;
+          const url = `https://www.homeintown.in/visit/${details.slug}`;
           doc.setTextColor(180, 83, 9);
           doc.text(url, pageWidth - margin - doc.getTextWidth(url), fY);
         }

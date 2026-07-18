@@ -1854,3 +1854,105 @@ export const profileApi = {
     return transformUserBackendToFrontend(result.user);
   },
 };
+
+/* ----------------------------------
+   Share API — Personalized sharing with contact details
+-----------------------------------*/
+
+export interface ShareContactInfo {
+  name: string;
+  phone: string;
+  email: string | null;
+  companyName: string | null;
+  businessLogoUrl: string | null;
+  businessAddress: string | null;
+  businessCity: string | null;
+  businessState: string | null;
+  businessPinCode?: string | null;
+  role: string;
+}
+
+export interface ShareTokenResponse {
+  token: string;
+  shareUrl: string;
+  type: 'link' | 'pdf' | 'qr';
+  projectId: string;
+}
+
+export interface ResolvedShareData {
+  project: any;
+  sharedBy: ShareContactInfo;
+  type: string;
+  viewCount: number;
+}
+
+export interface ShareRecord {
+  _id: string;
+  token: string;
+  project: { _id: string; projectName: string; slug: string; city?: string; media?: { coverImage?: { url: string } } };
+  type: 'link' | 'pdf' | 'qr';
+  viewCount: number;
+  lastViewedAt?: string;
+  createdAt: string;
+}
+
+export const shareApi = {
+  /**
+   * Generate a personalized share token for a project.
+   * The authenticated user's contact details are tied to this token.
+   */
+  async generateToken(projectId: string, type: 'link' | 'pdf' | 'qr'): Promise<ShareTokenResponse> {
+    const response = await fetch(`${API_URL}/share/generate`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, type }),
+    });
+    return handleResponse<ShareTokenResponse>(response);
+  },
+
+  /**
+   * Resolve a share token (public — no auth).
+   * Returns the project data + sharer's contact info.
+   */
+  async resolveToken(token: string): Promise<ResolvedShareData> {
+    const response = await fetch(`${API_URL}/public/share/${token}`, COMMON_FETCH_OPTIONS);
+    return handleResponse<ResolvedShareData>(response);
+  },
+
+  /**
+   * Get the authenticated user's contact info for PDF embedding.
+   */
+  async getMyContact(): Promise<ShareContactInfo> {
+    const response = await fetch(`${API_URL}/share/my-contact`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ contactInfo: ShareContactInfo }>(response);
+    return data.contactInfo;
+  },
+
+  /**
+   * Get all share tokens created by the current user (for analytics).
+   */
+  async getMyShares(): Promise<ShareRecord[]> {
+    const response = await fetch(`${API_URL}/share/my-shares`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ shares: ShareRecord[] }>(response);
+    return data.shares;
+  },
+
+  /**
+   * Deactivate a share token (disables the shared link).
+   */
+  async deactivateToken(token: string): Promise<void> {
+    const response = await fetch(`${API_URL}/share/${token}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'DELETE',
+      headers: getAuthHeaders(),
+    });
+    await handleResponse(response);
+  },
+};

@@ -30,6 +30,10 @@ const nextConfig: NextConfig = {
         source: '/api/:path*',
         destination: backendUrl + '/:path*',
       },
+      {
+        source: '/r2-assets/:path*',
+        destination: 'https://pub-daa9113fecb449cfb19044d3d822effd.r2.dev/:path*',
+      },
     ];
   },
 };
