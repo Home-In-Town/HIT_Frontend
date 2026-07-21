@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { marketplaceApi, projectsApi, MarketplaceListing, MarketplaceAction } from '@/lib/api';
+import { marketplaceApi, projectsApi, shareApi, MarketplaceListing, MarketplaceAction } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -508,354 +508,86 @@ export default function MarketplacePage() {
       });
   };
 
+  const handleGenerateQR = (e: React.MouseEvent, slug: string, name: string) => {
+    e.stopPropagation();
+    if (!slug) {
+      toast.error("QR not available for this listing");
+      return;
+    }
+    const url = `${window.location.origin}/visit/${slug}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+    const link = document.createElement('a');
+    link.href = qrUrl;
+    link.download = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_QR.png`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success('QR code downloading!');
+  };
+
   const handleDownloadPDF = async (e: React.MouseEvent, details: any, item: any) => {
     e.stopPropagation();
     toast.loading('Generating brochure...', { id: 'pdf-gen' });
 
     try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 14;
+      const { generateProjectPdf } = await import('@/utils/generateProjectPdf');
 
-      // Helper: load image as base64 (proxy R2 URLs to avoid CORS)
-      const R2_HOST = 'pub-daa9113fecb449cfb19044d3d822effd.r2.dev';
-      const loadImage = (url: string): Promise<{ data: string; w: number; h: number } | null> => {
-        return new Promise(async (resolve) => {
-          try {
-            let fetchUrl = url;
-            if (url.includes(R2_HOST)) {
-              const path = url.split(R2_HOST)[1];
-              fetchUrl = `/r2-assets${path}`;
-            }
-            const response = await fetch(fetchUrl);
-            const blob = await response.blob();
-            const dataUrl = await new Promise<string>((res) => {
-              const reader = new FileReader();
-              reader.onloadend = () => res(reader.result as string);
-              reader.readAsDataURL(blob);
-            });
-            const img = new Image();
-            img.onload = () => resolve({ data: dataUrl, w: img.naturalWidth, h: img.naturalHeight });
-            img.onerror = () => resolve(null);
-            img.src = dataUrl;
-          } catch { resolve(null); }
-        });
+      const [fullProject, contactInfo] = await Promise.all([
+        projectsApi.getById(details._id).catch(() => null),
+        shareApi.getMyContact().catch(() => null),
+      ]);
+
+      const shareResult = await shareApi.generateToken(details._id, 'pdf').catch(() => null);
+      const shareUrl = shareResult?.shareUrl || `https://www.homeintown.in/visit/${details.slug}`;
+
+      const getImageUrl = (img: any): string | null => {
+        if (!img) return null;
+        if (typeof img === 'string') return img;
+        return img?.url || null;
       };
 
-      // Price formatter for PDF (Rs. instead of unicode rupee)
-      const pdfPrice = (price: number) => {
-        if (!price || price === 0) return 'Price on Request';
-        if (price >= 10000000) return `Rs. ${(price / 10000000).toFixed(2)} Cr`;
-        if (price >= 100000) return `Rs. ${(price / 100000).toFixed(2)} Lacs`;
-        return `Rs. ${price.toLocaleString('en-IN')}`;
+      const pdfData = {
+        id: details._id,
+        name: details.name,
+        type: details.type || 'flat',
+        city: details.city,
+        location: details.location,
+        price: details.price,
+        startingPrice: details.price,
+        pricePerSqFt: details.pricePerSqFt,
+        priceRange: details.priceRange || '',
+        area: details.area,
+        bhkOptions: details.bhkOptions || [],
+        amenities: details.amenities || [],
+        coverImage: details.media || getImageUrl(fullProject?.coverImage),
+        galleryImages: fullProject?.galleryImages?.map((img: any) => getImageUrl(img)).filter(Boolean) as string[] || [],
+        layoutImage: fullProject?.layoutImage ? getImageUrl(fullProject.layoutImage) : null,
+        slug: details.slug,
+        reraApproved: details.reraApproved || false,
+        reraNumber: (fullProject as any)?.reraNumber || '',
+        projectStatus: details.projectStatus || '',
+        bankLoanAvailable: details.bankLoanAvailable || false,
+        gatedCommunity: details.gatedCommunity || false,
+        floorRange: details.floorRange || '',
+        facingOptions: (fullProject as any)?.facingOptions || (fullProject as any)?.configuration?.facingOptions || [],
+        paymentPlan: (fullProject as any)?.paymentPlan || '',
+        landmarks: (fullProject as any)?.landmarks || [],
       };
-      const pdfRate = (rate: number) => {
-        if (!rate || rate === 0) return 'On Request';
-        return `Rs. ${rate.toLocaleString('en-IN')}/sq.ft`;
+
+      const contact = contactInfo || {
+        name: user?.name || 'HomeInTown',
+        phone: user?.phone || '',
+        email: null,
+        companyName: user?.companyName || null,
+        businessLogoUrl: null,
+        businessAddress: null,
+        businessCity: null,
+        businessState: null,
+        role: user?.role || 'captain',
       };
 
-      // ========== PAGE 1: HERO COVER ==========
-
-      // Full-bleed cover image with dark overlay
-      let coverLoaded = false;
-      let y = 0;
-      if (details.media) {
-        const coverData = await loadImage(details.media);
-        if (coverData) {
-          coverLoaded = true;
-          const imgH = Math.min((coverData.h / coverData.w) * pageWidth, 135);
-          doc.addImage(coverData.data, 'JPEG', 0, 0, pageWidth, imgH);
-
-          // Dark scrim at bottom
-          doc.setFillColor(20, 18, 15);
-          (doc as any).setGState(new (doc as any).GState({ opacity: 0.7 }));
-          doc.rect(0, imgH - 45, pageWidth, 45, 'F');
-          (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
-
-          // Property name over image
-          doc.setTextColor(255, 255, 255);
-          doc.setFontSize(26);
-          doc.setFont('helvetica', 'bold');
-          const nameLines = doc.splitTextToSize(details.name, pageWidth - margin * 2 - 50);
-          doc.text(nameLines, margin, imgH - 25);
-
-          // Location
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'normal');
-          doc.setTextColor(210, 210, 210);
-          doc.text(details.location || details.city || '', margin, imgH - 12);
-
-          // Price badge top-right
-          const priceStr = pdfPrice(details.price);
-          const badgeW = doc.getTextWidth(priceStr) * 1.1 + 14;
-          (doc as any).setGState(new (doc as any).GState({ opacity: 0.95 }));
-          doc.setFillColor(180, 83, 9);
-          doc.roundedRect(pageWidth - badgeW - 10, 10, badgeW, 11, 2, 2, 'F');
-          (doc as any).setGState(new (doc as any).GState({ opacity: 1 }));
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.setTextColor(255, 255, 255);
-          doc.text(priceStr, pageWidth - badgeW - 10 + 7, 17.5);
-
-          y = imgH + 6;
-        }
-      }
-
-      if (!coverLoaded) {
-        // Fallback styled header without image
-        doc.setFillColor(28, 25, 23);
-        doc.rect(0, 0, pageWidth, 65, 'F');
-        doc.setFillColor(180, 83, 9);
-        doc.rect(0, 65, pageWidth, 3, 'F');
-
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(26);
-        doc.setFont('helvetica', 'bold');
-        doc.text(details.name, margin, 30);
-
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(200, 200, 200);
-        doc.text(details.location || details.city || '', margin, 42);
-
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 83, 9);
-        doc.text(pdfPrice(details.price), margin, 56);
-
-        y = 76;
-      }
-
-      // ===== Property Details Section =====
-      doc.setFillColor(180, 83, 9);
-      doc.rect(margin, y, 25, 0.8, 'F');
-      y += 7;
-
-      doc.setFontSize(11);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(28, 25, 23);
-      doc.text('Property Overview', margin, y);
-      y += 9;
-
-      // 3-column grid of details
-      const detailItems: { label: string; value: string }[] = [
-        { label: 'TYPE', value: details.type ? details.type.charAt(0).toUpperCase() + details.type.slice(1) : 'Residential' },
-        { label: 'AREA', value: details.area || 'On Request' },
-        { label: 'PRICE', value: pdfPrice(details.price) },
-        { label: 'RATE', value: pdfRate(details.pricePerSqFt) },
-        { label: 'LOCATION', value: `${(details.location || '').split(',')[0].trim()}, ${(details.city || '').split(',')[0].trim()}` },
-        { label: 'LISTED BY', value: details.listedBy || '' },
-      ];
-
-      const gridCols = 3;
-      const cellW = (pageWidth - margin * 2) / gridCols;
-      const cellH = 16;
-
-      detailItems.forEach((d, idx) => {
-        const colIdx = idx % gridCols;
-        const rowIdx = Math.floor(idx / gridCols);
-        const x = margin + colIdx * cellW;
-        const cellY = y + rowIdx * cellH;
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(160, 155, 150);
-        doc.text(d.label, x, cellY);
-
-        doc.setFontSize(9.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(28, 25, 23);
-        const valLines = doc.splitTextToSize(d.value, cellW - 4);
-        doc.text(valLines[0] || '-', x, cellY + 5);
-      });
-
-      y += Math.ceil(detailItems.length / gridCols) * cellH + 4;
-
-      // Description section
-      const description = (item as any).description
-        ? (item as any).description.replace(/^TARGET LOCATION:.*\n\n?/, '')
-        : '';
-      if (description && y < pageHeight - 55) {
-        doc.setFillColor(180, 83, 9);
-        doc.rect(margin, y, 25, 0.8, 'F');
-        y += 7;
-
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(28, 25, 23);
-        doc.text('About', margin, y);
-        y += 7;
-
-        doc.setFontSize(8.5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(80, 80, 80);
-        const descLines = doc.splitTextToSize(description, pageWidth - margin * 2);
-        const maxLines = Math.min(descLines.length, 6);
-        doc.text(descLines.slice(0, maxLines), margin, y);
-        y += maxLines * 4 + 6;
-      }
-
-      // Amenities (chip-style)
-      if (details.amenities && details.amenities.length > 0 && y < pageHeight - 45) {
-        doc.setFillColor(180, 83, 9);
-        doc.rect(margin, y, 25, 0.8, 'F');
-        y += 7;
-
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(28, 25, 23);
-        doc.text('Amenities', margin, y);
-        y += 8;
-
-        doc.setFontSize(7.5);
-        doc.setFont('helvetica', 'normal');
-        let ax = margin;
-        const maxAx = pageWidth - margin;
-        details.amenities.slice(0, 14).forEach((amenity: string) => {
-          const tw = doc.getTextWidth(amenity) + 5;
-          if (ax + tw > maxAx) { ax = margin; y += 6.5; }
-          doc.setFillColor(245, 242, 238);
-          doc.roundedRect(ax, y - 3, tw, 5, 1.2, 1.2, 'F');
-          doc.setTextColor(70, 65, 60);
-          doc.text(amenity, ax + 2.5, y);
-          ax += tw + 1.5;
-        });
-        y += 10;
-      }
-
-      // Contact banner
-      if (y > pageHeight - 32) { doc.addPage(); y = margin; }
-
-      const contactH = 20;
-      doc.setFillColor(28, 25, 23);
-      doc.roundedRect(margin, y, pageWidth - margin * 2, contactH, 2.5, 2.5, 'F');
-      doc.setFillColor(180, 83, 9);
-      doc.rect(margin, y, 2.5, contactH, 'F');
-
-      doc.setFontSize(6.5);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(180, 83, 9);
-      doc.text('CONTACT', margin + 7, y + 5.5);
-
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(255, 255, 255);
-      doc.text(details.listedBy || 'Builder', margin + 7, y + 12);
-
-      if (details.listedByPhone) {
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(200, 200, 200);
-        doc.text(details.listedByPhone, margin + 7, y + 17);
-      }
-      if (details.companyName) {
-        doc.setFontSize(8.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(180, 83, 9);
-        const cw = doc.getTextWidth(details.companyName);
-        doc.text(details.companyName, pageWidth - margin - 7 - cw, y + 12);
-      }
-
-      // ========== PAGE 2: GALLERY ==========
-      const allImages: string[] = [];
-      if (details.media) allImages.push(details.media);
-      if (details.galleryImages?.length) {
-        allImages.push(...details.galleryImages.slice(0, 7));
-      }
-      if (details.layoutImage) allImages.push(details.layoutImage);
-
-      const uniqueImages = [...new Set(allImages)];
-
-      if (uniqueImages.length > 1) {
-        doc.addPage();
-
-        // Gallery header bar
-        doc.setFillColor(28, 25, 23);
-        doc.rect(0, 0, pageWidth, 20, 'F');
-        doc.setFillColor(180, 83, 9);
-        doc.rect(0, 20, pageWidth, 1.5, 'F');
-
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(255, 255, 255);
-        doc.text('PROPERTY GALLERY', margin, 13);
-
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(180, 83, 9);
-        const cntTxt = `${uniqueImages.length} Photos`;
-        doc.text(cntTxt, pageWidth - margin - doc.getTextWidth(cntTxt), 13);
-
-        let gy = 27;
-
-        // First image large (hero style)
-        const heroImg = await loadImage(uniqueImages[0]);
-        if (heroImg) {
-          const heroW = pageWidth - margin * 2;
-          const heroH = Math.min((heroImg.h / heroImg.w) * heroW, 80);
-          doc.addImage(heroImg.data, 'JPEG', margin, gy, heroW, heroH);
-          gy += heroH + 3;
-        }
-
-        // Remaining images in 2-col grid
-        const gap = 3;
-        const colW = (pageWidth - margin * 2 - gap) / 2;
-        const thumbH = 52;
-        let imgCol = 0;
-
-        for (let i = 1; i < uniqueImages.length && i < 8; i++) {
-          if (gy + thumbH > pageHeight - 12) {
-            doc.addPage();
-            gy = margin;
-          }
-          const imgResult = await loadImage(uniqueImages[i]);
-          if (!imgResult) continue;
-
-          const x = margin + imgCol * (colW + gap);
-          doc.addImage(imgResult.data, 'JPEG', x, gy, colW, thumbH);
-
-          imgCol++;
-          if (imgCol >= 2) { imgCol = 0; gy += thumbH + gap; }
-        }
-      }
-
-      // ========== FOOTER ON ALL PAGES ==========
-      const totalPages = (doc as any).getNumberOfPages();
-      for (let i = 1; i <= totalPages; i++) {
-        doc.setPage(i);
-        const fY = pageHeight - 7;
-
-        // Amber accent line
-        doc.setFillColor(180, 83, 9);
-        doc.rect(margin, fY - 3, pageWidth - margin * 2, 0.3, 'F');
-
-        doc.setFontSize(6.5);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(28, 25, 23);
-        doc.text('HomeInTown', margin, fY);
-
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(160, 155, 150);
-        doc.text(' | Property Brochure', margin + doc.getTextWidth('HomeInTown'), fY);
-
-        // Page
-        const pg = `${i}/${totalPages}`;
-        const pgW = doc.getTextWidth(pg);
-        doc.text(pg, (pageWidth - pgW) / 2, fY);
-
-        // URL
-        if (details.slug) {
-          const url = `https://www.homeintown.in/visit/${details.slug}`;
-          doc.setTextColor(180, 83, 9);
-          doc.text(url, pageWidth - margin - doc.getTextWidth(url), fY);
-        }
-      }
-
-      // Save
-      const fileName = `${details.name.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 30)}_Brochure.pdf`;
-      doc.save(fileName);
+      await generateProjectPdf(pdfData, contact, shareUrl);
       toast.success('Brochure downloaded!', { id: 'pdf-gen' });
     } catch (err) {
       console.error('PDF generation failed:', err);
@@ -1141,6 +873,18 @@ export default function MarketplacePage() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                   </svg>
                                 </button>
+                                {details.slug && (
+                                  <button
+                                    onClick={(e) => handleGenerateQR(e, details.slug, details.name)}
+                                    className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
+                                    title="Download QR"
+                                  >
+                                    <svg className="w-2.5 h-2.5 md:w-3 md:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75H16.5v-.75z" />
+                                    </svg>
+                                  </button>
+                                )}
                               </div>
                             </div>
 
