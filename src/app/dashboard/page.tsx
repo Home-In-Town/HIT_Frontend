@@ -36,7 +36,11 @@ export default function DashboardPage() {
         }
         break;
       case 'unassigned':
-        router.replace('/dashboard/pending');
+        if (user.employerId) {
+          router.replace('/dashboard/employee/assignment');
+        } else {
+          router.replace('/dashboard/pending');
+        }
         break;
       case 'captain':
         router.replace('/dashboard/captain');

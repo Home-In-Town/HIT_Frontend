@@ -104,6 +104,16 @@ export default function ProjectsPage() {
     captainName: string | null;
   } | null>(null);
 
+  // Agent Assignment States (captain assigning agents)
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [agentAssignLoading, setAgentAssignLoading] = useState(false);
+  const [pendingAgentAssignment, setPendingAgentAssignment] = useState<{
+    projectId: string;
+    projectName: string;
+    agentId: string | null;
+    agentName: string | null;
+  } | null>(null);
+
   // Filter State
   const [filters, setFilters] = useState<FilterState>({
     searchQuery: '',
@@ -238,6 +248,41 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleAssignAgent = async (projectId: string, agentId: string | null, agentName: string | null) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    setPendingAgentAssignment({
+      projectId,
+      projectName: project.name,
+      agentId,
+      agentName,
+    });
+    setAgentModalOpen(true);
+  };
+
+  const handleConfirmAgentAssignment = async () => {
+    if (!pendingAgentAssignment) return;
+
+    setAgentAssignLoading(true);
+    try {
+      const updatedProject = await projectsApi.assignAgent(pendingAgentAssignment.projectId, pendingAgentAssignment.agentId);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === pendingAgentAssignment.projectId ? updatedProject : p))
+      );
+      toast.success(
+        pendingAgentAssignment.agentName
+          ? `Agent assigned successfully`
+          : `Agent unassigned successfully`
+      );
+    } catch {
+      toast.error('Failed to update agent assignment');
+    } finally {
+      setAgentAssignLoading(false);
+      setAgentModalOpen(false);
+      setPendingAgentAssignment(null);
+    }
+  };
+
   if (loading) {
     return (
         <div className="flex items-center justify-center h-screen bg-[#FAF7F2]">
@@ -281,6 +326,7 @@ export default function ProjectsPage() {
                         onDelete={handleDeleteClick}
                         onCopyLink={copyLink}
                         onAssignCaptain={handleAssignCaptain}
+                        onAssignAgent={handleAssignAgent}
                     />
                 ) : (
                     <ProjectGrid 
@@ -318,6 +364,23 @@ export default function ProjectsPage() {
         }
         confirmText="Confirm"
         isLoading={captainAssignLoading}
+      />
+
+      <ConfirmationModal
+        isOpen={agentModalOpen}
+        onClose={() => {
+          setAgentModalOpen(false);
+          setPendingAgentAssignment(null);
+        }}
+        onConfirm={handleConfirmAgentAssignment}
+        title="Confirm Agent Assignment"
+        message={
+          pendingAgentAssignment?.agentName
+            ? `Assign ${pendingAgentAssignment.agentName} to ${pendingAgentAssignment.projectName}?`
+            : `Unassign agent from ${pendingAgentAssignment?.projectName}?`
+        }
+        confirmText="Confirm"
+        isLoading={agentAssignLoading}
       />
     </div>
   );

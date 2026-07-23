@@ -101,9 +101,20 @@ export interface Project {
     companyName?: string;
     role: string;
   };
+  assignedAgent?: {
+    id: string;
+    _id: string;
+    name: string;
+    phone?: string;
+  } | null;
 }
 
 export interface Captain {
+  id: string;
+  name: string;
+}
+
+export interface Agent {
   id: string;
   name: string;
 }

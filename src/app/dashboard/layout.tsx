@@ -267,21 +267,39 @@ const orgPath = user
           )}
 
           {user?.role === 'employee' && (
-            <Link
-              href="/dashboard/employee/history"
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                isActive('/dashboard/employee/history')
-                  ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
-                  : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
-              } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
-              title={isCollapsed ? "Archive" : ""}
-            >
-              <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Archive</span>}
-            </Link>
+            <>
+              <Link
+                href="/dashboard/projects"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/projects')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "My Projects" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">My Projects</span>}
+              </Link>
+
+              <Link
+                href="/dashboard/employee/history"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/employee/history')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Archive" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Archive</span>}
+              </Link>
+            </>
           )}
 
           {user?.role === 'captain' && (
@@ -332,6 +350,22 @@ const orgPath = user
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">CRM</span>}
+              </Link>
+
+              <Link
+                href="/dashboard/employees"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/employees')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Field Team" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Field Team</span>}
               </Link>
             </>
           )}
