@@ -6,8 +6,8 @@ export function getLeadGenUrl() {
   return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
 }
 
-import { Project, ProjectFormData, FileData, LayoutEntity, Landmark, Captain } from '@/types/project';
-export type { Project, ProjectFormData, FileData, LayoutEntity, Captain };
+import { Project, ProjectFormData, FileData, LayoutEntity, Landmark, Captain, Agent } from '@/types/project';
+export type { Project, ProjectFormData, FileData, LayoutEntity, Captain, Agent };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
@@ -112,6 +112,10 @@ export function transformBackendToFrontend(backendProject: any): Project {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
     } : undefined,
+    assignedAgent: backendProject.assignedAgent ? {
+      ...backendProject.assignedAgent,
+      id: String(backendProject.assignedAgent.id || backendProject.assignedAgent._id || ''),
+    } : null,
   };
 }
 
@@ -311,6 +315,33 @@ export const projectsApi = {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ captainId }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
+
+  // Get agents under the logged-in captain
+  async getMyAgents(): Promise<{ id: string; name: string }[]> {
+    const response = await fetch(`${API_URL}/projects/my-agents`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any[]>(response);
+    return data.map(a => ({
+      id: String(a._id || a.id),
+      name: a.name || '',
+    }));
+  },
+
+  // Assign or unassign an agent to a project (captain only)
+  async assignAgent(projectId: string, agentId: string | null): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/assign-agent`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ agentId }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any>(response);

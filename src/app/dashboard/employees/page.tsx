@@ -12,7 +12,7 @@ export default function EmployeesPage() {
   const isLoading = status === 'loading';
 
   useEffect(() => {
-    if (!isLoading && (!user || (user.role !== 'admin' && user.role !== 'builder' && user.role !== 'agent'))) {
+    if (!isLoading && (!user || (user.role !== 'admin' && user.role !== 'builder' && user.role !== 'agent' && user.role !== 'captain'))) {
       router.push('/login');
     }
   }, [user, status, router, isLoading]);
