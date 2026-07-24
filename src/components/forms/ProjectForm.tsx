@@ -122,6 +122,10 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   const MAX_VIDEOS = 2;
   const [uploading, setUploading] = useState(false);
   const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [customAmenity, setCustomAmenity] = useState('');
+  const [customAmenities, setCustomAmenities] = useState<string[]>([]);
+  const [customPropertyType, setCustomPropertyType] = useState('');
+  const [showCustomPropertyInput, setShowCustomPropertyInput] = useState(false);
 
   const router = useRouter();
   const [formData, setFormData] = useState<ProjectFormData>({
@@ -410,6 +414,34 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
     }));
   };
 
+  const handleAddCustomAmenity = () => {
+    const trimmed = customAmenity.trim();
+    if (!trimmed) return;
+    // Avoid duplicates (check both predefined and custom)
+    if (
+      AMENITIES.includes(trimmed as any) ||
+      customAmenities.includes(trimmed) ||
+      formData.amenities.includes(trimmed)
+    ) {
+      setCustomAmenity('');
+      return;
+    }
+    setCustomAmenities((prev) => [...prev, trimmed]);
+    setFormData((prev) => ({
+      ...prev,
+      amenities: [...prev.amenities, trimmed],
+    }));
+    setCustomAmenity('');
+  };
+
+  const handleAddCustomPropertyType = () => {
+    const trimmed = customPropertyType.trim();
+    if (!trimmed) return;
+    updateField('propertyType', trimmed);
+    setShowCustomPropertyInput(false);
+    setCustomPropertyType('');
+  };
+
   const handleBHKToggle = (bhk: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -552,7 +584,10 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
                   <button
                     key={pType}
                     type="button"
-                    onClick={() => updateField('propertyType', pType)}
+                    onClick={() => {
+                      updateField('propertyType', pType);
+                      setShowCustomPropertyInput(false);
+                    }}
                     className={`px-4 py-2 border rounded-lg text-sm transition-all ${
                       formData.propertyType === pType
                         ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
@@ -562,6 +597,65 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
                     {formData.propertyType === pType ? '✓ ' : ''}{pType}
                   </button>
                 ))}
+
+                {/* Custom Property Type Button */}
+                {!showCustomPropertyInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomPropertyInput(true)}
+                    className={`px-4 py-2 border border-dashed rounded-lg text-sm transition-all ${
+                      formData.propertyType &&
+                      !CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.includes(formData.propertyType as any)
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    + Custom
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customPropertyType}
+                      onChange={(e) => setCustomPropertyType(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomPropertyType();
+                        }
+                      }}
+                      placeholder="Enter property type"
+                      autoFocus
+                      className="px-3 py-2 border border-[#D6D3D1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomPropertyType}
+                      className="px-3 py-2 bg-[#B45309] text-white text-sm rounded-lg hover:bg-[#92400E] transition-colors"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomPropertyInput(false);
+                        setCustomPropertyType('');
+                      }}
+                      className="px-2 py-2 text-[#78716C] hover:text-red-500 text-sm transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Show the custom property type as a selected chip if it doesn't match predefined */}
+                {formData.propertyType &&
+                  !CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.includes(formData.propertyType as any) &&
+                  !showCustomPropertyInput && (
+                    <span className="px-4 py-2 border border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309] rounded-lg text-sm">
+                      ✓ {formData.propertyType}
+                    </span>
+                  )}
               </div>
             )}
             {formErrors.propertyType && (
@@ -728,7 +822,24 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
               {formData.amenities.includes(amenity) ? '✓ ' : ''}{amenity}
             </button>
           ))}
+
+          {/* Custom amenities chips */}
+          {customAmenities.map((amenity) => (
+            <button
+              key={`custom-${amenity}`}
+              type="button"
+              onClick={() => handleAmenityToggle(amenity)}
+              className={`p-3 border rounded-lg transition-all text-left text-sm ${
+                formData.amenities.includes(amenity)
+                  ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                  : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+              }`}
+            >
+              {formData.amenities.includes(amenity) ? '✓ ' : ''}{amenity}
+            </button>
+          ))}
         </div>
+
         {AMENITIES.length > 10 && (
           <button
             type="button"
@@ -738,6 +849,32 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             {showAllAmenities ? '− Show less' : `+ See more (${AMENITIES.length - 10} more)`}
           </button>
         )}
+
+        {/* Add Custom Amenity Input */}
+        <div className="mt-4 flex items-center gap-2">
+          <input
+            type="text"
+            value={customAmenity}
+            onChange={(e) => setCustomAmenity(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddCustomAmenity();
+              }
+            }}
+            placeholder="Add custom amenity..."
+            className="flex-1 max-w-xs px-4 py-2.5 border border-[#D6D3D1] rounded-lg text-sm text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={handleAddCustomAmenity}
+            disabled={!customAmenity.trim()}
+            className="px-4 py-2.5 bg-[#B45309] text-white text-sm font-medium rounded-lg hover:bg-[#92400E] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add
+          </button>
+        </div>
+
         {formErrors.amenities && (
           <p className="text-sm text-red-600 mt-2">
             {formErrors.amenities}
