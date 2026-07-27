@@ -1976,6 +1976,169 @@ export const shareApi = {
   },
 
   /**
+   * Download all project media with contact details watermarked on images.
+   * Images get a branded contact strip at the bottom.
+   * Videos and brochures download as-is with a contact card file.
+   */
+  async downloadGallery(projectId: string, projectName?: string): Promise<void> {
+    // Fetch project details
+    const project = await projectsApi.getById(projectId);
+    if (!project) throw new Error('Project not found');
+
+    // Fetch user's contact info
+    const contact = await this.getMyContact();
+
+    const name = (project as any).projectName || (project as any).name || projectName || 'Project';
+    const safeName = name.replace(/[^a-zA-Z0-9\s-]/g, '').trim();
+
+    // Helper to get URL from file object
+    const getUrl = (fileObj: any): string | null => {
+      if (!fileObj) return null;
+      if (typeof fileObj === 'string') return fileObj;
+      return fileObj.url || null;
+    };
+
+    // Collect media
+    const images: { url: string; filename: string }[] = [];
+    const others: { url: string; filename: string }[] = [];
+
+    const coverUrl = getUrl((project as any).media?.coverImage) || getUrl((project as any).coverImage);
+    if (coverUrl) images.push({ url: coverUrl, filename: `${safeName}_Cover.jpg` });
+
+    const gallery = (project as any).media?.galleryImages || (project as any).galleryImages || [];
+    gallery.forEach((img: any, i: number) => {
+      const url = getUrl(img);
+      if (url) images.push({ url, filename: `${safeName}_Gallery_${i + 1}.jpg` });
+    });
+
+    const layoutUrl = getUrl((project as any).media?.layoutImage) || getUrl((project as any).layoutImage);
+    if (layoutUrl) images.push({ url: layoutUrl, filename: `${safeName}_Layout.jpg` });
+
+    const videos = (project as any).media?.videos || (project as any).videos || [];
+    videos.forEach((vid: any, i: number) => {
+      const url = getUrl(vid);
+      if (url) others.push({ url, filename: `${safeName}_Video_${i + 1}.mp4` });
+    });
+
+    const brochureUrl = getUrl((project as any).media?.brochurePdf) || getUrl((project as any).brochureUrl);
+    if (brochureUrl) others.push({ url: brochureUrl, filename: `${safeName}_Brochure.pdf` });
+
+    if (images.length === 0 && others.length === 0) throw new Error('No media found for this project');
+
+    // Watermark helper: draws contact info strip at bottom of image
+    const R2_HOST = 'pub-daa9113fecb449cfb19044d3d822effd.r2.dev';
+    const watermarkImage = async (imgUrl: string): Promise<Blob> => {
+      // Proxy R2 URLs to avoid CORS
+      let fetchUrl = imgUrl;
+      if (imgUrl.includes(R2_HOST)) {
+        const path = imgUrl.split(R2_HOST)[1];
+        fetchUrl = `/r2-assets${path}`;
+      }
+
+      // Fetch image as blob to bypass CORS
+      const response = await fetch(fetchUrl);
+      const imgBlob = await response.blob();
+      const objectUrl = URL.createObjectURL(imgBlob);
+
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => {
+          const stripHeight = Math.max(48, Math.round(img.height * 0.07));
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height + stripHeight;
+          const ctx = canvas.getContext('2d')!;
+
+          // Draw original image
+          ctx.drawImage(img, 0, 0);
+
+          // Draw contact strip background
+          ctx.fillStyle = '#1C1917';
+          ctx.fillRect(0, img.height, canvas.width, stripHeight);
+
+          // Accent line
+          ctx.fillStyle = '#B45309';
+          ctx.fillRect(0, img.height, canvas.width, 3);
+
+          // Contact text
+          const fontSize = Math.max(12, Math.round(stripHeight * 0.32));
+          const smallFont = Math.max(10, Math.round(stripHeight * 0.24));
+          const padding = Math.round(canvas.width * 0.02);
+          const textY = img.height + stripHeight * 0.55;
+          const subTextY = img.height + stripHeight * 0.82;
+
+          // Name + Company
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          ctx.fillStyle = '#FFFFFF';
+          const displayName = contact.companyName
+            ? `${contact.name} | ${contact.companyName}`
+            : contact.name;
+          ctx.fillText(displayName, padding, textY);
+
+          // Phone + Role
+          ctx.font = `${smallFont}px sans-serif`;
+          ctx.fillStyle = '#A8A29E';
+          const subText = [contact.phone, contact.role?.charAt(0).toUpperCase() + contact.role?.slice(1)]
+            .filter(Boolean).join(' • ');
+          ctx.fillText(subText, padding, subTextY);
+
+          // HomeInTown branding on right
+          ctx.font = `bold ${smallFont}px sans-serif`;
+          ctx.fillStyle = '#B45309';
+          const brand = 'HomeInTown';
+          const brandWidth = ctx.measureText(brand).width;
+          ctx.fillText(brand, canvas.width - padding - brandWidth, textY);
+
+          URL.revokeObjectURL(objectUrl);
+
+          canvas.toBlob(
+            (blob) => blob ? resolve(blob) : reject(new Error('Canvas toBlob failed')),
+            'image/jpeg',
+            0.92
+          );
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error('Failed to load image'));
+        };
+        img.src = objectUrl;
+      });
+    };
+
+    // Download watermarked images
+    for (let i = 0; i < images.length; i++) {
+      try {
+        const blob = await watermarkImage(images[i].url);
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = images[i].filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        // Small delay between downloads
+        if (i < images.length - 1) await new Promise(r => setTimeout(r, 600));
+      } catch (err) {
+        console.error(`Failed to watermark ${images[i].filename}:`, err);
+      }
+    }
+
+    // Download videos/brochures as-is
+    for (let i = 0; i < others.length; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      const link = document.createElement('a');
+      link.href = others[i].url;
+      link.download = others[i].filename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  },
+
+  /**
    * Deactivate a share token (disables the shared link).
    */
   async deactivateToken(token: string): Promise<void> {
