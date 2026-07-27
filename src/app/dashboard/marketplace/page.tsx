@@ -26,6 +26,7 @@ import {
   ShareIcon,
 } from '@heroicons/react/24/outline';
 import { CheckBadgeIcon } from '@heroicons/react/24/solid';
+import { Images } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
   Active: 'bg-emerald-50 text-emerald-700 border-zinc-200',
@@ -526,6 +527,18 @@ export default function MarketplacePage() {
     toast.success('QR code downloading!');
   };
 
+  const handleDownloadGallery = async (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    toast.loading('Downloading gallery...', { id: 'gallery-dl' });
+    try {
+      await shareApi.downloadGallery(id, name);
+      toast.success('Gallery downloaded!', { id: 'gallery-dl' });
+    } catch (err: any) {
+      console.error('Gallery download error:', err);
+      toast.error(err.message || 'Failed to download gallery', { id: 'gallery-dl' });
+    }
+  };
+
   const handleDownloadPDF = async (e: React.MouseEvent, details: any, item: any) => {
     e.stopPropagation();
     toast.loading('Generating brochure...', { id: 'pdf-gen' });
@@ -885,6 +898,13 @@ export default function MarketplacePage() {
                                     </svg>
                                   </button>
                                 )}
+                                <button
+                                  onClick={(e) => handleDownloadGallery(e, details._id, details.name)}
+                                  className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
+                                  title="Download Gallery"
+                                >
+                                  <Images className="w-2.5 h-2.5 md:w-3 md:h-3" />
+                                </button>
                               </div>
                             </div>
 

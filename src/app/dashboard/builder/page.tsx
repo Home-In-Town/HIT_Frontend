@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi } from '@/lib/api';
+import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi } from '@/lib/api';
 import {
   Zap,
   ShoppingBag,
@@ -22,6 +22,7 @@ import {
   Share2,
   Download,
   QrCode,
+  Images,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -251,6 +252,17 @@ export default function BuilderDashboardPage() {
     toast.success('QR code downloading!');
   }
 
+  async function handleDownloadGallery(id: string, name: string) {
+    toast.loading('Downloading gallery...', { id: 'gallery' });
+    try {
+      await shareApi.downloadGallery(id, name);
+      toast.success('Gallery downloaded!', { id: 'gallery' });
+    } catch (err: any) {
+      console.error('Gallery download error:', err);
+      toast.error(err.message || 'Failed to download gallery', { id: 'gallery' });
+    }
+  }
+
   const formatPrice = (price: number) => {
     if (!price) return 'Price on Request';
     if (price >= 10000000) return `\u20B9${(price / 10000000).toFixed(2)} Cr`;
@@ -387,6 +399,14 @@ export default function BuilderDashboardPage() {
                           className="w-6 h-6 bg-[#FAF7F2] border border-[#E7E5E4] rounded-md flex items-center justify-center active:scale-90"
                         >
                           <QrCode className="w-3 h-3 text-[#57534E]" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDownloadGallery(property.id, property.name)}
+                          className="w-6 h-6 bg-[#FAF7F2] border border-[#E7E5E4] rounded-md flex items-center justify-center active:scale-90"
+                          title="Download Gallery"
+                        >
+                          <Images className="w-3 h-3 text-[#57534E]" />
                         </button>
                       </div>
                     )}
