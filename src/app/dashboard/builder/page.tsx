@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -178,7 +178,7 @@ export default function BuilderDashboardPage() {
 
       // Generate share token for tracking
       const shareResult = await shareApi.generateToken(property.id, 'pdf').catch(() => null);
-      const shareUrl = shareResult?.shareUrl || `https://www.homeintown.in/visit/${property.slug}`;
+      const shareUrl = shareResult?.shareUrl || `https://homeintown.ai/visit/${property.slug}`;
 
       // Build PDF data from full project or fallback to card data
       const getImageUrl = (img: any): string | null => {
@@ -327,11 +327,11 @@ export default function BuilderDashboardPage() {
             </div>
             <div className="flex gap-3">
               <div className="text-center">
-                <p className="text-white text-base font-black font-serif">{statsLoading ? 'â€“' : stats.totalViews}</p>
+                <p className="text-white text-base font-black font-serif">{statsLoading ? '–' : stats.totalViews}</p>
                 <p className="text-stone-500 text-[8px] font-bold uppercase">Views</p>
               </div>
               <div className="text-center">
-                <p className="text-white text-base font-black font-serif">{statsLoading ? 'â€“' : stats.totalLeads}</p>
+                <p className="text-white text-base font-black font-serif">{statsLoading ? '–' : stats.totalLeads}</p>
                 <p className="text-stone-500 text-[8px] font-bold uppercase">Leads</p>
               </div>
             </div>
@@ -699,3 +699,4 @@ export default function BuilderDashboardPage() {
     </div>
   );
 }
+

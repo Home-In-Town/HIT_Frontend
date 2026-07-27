@@ -178,7 +178,7 @@ export default function AdminDashboardPage() {
 
       // Generate share token for tracking
       const shareResult = await shareApi.generateToken(property.id, 'pdf').catch(() => null);
-      const shareUrl = shareResult?.shareUrl || `https://www.homeintown.in/visit/${property.slug}`;
+      const shareUrl = shareResult?.shareUrl || `https://homeintown.ai/visit/${property.slug}`;
 
       // Build PDF data from full project or fallback to card data
       const getImageUrl = (img: any): string | null => {
@@ -699,3 +699,4 @@ export default function AdminDashboardPage() {
     </div>
   );
 }
+
