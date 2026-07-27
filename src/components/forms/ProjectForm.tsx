@@ -167,8 +167,14 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   // Section 3
   if (!formData.startingPrice) errors.startingPrice = 'Starting price is required';
 
-  // Section 4 - only validate BHK when Configuration section is visible (non-plot property types)
-  if (formData.propertyType && !['Residential Plot', 'Commercial Plot / Land'].includes(formData.propertyType) && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
+  // Section 4 - only validate BHK for Residential/Commercial non-plot types
+  // Mixed Use category never requires BHK since projects can be a combination
+  const isPlotType = formData.propertyType?.toLowerCase().includes('plot') || 
+    formData.propertyType?.toLowerCase().includes('land') ||
+    ['Residential Plot', 'Commercial Plot / Land', 'Farm Land'].includes(formData.propertyType || '');
+  const isMixedUse = formData.category === 'Mixed Use';
+  
+  if (formData.propertyType && !isPlotType && !isMixedUse && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
     errors.bhkOptions = 'Select at least one BHK option';
   }
 
@@ -891,8 +897,8 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Apartment-specific fields */}
-          {!['Residential Plot', 'Commercial Plot / Land'].includes(formData.propertyType) && (
+          {/* Apartment-specific fields - show for non-plot types OR Mixed Use (optional for Mixed Use) */}
+          {(formData.category === 'Mixed Use' || (!['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) && !formData.propertyType.toLowerCase().includes('plot') && !formData.propertyType.toLowerCase().includes('land'))) && (
           <>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-[#57534E] mb-2">
@@ -939,8 +945,8 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           </>
           )}
 
-          {/* Plot/Land-specific fields */}
-          {['Residential Plot', 'Commercial Plot / Land'].includes(formData.propertyType) && (
+          {/* Plot/Land-specific fields - show for plot types OR Mixed Use (optional for Mixed Use) */}
+          {(formData.category === 'Mixed Use' || ['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) || formData.propertyType.toLowerCase().includes('plot') || formData.propertyType.toLowerCase().includes('land')) && (
           <>
             <InputField
               label="Plot Size Range (sqft)"
