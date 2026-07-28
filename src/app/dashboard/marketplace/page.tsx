@@ -6,6 +6,7 @@ import { marketplaceApi, projectsApi, shareApi, MarketplaceListing, MarketplaceA
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { getPropertyLabel } from '@/lib/getPropertyLabel';
 import {
   PlusIcon,
   MapPinIcon,
@@ -122,6 +123,8 @@ function getProjectDetails(item: MarketplaceListing | any) {
     listedByPhone,
     role,
     type: project.projectType || project.type || 'flat',
+    category: project.category || '',
+    propertyType: project.propertyType || '',
     slug: project.slug || '',
     amenities: project.amenities || [],
     companyName: item.listedBy?.companyName || project.owner?.companyName || '',
@@ -564,6 +567,8 @@ export default function MarketplacePage() {
         id: details._id,
         name: details.name,
         type: details.type || 'flat',
+        category: details.category || '',
+        propertyType: details.propertyType || '',
         city: details.city,
         location: details.location,
         price: details.price,
@@ -926,7 +931,7 @@ export default function MarketplacePage() {
                                 </span>
                               )}
                               <span className="px-1.5 py-0.5 bg-amber-50 text-amber-700 rounded text-[7px] md:text-[8px] font-bold capitalize border border-amber-100">
-                                {details.type || 'Flat'}
+                                {getPropertyLabel(details)}
                               </span>
                             </div>
 

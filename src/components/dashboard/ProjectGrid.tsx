@@ -4,6 +4,7 @@ import React from 'react';
 import { Project } from '@/types/project';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { getPropertyLabel } from '@/lib/getPropertyLabel';
 
 interface ProjectGridProps {
   projects: Project[];
@@ -65,7 +66,7 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
              <div className="grid grid-cols-2 gap-2">
                <div className="bg-[#FAF7F2] p-2.5 rounded-xl border border-[#E7E5E4]/50">
                   <span className="block text-[#A8A29E] text-[9px] font-bold uppercase tracking-widest mb-0.5">Type</span>
-                  <span className="text-xs font-bold text-[#2A2A2A] truncate block">{project.type === 'flat' ? 'Apartment' : 'Plot'}</span>
+                  <span className="text-xs font-bold text-[#2A2A2A] truncate block">{getPropertyLabel(project)}</span>
                </div>
                <div className="bg-[#FAF7F2] p-2.5 rounded-xl border border-[#E7E5E4]/50">
                   <span className="block text-[#A8A29E] text-[9px] font-bold uppercase tracking-widest mb-0.5">Status</span>
