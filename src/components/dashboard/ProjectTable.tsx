@@ -9,6 +9,7 @@ import { projectsApi } from '@/lib/api';
 import CaptainCombobox from '@/components/dashboard/CaptainCombobox';
 import AgentCombobox from '@/components/dashboard/AgentCombobox';
 import toast from 'react-hot-toast';
+import { getPropertyLabel } from '@/lib/getPropertyLabel';
 
 interface ProjectTableProps {
   projects: Project[];
@@ -181,7 +182,7 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
 
                 <td className="px-6 py-3.5 whitespace-nowrap">
                   <span className="px-3 py-1 inline-flex text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#FAF7F2] text-[#57534E] border border-[#E7E5E4]">
-                    {project.type === 'flat' ? 'Apartment' : 'Plot'}
+                    {getPropertyLabel(project)}
                   </span>
                 </td>
 
