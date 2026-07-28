@@ -1978,7 +1978,7 @@ export const shareApi = {
   /**
    * Download all project media with contact details watermarked on images.
    * Images get a branded contact strip at the bottom.
-   * Videos and brochures download as-is with a contact card file.
+   * Videos download as-is. Brochures are excluded from gallery download.
    */
   async downloadGallery(projectId: string, projectName?: string): Promise<void> {
     // Fetch project details
@@ -2019,9 +2019,6 @@ export const shareApi = {
       const url = getUrl(vid);
       if (url) others.push({ url, filename: `${safeName}_Video_${i + 1}.mp4` });
     });
-
-    const brochureUrl = getUrl((project as any).media?.brochurePdf) || getUrl((project as any).brochureUrl);
-    if (brochureUrl) others.push({ url: brochureUrl, filename: `${safeName}_Brochure.pdf` });
 
     if (images.length === 0 && others.length === 0) throw new Error('No media found for this project');
 
@@ -2124,17 +2121,38 @@ export const shareApi = {
       }
     }
 
-    // Download videos/brochures as-is
+    // Download videos as blobs to force download instead of opening in new tab
+    const R2_HOST_CHECK = 'pub-daa9113fecb449cfb19044d3d822effd.r2.dev';
     for (let i = 0; i < others.length; i++) {
-      await new Promise(r => setTimeout(r, 500));
-      const link = document.createElement('a');
-      link.href = others[i].url;
-      link.download = others[i].filename;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      try {
+        await new Promise(r => setTimeout(r, 500));
+        let fetchUrl = others[i].url;
+        if (fetchUrl.includes(R2_HOST_CHECK)) {
+          const path = fetchUrl.split(R2_HOST_CHECK)[1];
+          fetchUrl = `/r2-assets${path}`;
+        }
+        const response = await fetch(fetchUrl);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = others[i].filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(`Failed to download ${others[i].filename}:`, err);
+        // Fallback: open in new tab if blob fetch fails
+        const link = document.createElement('a');
+        link.href = others[i].url;
+        link.download = others[i].filename;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     }
   },
 
