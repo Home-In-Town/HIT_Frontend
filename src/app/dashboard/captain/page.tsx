@@ -189,7 +189,7 @@ export default function CaptainDashboardPage() {
       ]);
 
       const shareResult = await shareApi.generateToken(property.id, 'pdf').catch(() => null);
-      const shareUrl = shareResult?.shareUrl || `https://www.homeintown.in/visit/${property.slug}`;
+      const shareUrl = shareResult?.shareUrl || `https://homeintown.ai/visit/${property.slug}`;
 
       const getImageUrl = (img: any): string | null => {
         if (!img) return null;
@@ -727,3 +727,4 @@ export default function CaptainDashboardPage() {
     </div>
   );
 }
+
