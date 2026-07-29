@@ -1658,6 +1658,71 @@ export const crmBridgeApi = {
       return 'https://lead-filteration-backend-624770114041.asia-south1.run.app';
     }
   },
+
+  // ── Lead Journey / Sales Funnel ──────────────────────────────────────────
+
+  async getJourney(leadId: string) {
+    const response = await fetch(`${API_URL}/crm-bridge/journey/${encodeURIComponent(leadId)}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async advanceStage(leadId: string, data: { stage: string; notes?: string; metadata?: Record<string, unknown> }) {
+    const response = await fetch(`${API_URL}/crm-bridge/journey/${encodeURIComponent(leadId)}/advance`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  async updatePropertyInterest(leadId: string, data: Record<string, unknown>) {
+    const response = await fetch(`${API_URL}/crm-bridge/journey/${encodeURIComponent(leadId)}/property-interest`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse(response);
+  },
+
+  async getFunnel() {
+    const response = await fetch(`${API_URL}/crm-bridge/journey/funnel`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getRecentActivity(limit = 20) {
+    const response = await fetch(`${API_URL}/crm-bridge/journey/recent?limit=${limit}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async createAccount() {
+    const response = await fetch(`${API_URL}/crm-bridge/create-account`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async linkByIdentifier(phoneOrEmail: string) {
+    const response = await fetch(`${API_URL}/crm-bridge/link-by-identifier`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phoneOrEmail }),
+    });
+    return handleResponse(response);
+  },
 };
 
 /* ----------------------------------
