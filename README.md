@@ -1,15 +1,21 @@
-# Dynamic Sales Website - Frontend
+# HomeInTown Frontend
 
-Next.js frontend for the Dynamic Sales Website & Trackable Link Generation system.
+Next.js frontend for the HomeInTown real estate platform. Deployed on Vercel.
 
-## Features
+**Live:** `https://www.homeintown.in`  
+**Repo:** `Home-In-Town/HIT_Frontend` (auto-deploys on push to `main`)
 
-- **Admin Dashboard** - Create, edit, publish, and manage real estate projects
-- **Public Sales Pages** - Dynamic, responsive project pages with premium UI
-- **Multi-CTA Support** - Call, WhatsApp, and Enquiry Form buttons
-- **Lead Capture Form** - Modal form collecting name, phone, and requirements
-- **Analytics Dashboard** - Track visits, time spent, and CTA interactions
-- **Trackable Links** - Generate shareable links with source/lead attribution
+---
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **Real-time:** Socket.io-client
+- **Animation:** Framer Motion
+
+---
 
 ## Quick Start
 
@@ -18,14 +24,25 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000
-
-## Environment Variables
+Open `http://localhost:3000`
 
 Create `.env.local`:
 ```
-NEXT_PUBLIC_API_URL=http://localhost:4000/api
+NEXT_PUBLIC_API_URL=http://localhost:5001/api
 ```
+
+---
+
+## Features
+
+- **Project Management** — create, edit, publish real estate projects with media uploads
+- **Public Sales Pages** — `/visit/:slug` — dynamic project pages with gallery, pricing, maps
+- **Analytics Dashboard** — track visits, time spent, CTA clicks per project
+- **CRM Pipeline** — lead management for builders/agents
+- **Chat** — real-time Socket.io chat with sessions, typing indicators, read receipts
+- **Employee Tracking** — GPS location tracking for field employees
+- **Marketplace** — property listings marketplace
+- **Multi-CTA** — Call, WhatsApp, and Enquiry Form on project pages
 
 ---
 
@@ -34,55 +51,28 @@ NEXT_PUBLIC_API_URL=http://localhost:4000/api
 | Route | Description |
 |-------|-------------|
 | `/` | Landing page |
-| `/dashboard` | Projects list with analytics |
-| `/dashboard/projects/new` | Create new project |
-| `/dashboard/projects/:id/edit` | Edit existing project |
-| `/visit/:slug` | Public sales page |
+| `/dashboard` | Projects list + analytics |
+| `/dashboard/projects/new` | Create project |
+| `/dashboard/projects/:id/edit` | Edit project |
+| `/dashboard/chat` | Real-time chat |
+| `/dashboard/analytics` | Analytics overview |
+| `/visit/:slug` | Public project sales page |
 
 ---
 
-## Public Sales Page
+## Media Upload Flow
 
-The visitor-facing project page (`/visit/:slug`) includes:
+Projects use a 3-step upload flow:
+1. `POST /api/projects` — create project record, get MongoDB ID
+2. `POST /api/files/proxy-upload` × N — upload each file to Cloudflare R2, saved to DB via `$push`
+3. `PUT /api/projects/:id` — sync text metadata + link media
 
-- **Hero Section** - Cover image with project highlights
-- **Gallery** - Image gallery with lightbox
-- **About** - Project specifications
-- **Amenities** - Visual amenities grid
-- **Pricing** - Price details and payment plans
-- **Location** - Google Maps integration
-- **CTA Section** - Three contact options:
-  - 📞 **Call** - Direct phone call
-  - 💬 **WhatsApp** - Pre-filled message
-  - 📋 **Enquiry Form** - Lead capture modal
+Key file: `src/lib/api.ts` → `transformFrontendToBackend()` — maps frontend form state to backend schema. Do NOT send empty media arrays — that would overwrite media saved in step 2.
 
 ---
 
-## Trackable Links
+## User Roles
 
-```
-/visit/project-name?source=whatsapp&leadId=XYZ123
-```
+`admin` | `builder` | `agent` | `employee` | `user`
 
-Query params are optional and used for analytics attribution.
-
----
-
-## Tracking Integration
-
-The frontend automatically handles analytics tracking via the `useTracking` hook:
-
-- **Page Views**: Triggered on page load
-- **Time Spent**: Updates every 30s and on page unload
-- **CTA Clicks**: Tracks usage of contact options
-  - `call`: Phone button clicks
-  - `whatsapp`: WhatsApp button clicks
-  - `form`: Enquiry form submissions (sends `ctaType: 'form'`)
-
----
-
-## Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Styling**: Tailwind CSS
-- **Language**: TypeScript
+Auth: Phone + MPIN, OTP via MSG91 SMS (DLT registration pending — see SESSION_CONTEXT).

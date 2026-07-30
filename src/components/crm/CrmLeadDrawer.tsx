@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { CrmLead, crmBridgeApi, ApiError } from '@/lib/api';
+import LeadJourneyTimeline from './LeadJourneyTimeline';
 
 interface CrmLeadDrawerProps {
   lead: CrmLead | null;
@@ -328,6 +329,16 @@ export default function CrmLeadDrawer({ lead, open, onClose }: CrmLeadDrawerProp
                       </div>
                     </div>
                   </div>
+                </section>
+              )}
+
+              {/* Sales Journey Timeline */}
+              {lead?.id && (
+                <section>
+                  <h3 className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-widest mb-3">
+                    Sales Journey
+                  </h3>
+                  <LeadJourneyTimeline leadId={lead.id} />
                 </section>
               )}
             </>
