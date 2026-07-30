@@ -6,6 +6,15 @@ import { useAuth } from '@/lib/authContext';
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') || 'http://localhost:5001';
 
+/**
+ * Helper to read a cookie value by name (for passing token explicitly to socket auth).
+ */
+function getCookie(name: string): string | undefined {
+  if (typeof document === 'undefined') return undefined;
+  const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : undefined;
+}
+
 export function useSocket() {
   const { user } = useAuth();
   const socketRef = useRef<Socket | null>(null);
@@ -14,10 +23,22 @@ export function useSocket() {
   useEffect(() => {
     if (!user) return;
 
+    const token = getCookie('token');
+
     const socket = io(SOCKET_URL, {
       withCredentials: true,
-      transports: ['websocket', 'polling'],
+      // Start with polling (reliably sends cookies), then upgrade to websocket
+      transports: ['polling', 'websocket'],
       autoConnect: true,
+      // Pass token explicitly so the server auth middleware can use it
+      // even when cookies aren't forwarded on the WebSocket upgrade request
+      auth: {
+        token,
+      },
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     });
 
     socket.on('connect', () => {
@@ -25,13 +46,17 @@ export function useSocket() {
       console.log('🟢 Socket connected');
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', (reason) => {
       setIsConnected(false);
-      console.log('🔴 Socket disconnected');
+      console.log('🔴 Socket disconnected:', reason);
     });
 
     socket.on('connect_error', (err) => {
       console.error('Socket connection error:', err.message);
+      // If auth failed, don't keep retrying with a bad/missing token
+      if (err.message === 'Authentication required' || err.message === 'Invalid authentication token') {
+        socket.disconnect();
+      }
     });
 
     socketRef.current = socket;

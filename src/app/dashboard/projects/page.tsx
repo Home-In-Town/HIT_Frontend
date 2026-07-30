@@ -74,6 +74,8 @@ const MOCK_PROJECTS: Project[] = [
   },
 ];
 
+const PROJECTS_PER_PAGE = 10;
+
 interface FilterState {
     searchQuery: string;
     status: 'all' | 'published' | 'draft';
@@ -124,6 +126,9 @@ export default function ProjectsPage() {
     viewMode: 'table',
   });
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+
   useEffect(() => {
     async function fetchProjects() {
       try {
@@ -147,6 +152,7 @@ export default function ProjectsPage() {
 
   const handleFilterChange = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1); // Reset to first page when filters change
   };
 
   const filteredProjects = useMemo(() => {
@@ -179,6 +185,20 @@ export default function ProjectsPage() {
       return matchesSearch && matchesStatus && matchesType && matchesCity && matchesRera;
     });
   }, [projects, filters]);
+
+  // Pagination derived values
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
+  const paginatedProjects = useMemo(() => {
+    const start = (currentPage - 1) * PROJECTS_PER_PAGE;
+    return filteredProjects.slice(start, start + PROJECTS_PER_PAGE);
+  }, [filteredProjects, currentPage]);
+
+  // Reset to last valid page if current exceeds total (e.g. after delete)
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
 
   // Actions
   const copyLink = (link: string) => {
@@ -322,7 +342,7 @@ export default function ProjectsPage() {
             <>
                 {filters.viewMode === 'table' ? (
                     <ProjectTable 
-                        projects={filteredProjects} 
+                        projects={paginatedProjects} 
                         onDelete={handleDeleteClick}
                         onCopyLink={copyLink}
                         onAssignCaptain={handleAssignCaptain}
@@ -334,6 +354,39 @@ export default function ProjectsPage() {
                         onDelete={handleDeleteClick}
                         onCopyLink={copyLink}
                     />
+                )}
+
+                {/* Pagination Footer — table mode only */}
+                {filters.viewMode === 'table' && filteredProjects.length > PROJECTS_PER_PAGE && (
+                  <div className="flex items-center justify-between px-4 py-3 mt-4 bg-white border border-[#E7E5E4] rounded-2xl shadow-sm">
+                    <p className="text-xs text-[#A8A29E] font-medium">
+                      Page <strong className="text-[#57534E]">{currentPage}</strong> of <strong className="text-[#57534E]">{totalPages}</strong>
+                      {' '}&middot;{' '}
+                      <strong className="text-[#57534E]">{filteredProjects.length}</strong> total projects
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#57534E] bg-white border border-[#E7E5E4] rounded-lg hover:border-[#B45309]/40 hover:text-[#B45309] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#57534E] bg-white border border-[#E7E5E4] rounded-lg hover:border-[#B45309]/40 hover:text-[#B45309] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        Next
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 )}
             </>
         )}
