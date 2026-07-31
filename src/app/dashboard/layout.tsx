@@ -371,7 +371,7 @@ const orgPath = user
           )}
 
           {/* Chat Link */}
-          {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'agent') && (
+          {(user?.role === 'admin') && (
             <>
 
               <Link
@@ -424,6 +424,25 @@ const orgPath = user
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">CRM</span>}
               </Link>
             </>
+          )}
+
+          {/* CRM — visible to admin, builder, agent (outside chat block) */}
+          {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'agent') && user?.role !== 'admin' && (
+            <Link
+              href="/dashboard/crm"
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                isActive('/dashboard/crm')
+                  ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                  : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+              } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+              title={isCollapsed ? "CRM" : ""}
+            >
+              <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">CRM</span>}
+            </Link>
           )}
 
           {/* Profile — all roles */}

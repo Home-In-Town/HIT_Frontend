@@ -2233,3 +2233,141 @@ export const shareApi = {
     await handleResponse(response);
   },
 };
+
+/* ----------------------------------
+   Lead Matching API (Admin Intelligence)
+-----------------------------------*/
+
+export interface ExtractedLeadParams {
+  bhkType?: string | null;
+  budget?: number | null;
+  budgetMax?: number | null;
+  location?: string | null;
+  locationRaw?: string | null;
+  locationCanonical?: string | null;
+  city?: string | null;
+  propertyType?: string | null;
+  possessionNeeded?: string | null;
+  loanRequired?: boolean;
+  urgency?: 'normal' | 'urgent' | 'very_urgent';
+}
+
+export interface ExtractedLeadMatch {
+  project: {
+    _id: string;
+    projectName: string;
+    city?: string;
+    location?: string;
+    pricing?: { startingPrice?: number };
+    configuration?: { bhkOptions?: string[] };
+    slug?: string;
+  };
+  score: number;
+  confidence: number;
+  matchedOn: string[];
+}
+
+export interface ExtractedLead {
+  _id: string;
+  source: 'group_chat' | 'direct_chat';
+  originalText: string;
+  extractedBy: { _id: string; name: string; role: string; companyName?: string };
+  extractedByRole: string;
+  params: ExtractedLeadParams;
+  intent: 'requirement' | 'implicit_requirement' | 'follow_up_requirement';
+  extractionConfidence: number;
+  paramCount: number;
+  matches: ExtractedLeadMatch[];
+  matchCount: number;
+  bestMatchScore: number;
+  status: 'auto_detected' | 'confirmed' | 'rejected' | 'converted' | 'expired';
+  adminNotified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadMatchingStats {
+  total: number;
+  withMatches: number;
+  matchRate: string;
+  avgConfidence: number;
+  byStatus: Record<string, number>;
+  bySource: Record<string, number>;
+}
+
+export interface LeadMatchingPagination {
+  page: number;
+  limit: number;
+  total: number;
+  pages: number;
+}
+
+export const leadMatchingApi = {
+  async getLeads(params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+    minConfidence?: number;
+    source?: string;
+  }): Promise<{ leads: ExtractedLead[]; pagination: LeadMatchingPagination }> {
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', String(params.page));
+    if (params?.limit) query.set('limit', String(params.limit));
+    if (params?.status) query.set('status', params.status);
+    if (params?.minConfidence) query.set('minConfidence', String(params.minConfidence));
+    if (params?.source) query.set('source', params.source);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+
+    const response = await fetch(`${API_URL}/lead-matching/leads${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async getLeadById(id: string): Promise<{ lead: ExtractedLead }> {
+    const response = await fetch(`${API_URL}/lead-matching/leads/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async updateLeadStatus(id: string, status: string, convertedTo?: string): Promise<{ lead: ExtractedLead }> {
+    const response = await fetch(`${API_URL}/lead-matching/leads/${id}/status`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PATCH',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, convertedTo }),
+    });
+    return handleResponse(response);
+  },
+
+  async getStats(): Promise<LeadMatchingStats> {
+    const response = await fetch(`${API_URL}/lead-matching/stats`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse(response);
+  },
+
+  async testExtract(text: string): Promise<any> {
+    const response = await fetch(`${API_URL}/lead-matching/extract`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    return handleResponse(response);
+  },
+
+  async testMatch(text: string): Promise<any> {
+    const response = await fetch(`${API_URL}/lead-matching/test-match`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    return handleResponse(response);
+  },
+};
