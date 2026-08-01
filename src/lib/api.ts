@@ -2274,12 +2274,15 @@ export interface ExtractedLead {
   extractedBy: { _id: string; name: string; role: string; companyName?: string };
   extractedByRole: string;
   params: ExtractedLeadParams;
-  intent: 'requirement' | 'implicit_requirement' | 'follow_up_requirement';
+  intent: 'requirement' | 'implicit_requirement' | 'follow_up_requirement' | 'inventory';
   extractionConfidence: number;
   paramCount: number;
   matches: ExtractedLeadMatch[];
   matchCount: number;
   bestMatchScore: number;
+  crossMatches?: { lead: { _id: string; originalText?: string; params?: ExtractedLeadParams; extractedBy?: { _id: string; name: string; role: string } }; score: number; matchedOn: string[]; matchType: string }[];
+  crossMatchCount?: number;
+  bestCrossMatchScore?: number;
   status: 'auto_detected' | 'confirmed' | 'rejected' | 'converted' | 'expired';
   adminNotified: boolean;
   createdAt: string;
