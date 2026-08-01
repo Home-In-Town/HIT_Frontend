@@ -5,8 +5,10 @@ import { useAuth } from '@/lib/authContext';
 import { groupChatApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
+import LeadsTab from './LeadsTab';
+import StatsTab from './StatsTab';
 
-type ActiveTab = 'rooms' | 'deals';
+type ActiveTab = 'rooms' | 'deals' | 'leads' | 'stats';
 type PostMode = 'text' | 'inventory' | 'requirement';
 
 export default function GroupChatPage() {
@@ -199,12 +201,45 @@ export default function GroupChatPage() {
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             </button>
           </div>
+
+          {/* Tab buttons */}
+          <div className="flex gap-1 mb-3 p-1 bg-[#FAF7F2] rounded-xl">
+            <button onClick={() => setActiveTab('rooms')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+              Chats
+            </button>
+            <button onClick={() => setActiveTab('deals')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'deals' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+              Deals
+            </button>
+            {user?.role === 'admin' && (
+              <>
+                <button onClick={() => setActiveTab('leads')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'leads' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+                  Leads
+                </button>
+                <button onClick={() => setActiveTab('stats')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'stats' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+                  Stats
+                </button>
+              </>
+            )}
+          </div>
+
+          {activeTab === 'rooms' && (
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
             <input type="text" placeholder="Search groups..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20" />
           </div>
+          )}
         </div>
 
+        {/* Tab content */}
+        {activeTab === 'leads' && user?.role === 'admin' && (
+          <LeadsTab />
+        )}
+
+        {activeTab === 'stats' && user?.role === 'admin' && (
+          <StatsTab />
+        )}
+
+        {activeTab === 'rooms' && (
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-32"><div className="w-6 h-6 border-2 border-[#B45309] border-t-transparent rounded-full animate-spin" /></div>
@@ -252,6 +287,7 @@ export default function GroupChatPage() {
             </>
           )}
         </div>
+        )}
       </div>
 
       {/* Main Chat Area */}
