@@ -59,6 +59,13 @@ export interface Project {
   paymentPlan: string;
   bankLoanAvailable: boolean;
 
+  // Additional charges (optional)
+  gstPercentage?: number;
+  stampDutyPercentage?: number;
+  registrationCharges?: number;
+  maintenanceCharges?: string;
+  otherCharges?: string;
+
   // Flat-specific fields
   bhkOptions?: string[];
   carpetAreaRange?: string;
