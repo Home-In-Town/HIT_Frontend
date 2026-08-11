@@ -88,6 +88,11 @@ export function transformBackendToFrontend(backendProject: any): Project {
     priceRange: backendProject.pricing?.totalPriceRange ?? backendProject.priceRange ?? '',
     paymentPlan: backendProject.pricing?.paymentPlan ?? backendProject.paymentPlan ?? '',
     bankLoanAvailable: backendProject.pricing?.bankLoanAvailable ?? backendProject.bankLoanAvailable ?? false,
+    gstPercentage: backendProject.pricing?.gstPercentage ?? backendProject.gstPercentage ?? undefined,
+    stampDutyPercentage: backendProject.pricing?.stampDutyPercentage ?? backendProject.stampDutyPercentage ?? undefined,
+    registrationCharges: backendProject.pricing?.registrationCharges ?? backendProject.registrationCharges ?? undefined,
+    maintenanceCharges: backendProject.pricing?.maintenanceCharges ?? backendProject.maintenanceCharges ?? '',
+    otherCharges: backendProject.pricing?.otherCharges ?? backendProject.otherCharges ?? '',
     bhkOptions: backendProject.configuration?.bhkOptions ?? backendProject.bhkOptions ?? [],
     carpetAreaRange: backendProject.configuration?.carpetAreaRange ?? backendProject.carpetAreaRange ?? '',
     floorRange: backendProject.configuration?.floorRange ?? backendProject.floorRange ?? '',
@@ -144,6 +149,11 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
       totalPriceRange: project.priceRange,
       paymentPlan: project.paymentPlan,
       bankLoanAvailable: project.bankLoanAvailable,
+      gstPercentage: project.gstPercentage,
+      stampDutyPercentage: project.stampDutyPercentage,
+      registrationCharges: project.registrationCharges,
+      maintenanceCharges: project.maintenanceCharges,
+      otherCharges: project.otherCharges,
     },
 
     configuration: {

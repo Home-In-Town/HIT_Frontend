@@ -35,6 +35,11 @@ const DEFAULT_FORM_DATA: ProjectFormData = {
   priceRange: '',
   paymentPlan: '',
   bankLoanAvailable: false,
+  gstPercentage: undefined,
+  stampDutyPercentage: undefined,
+  registrationCharges: undefined,
+  maintenanceCharges: '',
+  otherCharges: '',
   bhkOptions: [],
   carpetAreaRange: '',
   floorRange: '',
@@ -1084,6 +1089,88 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
                   {val ? '✓ Yes' : '✗ No'}
                 </label>
               ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Charges */}
+        <div className="mt-6 pt-6 border-t border-[#E7E5E4]">
+          <p className="text-sm font-semibold text-[#57534E] mb-4 uppercase tracking-wide">
+            Additional Charges <span className="text-[#A8A29E] font-normal normal-case tracking-normal">(Optional)</span>
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+                GST
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="gstPercentage"
+                  value={formData.gstPercentage ?? ''}
+                  onChange={(e) => updateField('gstPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="e.g., 5"
+                  min={0}
+                  max={100}
+                  className="w-full px-4 py-2.5 pr-10 bg-white border border-[#D6D3D1] rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent transition-shadow"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] text-sm font-medium pointer-events-none">%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+                Stamp Duty
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="stampDutyPercentage"
+                  value={formData.stampDutyPercentage ?? ''}
+                  onChange={(e) => updateField('stampDutyPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="e.g., 6"
+                  min={0}
+                  max={100}
+                  className="w-full px-4 py-2.5 pr-10 bg-white border border-[#D6D3D1] rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent transition-shadow"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] text-sm font-medium pointer-events-none">%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+                Registration Charges
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C] text-sm font-medium pointer-events-none">₹</span>
+                <input
+                  type="number"
+                  name="registrationCharges"
+                  value={formData.registrationCharges ?? ''}
+                  onChange={(e) => updateField('registrationCharges', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="e.g., 30000"
+                  min={0}
+                  className="w-full pl-7 pr-4 py-2.5 bg-white border border-[#D6D3D1] rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent transition-shadow"
+                />
+              </div>
+            </div>
+
+            <InputField
+              label="Maintenance Charges"
+              name="maintenanceCharges"
+              placeholder="e.g., ₹3/sq ft/month"
+              value={formData.maintenanceCharges ?? ''}
+              onChange={(v) => updateField('maintenanceCharges', v)}
+            />
+
+            <div className="md:col-span-2">
+              <InputField
+                label="Other Charges"
+                name="otherCharges"
+                placeholder="e.g., PLC charges applicable, Floor rise charges, etc."
+                value={formData.otherCharges ?? ''}
+                onChange={(v) => updateField('otherCharges', v)}
+              />
             </div>
           </div>
         </div>
