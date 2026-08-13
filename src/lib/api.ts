@@ -2383,4 +2383,31 @@ export const leadMatchingApi = {
     });
     return handleResponse(response);
   },
+
+  async confirm(payload: LeadConfirmPayload): Promise<LeadConfirmResult> {
+    const response = await fetch(`${API_URL}/lead-matching/confirm`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+  },
 };
+
+// ── Lead Matching: Confirm (user-reviewed params) ──────────────────────────
+export interface LeadConfirmPayload {
+  originalText: string;
+  messageId?: string;
+  roomId: string;
+  source: 'group_chat';
+  intent: 'requirement' | 'inventory';
+  params: ExtractedLeadParams;
+}
+
+export interface LeadConfirmResult {
+  success: boolean;
+  lead: ExtractedLead | null;
+  matches: ExtractedLeadMatch[];
+  matchCount: number;
+}
