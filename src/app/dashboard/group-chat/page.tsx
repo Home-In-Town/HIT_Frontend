@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { groupChatApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
+import { groupChatApi, leadMatchingApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
 import LeadsTab from './LeadsTab';
 import StatsTab from './StatsTab';
+import LeadConfirmModal from './LeadConfirmModal';
 
 type ActiveTab = 'rooms' | 'deals' | 'leads' | 'stats';
 type PostMode = 'text' | 'inventory' | 'requirement';
@@ -49,6 +50,12 @@ export default function GroupChatPage() {
     name: '', roomType: 'area' as 'project' | 'area',
     city: '', location: '', description: ''
   });
+
+  // Lead confirmation modal state
+  const [leadModal, setLeadModal] = useState<{
+    extraction: { intent: 'requirement' | 'inventory'; confidence: number; params: any; extractedFrom: string };
+    messageId?: string;
+  } | null>(null);
 
   // Fetch rooms
   const fetchRooms = useCallback(async () => {
@@ -137,8 +144,18 @@ export default function GroupChatPage() {
   const handleSendText = async () => {
     if (!textMsg.trim() || !activeRoom) return;
     try {
-      await groupChatApi.postMessage(activeRoom._id, { messageType: 'text', content: textMsg.trim() });
+      const message = await groupChatApi.postMessage(activeRoom._id, { messageType: 'text', content: textMsg.trim() });
       setTextMsg('');
+
+      // After message sent, try NLP extraction for confirmation modal
+      try {
+        const extraction = await leadMatchingApi.testExtract(textMsg.trim());
+        if (extraction?.detected) {
+          setLeadModal({ extraction, messageId: message._id });
+        }
+      } catch {
+        // Extraction failure is non-blocking — message already sent
+      }
     } catch (err: any) { toast.error('Failed to send'); }
   };
 
@@ -148,12 +165,37 @@ export default function GroupChatPage() {
       toast.error('Budget and Area are required'); return;
     }
     try {
-      await groupChatApi.postMessage(activeRoom._id, {
+      const message = await groupChatApi.postMessage(activeRoom._id, {
         messageType: 'requirement_card', requirementCard: reqForm
       });
+
+      // Build extraction from the structured form and show modal
+      const budgetInLakhs = reqForm.budget > 10000 ? Math.round(reqForm.budget / 100000) : reqForm.budget;
+      setLeadModal({
+        extraction: {
+          intent: 'requirement',
+          confidence: 1.0,
+          extractedFrom: `${reqForm.bhkType} ${reqForm.area} ${reqForm.city} ${budgetInLakhs}L ${reqForm.possessionNeeded}`,
+          params: {
+            bhkType: reqForm.bhkType,
+            budget: budgetInLakhs,
+            budgetMax: null,
+            location: reqForm.area,
+            locationRaw: reqForm.area,
+            locationCanonical: null,
+            locationConfidence: 0,
+            city: reqForm.city,
+            propertyType: 'flat',
+            possessionNeeded: reqForm.possessionNeeded,
+            loanRequired: reqForm.loanRequired,
+            urgency: reqForm.urgency,
+          }
+        },
+        messageId: message._id,
+      });
+
       setReqForm({ bhkType: '2BHK', budget: 0, area: '', city: '', possessionNeeded: 'immediate', loanRequired: false, urgency: 'normal', clientNotes: '' });
       setPostMode('text');
-      toast.success('Requirement posted! Matching...');
     } catch (err: any) { toast.error(err.message || 'Failed to post'); }
   };
 
@@ -163,12 +205,38 @@ export default function GroupChatPage() {
       toast.error('Area and Price are required'); return;
     }
     try {
-      await groupChatApi.postMessage(activeRoom._id, {
+      const message = await groupChatApi.postMessage(activeRoom._id, {
         messageType: 'inventory_card', inventoryCard: invForm
       });
+
+      // Build extraction from structured form and show modal
+      const invBudgetInLakhs = invForm.priceRange.min > 10000 ? Math.round(invForm.priceRange.min / 100000) : invForm.priceRange.min;
+      const invBudgetMaxInLakhs = invForm.priceRange.max > 10000 ? Math.round(invForm.priceRange.max / 100000) : (invForm.priceRange.max || null);
+      setLeadModal({
+        extraction: {
+          intent: 'inventory',
+          confidence: 1.0,
+          extractedFrom: `I have ${invForm.bhkOptions?.join('/')} flat ${invForm.area} ${invForm.city} ${invBudgetInLakhs}L`,
+          params: {
+            bhkType: invForm.bhkOptions?.[0] || null,
+            budget: invBudgetInLakhs,
+            budgetMax: invBudgetMaxInLakhs,
+            location: invForm.area,
+            locationRaw: invForm.area,
+            locationCanonical: null,
+            locationConfidence: 0,
+            city: invForm.city,
+            propertyType: 'flat',
+            possessionNeeded: invForm.possessionStatus === 'ready' ? 'immediate' : null,
+            loanRequired: invForm.bankLoanAvailable,
+            urgency: 'normal',
+          }
+        },
+        messageId: message._id,
+      });
+
       setInvForm({ bhkOptions: [], priceRange: { min: 0, max: 0 }, area: '', city: '', possessionStatus: 'ready', bankLoanAvailable: false, commissionPercent: 2, description: '' });
       setPostMode('text');
-      toast.success('Inventory posted!');
     } catch (err: any) { toast.error(err.message || 'Failed to post'); }
   };
 
@@ -400,6 +468,24 @@ export default function GroupChatPage() {
           </>
         )}
       </div>
+
+      {/* Lead Confirmation Modal */}
+      {leadModal && activeRoom && (
+        <LeadConfirmModal
+          extraction={leadModal.extraction}
+          messageId={leadModal.messageId}
+          roomId={activeRoom._id}
+          onConfirm={({ matchCount, topScore }) => {
+            setLeadModal(null);
+            if (matchCount > 0) {
+              toast.success(`✓ Lead saved — ${matchCount} match${matchCount > 1 ? 'es' : ''} found (${topScore}%)`, { duration: 4000 });
+            } else {
+              toast.success('✓ Lead saved — No matches yet, will check when new inventory arrives', { duration: 4000 });
+            }
+          }}
+          onDismiss={() => setLeadModal(null)}
+        />
+      )}
 
       {/* Create Room Modal */}
       {showCreateRoom && (
