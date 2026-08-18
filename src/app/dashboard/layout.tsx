@@ -371,7 +371,7 @@ const orgPath = user
           )}
 
           {/* Chat Link */}
-          {(user?.role === 'admin') && (
+          {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'captain') && (
             <>
 
               <Link
@@ -407,7 +407,8 @@ const orgPath = user
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Group Chat</span>}
               </Link>
 
-              {/* CRM — admin/builder/agent only */}
+              {/* CRM — admin only (builders/agents/captains have their own CRM link) */}
+              {user?.role === 'admin' && (
               <Link
                 href="/dashboard/crm"
                 onClick={() => setSidebarOpen(false)}
@@ -423,6 +424,7 @@ const orgPath = user
                 </svg>
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">CRM</span>}
               </Link>
+              )}
             </>
           )}
 
