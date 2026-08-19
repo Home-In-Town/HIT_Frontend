@@ -371,7 +371,7 @@ const orgPath = user
           )}
 
           {/* Chat Link */}
-          {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'captain') && (
+          {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'captain' || user?.role === 'agent' || user?.role === 'employee') && (
             <>
 
               <Link
