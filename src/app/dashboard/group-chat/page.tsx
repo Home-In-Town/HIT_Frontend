@@ -401,10 +401,10 @@ export default function GroupChatPage() {
               {/* Mode switcher */}
               <div className="flex items-center gap-2 mb-2">
                 <button onClick={() => setPostMode('text')} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${postMode === 'text' ? 'bg-[#B45309] text-white' : 'bg-[#FAF7F2] text-gray-600'}`}>Text</button>
-                {(user?.role === 'agent' || user?.role === 'admin') && (
+                {(user?.role === 'agent' || user?.role === 'admin' || user?.role === 'captain') && (
                   <button onClick={() => setPostMode('requirement')} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${postMode === 'requirement' ? 'bg-orange-600 text-white' : 'bg-[#FAF7F2] text-gray-600'}`}>🔍 Post Requirement</button>
                 )}
-                {(user?.role === 'builder' || user?.role === 'admin') && (
+                {(user?.role === 'builder' || user?.role === 'admin' || user?.role === 'captain' || user?.role === 'agent') && (
                   <button onClick={() => setPostMode('inventory')} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${postMode === 'inventory' ? 'bg-emerald-600 text-white' : 'bg-[#FAF7F2] text-gray-600'}`}>🏠 Post Inventory</button>
                 )}
               </div>

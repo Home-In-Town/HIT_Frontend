@@ -18,8 +18,8 @@ export default function ChatPage() {
 function ChatContent() {
   const { user } = useAuth();
 
-  // Builders and captains see the Builder Network view
-  if (user?.role === 'builder' || user?.role === 'captain') {
+  // Builders, captains, agents, and employees see the Builder Network view
+  if (user?.role === 'builder' || user?.role === 'captain' || user?.role === 'agent' || user?.role === 'employee') {
     return <BuilderNetworkView />;
   }
 
