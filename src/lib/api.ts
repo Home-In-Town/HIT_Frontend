@@ -1195,6 +1195,62 @@ export const chatApi = {
 };
 
 /* ----------------------------------
+   Builders Network API (FOMO Chat)
+-----------------------------------*/
+
+export interface BuilderNetworkItem {
+  _id: string;
+  name: string;
+  companyName: string | null;
+  businessLogoUrl: string | null;
+  businessCity: string | null;
+  isVerified: boolean;
+  verificationStatus: 'unverified' | 'pending' | 'verified';
+  rating: number;
+  ratingCount: number;
+  lastSeen: string | null;
+  isOnline: boolean;
+  joinedAt: string;
+  projectCount: number;
+  projectLocations: string[];
+  agentInterestCount: number;
+  dealsClosedCount: number;
+  newProjectsThisWeek: number;
+}
+
+export interface PlatformPulse {
+  totalBuilders: number;
+  onlineNow: number;
+  activeLeadsToday: number;
+  dealsClosedToday: number;
+  newProjectsToday: number;
+}
+
+export interface BuildersNetworkResponse {
+  builders: BuilderNetworkItem[];
+  total: number;
+  page: number;
+  limit: number;
+  pulse: PlatformPulse;
+}
+
+export const buildersNetworkApi = {
+  async getBuilders(params?: { search?: string; city?: string; page?: number; limit?: number }): Promise<BuildersNetworkResponse> {
+    const query = new URLSearchParams();
+    if (params?.search) query.set('search', params.search);
+    if (params?.city) query.set('city', params.city);
+    if (params?.page) query.set('page', params.page.toString());
+    if (params?.limit) query.set('limit', params.limit.toString());
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_URL}/chat/builders-network${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<BuildersNetworkResponse>(response);
+  },
+};
+
+/* ----------------------------------
    CRM API
 -----------------------------------*/
 
