@@ -1,0 +1,1494 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Project, ProjectFormData, AMENITIES, ProjectStatus } from '@/types/project';
+import { projectsApi, mediaApi} from '@/lib/api';
+import { PROPERTY_CATEGORIES, CATEGORY_PROPERTY_TYPES, PropertyCategory } from '@/lib/propertyConfig';
+import toast from 'react-hot-toast';
+import { useRef } from 'react';
+
+interface ProjectFormProps {
+  initialData?: Partial<Project>;
+  mode: 'create' | 'edit';
+}
+
+const validateFileSize = (file: File, maxKB: number) => {
+  return file.size <= maxKB * 1024;
+};
+
+const DEFAULT_FORM_DATA: ProjectFormData = {
+  name: '',
+  type: 'flat',
+  category: '',
+  propertyType: '',
+  city: '',
+  location: '',
+  latitude: 0,
+  longitude: 0,
+  googleMapLink: '',
+  reraApproved: false,
+  reraNumber: '',
+  projectStatus: 'under-construction',
+  startingPrice: 0,
+  pricePerSqFt: 0,
+  priceRange: '',
+  paymentPlan: '',
+  bankLoanAvailable: false,
+  gstPercentage: undefined,
+  stampDutyPercentage: undefined,
+  registrationCharges: undefined,
+  maintenanceCharges: '',
+  otherCharges: '',
+  bhkOptions: [],
+  carpetAreaRange: '',
+  floorRange: '',
+  plotSizeRange: '',
+  facingOptions: [],
+  gatedCommunity: false,
+  amenities: [],
+  coverImage: '',
+  galleryImages: [],
+  videos: [],
+  brochureUrl: '',
+  ctaButtonText: 'Book Site Visit',
+  whatsappNumber: '',
+  callNumber: '',
+  isPublished: false,
+};
+
+const InputField = ({
+  label,
+  name,
+  type = 'text',
+  placeholder,
+  required = false,
+  value,
+  onChange,
+  error,
+  inputProps = {},
+  refCallback,
+}: {
+  label: string;
+  name: string;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  value: string | number;
+  onChange: (value: string) => void;
+  error?: string;
+  inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
+  refCallback?: (el: HTMLInputElement | null) => void;
+}) => (
+  <div>
+    <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+      {label} {required && <span className="text-red-500">*</span>}
+    </label>
+
+    <input
+    ref={refCallback}
+      type={type}
+      name={name}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      placeholder={placeholder}
+      required={required}
+      className={`w-full px-4 py-2.5 bg-white rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] transition-shadow
+        focus:outline-none focus:ring-2 focus:border-transparent
+        ${
+          error
+            ? 'border border-red-500 ring-1 ring-red-500 focus:ring-red-500'
+            : 'border border-[#D6D3D1] focus:ring-[#B45309]'
+        }
+      `}
+      {...inputProps}
+    />
+
+    {error && (
+      <p className="mt-1 text-sm text-red-600">
+        {error}
+      </p>
+    )}
+  </div>
+);
+
+
+export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
+  const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [galleryFiles, setGalleryFiles] = useState<File[]>([]);
+  const [videoFiles, setVideoFiles] = useState<File[]>([]);
+  const [brochureFile, setBrochureFile] = useState<File | null>(null);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const fieldRefs = useRef<Record<string, HTMLElement | null>>({});
+  const COVER_IMAGE_MAX_KB = 500;    // 500 KB
+  const GALLERY_IMAGE_MAX_KB = 500;  // 500 KB each
+  const BROCHURE_MAX_KB = 2048;      // 2 MB
+  const VIDEO_MAX_KB = 30 * 1024; // 5 MB per video (MAX)
+  const MAX_VIDEOS = 2;
+  const [uploading, setUploading] = useState(false);
+  const [showAllAmenities, setShowAllAmenities] = useState(false);
+  const [customAmenity, setCustomAmenity] = useState('');
+  const [customAmenities, setCustomAmenities] = useState<string[]>([]);
+  const [customPropertyType, setCustomPropertyType] = useState('');
+  const [showCustomPropertyInput, setShowCustomPropertyInput] = useState(false);
+
+  const router = useRouter();
+  const [formData, setFormData] = useState<ProjectFormData>({
+    ...DEFAULT_FORM_DATA,
+    ...initialData,
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [publishedLink, setPublishedLink] = useState<string | null>(
+    initialData?.trackableLink || null
+  );
+
+  const updateField = <K extends keyof ProjectFormData>(
+    field: K,
+    value: ProjectFormData[K]
+  ) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const validateForm = (isPublishing = false) => {
+  const errors: Record<string, string> = {};
+
+  // Section 1
+  if (!formData.name?.trim()) errors.name = 'Project name is required';
+  if (!formData.category) errors.category = 'Category is required';
+  if (!formData.propertyType) errors.propertyType = 'Property type is required';
+  if (!formData.city?.trim()) errors.city = 'City is required';
+  if (!formData.location?.trim()) errors.location = 'Location is required';
+  if (!formData.googleMapLink?.trim()) errors.googleMapLink = 'Google Map Link is required';
+  
+  // Section 2
+  if (formData.reraApproved && !formData.reraNumber?.trim()) {
+    errors.reraNumber = 'RERA number is required when approved';
+  }
+  if (!formData.projectStatus) {
+    errors.projectStatus = 'Project status is required';
+  }
+
+  // Section 3
+  if (!formData.startingPrice) errors.startingPrice = 'Starting price is required';
+
+  // Section 4 - only validate BHK for Residential/Commercial non-plot types
+  // Mixed Use category never requires BHK since projects can be a combination
+  const isPlotType = formData.propertyType?.toLowerCase().includes('plot') || 
+    formData.propertyType?.toLowerCase().includes('land') ||
+    ['Residential Plot', 'Commercial Plot / Land', 'Farm Land'].includes(formData.propertyType || '');
+  const isMixedUse = formData.category === 'Mixed Use';
+  
+  if (formData.propertyType && !isPlotType && !isMixedUse && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
+    errors.bhkOptions = 'Select at least one BHK option';
+  }
+
+  // Section 5
+  if (!formData.amenities || formData.amenities.length === 0) {
+    errors.amenities = 'Select at least one amenity';
+  }
+
+  // Section 6
+  if (!formData.coverImage && !coverImageFile) { errors.coverImage = 'Cover image is required'; }
+
+
+  // Section 7
+  if (!formData.ctaButtonText?.trim()) {
+    errors.ctaButtonText = 'CTA button text is required';
+  }
+
+  if (!formData.whatsappNumber || formData.whatsappNumber.length < 10) {
+    errors.whatsappNumber = 'Enter a valid WhatsApp number';
+  }
+
+  if (!formData.callNumber || formData.callNumber.length < 10) {
+    errors.callNumber = 'Enter a valid call number';
+  }
+
+  setFormErrors(errors);
+  const firstErrorKey = Object.keys(errors)[0];
+  if (firstErrorKey) {
+    const el = fieldRefs.current[firstErrorKey];
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.focus();
+    }
+  }
+  return Object.keys(errors).length === 0;
+};
+
+  const handleSubmit = async (e: React.FormEvent, publish = false) => {
+  e.preventDefault();
+
+  setError(null);
+
+   const isValid = validateForm(publish);
+  if (!isValid) {
+    setError('Please fix the highlighted errors before continuing.');
+    return;
+  }
+  // Generate slug from project name
+  const slug = formData.name.toLowerCase().trim().replace(/\s+/g, '-');
+
+  try {
+    setLoading(true);
+    // Check for duplicate slug
+    const existingProject = await projectsApi.getBySlug(slug).catch(() => null);
+
+    if (existingProject) {
+      // If creating a new project OR editing a different project with same slug
+      if (mode === 'create' || existingProject.id !== initialData?.id) {
+        toast.error(
+          `Project with name "${formData.name}" already exists. Please choose a different name.`
+        );
+        setLoading(false);
+        return;
+      }
+    }
+
+    let project: Project;
+
+    if (mode === 'create') {
+      // Step 1: Initial Create with text metadata to get a valid ID
+      const initialPayload = {
+        ...formData,
+        slug,
+        coverImage: '',
+        galleryImages: [],
+        videos: [],
+        brochureUrl: '',
+      };
+
+      project = await projectsApi.create(initialPayload);
+      const projectId = project.id; // Correct project ID for media uploads
+
+      setUploading(true);
+
+      // Step 2: Upload all media using the REAL Project ID
+      
+      // COVER
+      let coverObj = null;
+      if (coverImageFile) {
+        coverObj = await mediaApi.uploadAndSave({
+          file: coverImageFile,
+          projectId,
+          type: 'cover',
+        });
+      }
+
+      // GALLERY
+      const galleryObjs = [];
+      for (const file of galleryFiles) {
+        const obj = await mediaApi.uploadAndSave({ file, projectId, type: 'gallery' });
+        galleryObjs.push(obj);
+      }
+
+      // VIDEOS
+      const videoObjs = [];
+      for (const file of videoFiles) {
+        const obj = await mediaApi.uploadAndSave({ file, projectId, type: 'video' });
+        videoObjs.push(obj);
+      }
+
+      // BROCHURE
+      let brochureObj = null;
+      if (brochureFile) {
+        brochureObj = await mediaApi.uploadAndSave({
+          file: brochureFile,
+          projectId,
+          type: 'brochure',
+        });
+      }
+
+      setUploading(false);
+
+      // Step 3: Final synchronization to link media to project
+      project = await projectsApi.update(projectId, {
+        ...formData, // Ensures price/name stay consistent
+        coverImage: coverObj as any,
+        galleryImages: galleryObjs as any,
+        videos: videoObjs as any,
+        brochureUrl: brochureObj as any,
+      });
+    } else {
+      const projectId = initialData!.id!;
+      const updateData = { ...formData };
+      
+      setUploading(true);
+
+      if (coverImageFile) {
+        const oldKey = (initialData?.coverImage as any)?.key;
+        let fileData;
+        if (oldKey) {
+          fileData = await mediaApi.replaceFile({
+            file: coverImageFile,
+            projectId,
+            type: 'cover',
+            oldKey,
+          });
+        } else {
+          fileData = await mediaApi.uploadAndSave({
+            file: coverImageFile,
+            projectId,
+            type: 'cover',
+          });
+        }
+        updateData.coverImage = fileData as any;
+      }
+
+      const validGalleryImages = updateData.galleryImages.filter(
+        img => typeof img === 'object' && (img as any).url
+      );
+      
+      for (const file of galleryFiles) {
+        const fileData = await mediaApi.uploadAndSave({ file, projectId, type: 'gallery' });
+        validGalleryImages.push(fileData as any);
+      }
+      updateData.galleryImages = validGalleryImages;
+
+      const validVideos = updateData.videos.filter(
+        vid => typeof vid === 'object' && (vid as any).url
+      );
+      
+      for (const file of videoFiles) {
+        const fileData = await mediaApi.uploadAndSave({ file, projectId, type: 'video' });
+        validVideos.push(fileData as any);
+      }
+      updateData.videos = validVideos;
+
+      if (brochureFile) {
+        const oldKey = (initialData?.brochureUrl as any)?.key;
+        let fileData;
+        if (oldKey) {
+          fileData = await mediaApi.replaceFile({
+            file: brochureFile,
+            projectId,
+            type: 'brochure',
+            oldKey,
+          });
+        } else {
+          fileData = await mediaApi.uploadAndSave({
+            file: brochureFile,
+            projectId,
+            type: 'brochure',
+          });
+        }
+        updateData.brochureUrl = fileData as any;
+      }
+
+      setUploading(false);
+
+      project = await projectsApi.update(projectId, updateData);
+    }
+
+    if (publish) {
+    const result = await projectsApi.publish(project.id);
+    setPublishedLink(result.trackableLink);
+
+    const fullLink = window.location.origin + result.trackableLink;
+
+    if (navigator.clipboard && window.isSecureContext) {
+      try {
+        await navigator.clipboard.writeText(fullLink);
+        toast.success("Project Published & Link Copied!");
+      } catch {
+        toast.success("Project Published! Copy link manually.");
+      }
+    } else {
+      toast.success("Project Published! Copy link manually.");
+    }
+  }
+
+    router.push('/dashboard/projects');
+  } catch (err: any) {
+    console.error('API error:', err);
+    // Friendly fallback for duplicate key error
+    if (err.message?.includes('duplicate key')) {
+      toast.error(
+        `Project with name "${formData.name}" already exists. Please choose another name.`
+      );
+    } else {
+      toast.error('An unexpected error occurred. Please try again.');
+    }
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+  const handleAmenityToggle = (amenity: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity)
+        ? prev.amenities.filter((a) => a !== amenity)
+        : [...prev.amenities, amenity],
+    }));
+  };
+
+  const handleAddCustomAmenity = () => {
+    const trimmed = customAmenity.trim();
+    if (!trimmed) return;
+    // Avoid duplicates (check both predefined and custom)
+    if (
+      AMENITIES.includes(trimmed as any) ||
+      customAmenities.includes(trimmed) ||
+      formData.amenities.includes(trimmed)
+    ) {
+      setCustomAmenity('');
+      return;
+    }
+    setCustomAmenities((prev) => [...prev, trimmed]);
+    setFormData((prev) => ({
+      ...prev,
+      amenities: [...prev.amenities, trimmed],
+    }));
+    setCustomAmenity('');
+  };
+
+  const handleAddCustomPropertyType = () => {
+    const trimmed = customPropertyType.trim();
+    if (!trimmed) return;
+    updateField('propertyType', trimmed);
+    setShowCustomPropertyInput(false);
+    setCustomPropertyType('');
+  };
+
+  const handleBHKToggle = (bhk: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      bhkOptions: prev.bhkOptions?.includes(bhk)
+        ? prev.bhkOptions.filter((b) => b !== bhk)
+        : [...(prev.bhkOptions || []), bhk],
+    }));
+  };
+
+  const handleFacingToggle = (facing: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      facingOptions: prev.facingOptions?.includes(facing)
+        ? prev.facingOptions.filter((f) => f !== facing)
+        : [...(prev.facingOptions || []), facing],
+    }));
+  };
+
+  const addGalleryImage = () => {
+    const url = prompt('Enter image URL:');
+    if (url) {
+      if (url.includes('unsplash.com/photos/')) {
+        alert(
+          'It looks like you pasted an Unsplash PAGE URL (a website), not an image file.\n\nPlease right-click the image on Unsplash and select "Copy Image Address" (or "Copy Image Link") to get the direct link.\n\nDirect links usually start with "https://images.unsplash.com/..."'
+        );
+        return;
+      }
+      setFormData((prev) => ({
+        ...prev,
+        galleryImages: [...prev.galleryImages, url],
+      }));
+    }
+  };
+
+  const removeGalleryImage = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      galleryImages: prev.galleryImages.filter((_, i) => i !== index),
+    }));
+  };
+
+  
+
+  const removeVideo = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      videos: prev.videos.filter((_, i) => i !== index),
+    }));
+  };
+
+  return (
+    <form onSubmit={(e) => handleSubmit(e)} className="space-y-8 max-w-5xl mx-auto">
+      {error && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+          {error}
+        </div>
+      )}
+
+      {publishedLink && (
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+          <p className="text-green-700 font-medium mb-2">✅ Project Published!</p>
+          <p className="text-sm text-green-600">Trackable Link:</p>
+          <a
+            href={publishedLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-green-800 font-medium hover:underline break-all"
+          >
+            {window.location.origin}{publishedLink}
+          </a>
+        </div>
+      )}
+
+      {/* Section 1: Basic Details */}
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">1</span>
+          Basic Details
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <InputField
+            label="Project Name"
+            name="name"
+            placeholder="e.g., Sunrise Heights"
+            required
+            value={formData.name}
+            error={formErrors.name}
+            refCallback={(el) => (fieldRefs.current.name = el)}
+            onChange={(v) => updateField('name', v)}
+          />
+
+          {/* Category Dropdown */}
+          <div>
+            <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+              Category <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="category"
+              value={formData.category}
+              onChange={(e) => {
+                const newCategory = e.target.value;
+                setFormData((prev) => ({
+                  ...prev,
+                  category: newCategory,
+                  propertyType: '',
+                }));
+              }}
+              ref={(el) => { fieldRefs.current.category = el }}
+              className={`w-full px-4 py-2.5 bg-white rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] transition-shadow
+                focus:outline-none focus:ring-2 focus:border-transparent
+                ${
+                  formErrors.category
+                    ? 'border border-red-500 ring-1 ring-red-500 focus:ring-red-500'
+                    : 'border border-[#D6D3D1] focus:ring-[#B45309]'
+                }
+              `}
+            >
+              <option value="" disabled>Select category</option>
+              {PROPERTY_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+            {formErrors.category && (
+              <p className="mt-1 text-sm text-red-600">
+                {formErrors.category}
+              </p>
+            )}
+          </div>
+
+          {/* Property Type - Chip Selection */}
+          <div className="md:col-span-2" ref={(el) => {fieldRefs.current.propertyType = el}}>
+            <label className="block text-sm font-medium text-[#57534E] mb-2 font-sans">
+              Property Type <span className="text-red-500">*</span>
+            </label>
+            {!formData.category ? (
+              <p className="text-sm text-[#A8A29E] italic">Select a category first</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.map((pType) => (
+                  <button
+                    key={pType}
+                    type="button"
+                    onClick={() => {
+                      updateField('propertyType', pType);
+                      setShowCustomPropertyInput(false);
+                    }}
+                    className={`px-4 py-2 border rounded-lg text-sm transition-all ${
+                      formData.propertyType === pType
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    {formData.propertyType === pType ? '✓ ' : ''}{pType}
+                  </button>
+                ))}
+
+                {/* Custom Property Type Button */}
+                {!showCustomPropertyInput ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomPropertyInput(true)}
+                    className={`px-4 py-2 border border-dashed rounded-lg text-sm transition-all ${
+                      formData.propertyType &&
+                      !CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.includes(formData.propertyType as any)
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    + Custom
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customPropertyType}
+                      onChange={(e) => setCustomPropertyType(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddCustomPropertyType();
+                        }
+                      }}
+                      placeholder="Enter property type"
+                      autoFocus
+                      className="px-3 py-2 border border-[#D6D3D1] rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddCustomPropertyType}
+                      className="px-3 py-2 bg-[#B45309] text-white text-sm rounded-lg hover:bg-[#92400E] transition-colors"
+                    >
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCustomPropertyInput(false);
+                        setCustomPropertyType('');
+                      }}
+                      className="px-2 py-2 text-[#78716C] hover:text-red-500 text-sm transition-colors"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+
+                {/* Show the custom property type as a selected chip if it doesn't match predefined */}
+                {formData.propertyType &&
+                  !CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.includes(formData.propertyType as any) &&
+                  !showCustomPropertyInput && (
+                    <span className="px-4 py-2 border border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309] rounded-lg text-sm">
+                      ✓ {formData.propertyType}
+                    </span>
+                  )}
+              </div>
+            )}
+            {formErrors.propertyType && (
+              <p className="mt-1 text-sm text-red-600">
+                {formErrors.propertyType}
+              </p>
+            )}
+          </div>
+
+          <InputField
+            label="City"
+            name="city"
+            placeholder="e.g., Mumbai"
+            required
+            value={formData.city}
+            error={formErrors.city}
+            refCallback={(el) => (fieldRefs.current.name = el)}
+            onChange={(v) => updateField('city', v)}
+          />
+
+          <InputField
+            label="Location / Area"
+            name="location"
+            placeholder="e.g., Andheri West"
+            required
+            value={formData.location}
+            error={formErrors.location}
+            refCallback={(el) => (fieldRefs.current.location = el)}
+            onChange={(v) => updateField('location', v)}
+          />
+
+          <div className="grid grid-cols-2 gap-4">
+            <InputField
+              label="Latitude"
+              name="latitude"
+              type="number"
+              placeholder="e.g., 19.0760"
+              value={formData.latitude || ''}
+              onChange={(v) => updateField('latitude', Number(v))}
+            />
+
+            <InputField
+              label="Longitude"
+              name="longitude"
+              type="number"
+              placeholder="e.g., 72.8777"
+              value={formData.longitude || ''}
+              onChange={(v) => updateField('longitude', Number(v))}
+            />
+          </div>
+
+          <InputField
+            label="Google Map Link"
+            name="googleMapLink"
+            type="url"
+            placeholder="https://maps.google.com/..."
+            required
+            error={formErrors.googleMapLink}
+            refCallback={(el) => (fieldRefs.current.googleMapLink = el)}
+            value={formData.googleMapLink}
+            onChange={(v) => updateField('googleMapLink', v)}
+          />
+        </div>
+      </section>
+
+      {/* Section 2: Legal & Trust */}
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#3F6212] text-white rounded-full flex items-center justify-center text-sm font-sans">2</span>
+          Legal & Trust
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium text-[#57534E] mb-1.5">
+              RERA Approved
+            </label>
+            <div className="flex gap-4">
+              {[true, false].map((val) => (
+                <label
+                  key={String(val)}
+                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
+                    formData.reraApproved === val
+                      ? 'border-green-600 bg-green-50 text-green-700 font-medium ring-1 ring-green-600'
+                      : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="reraApproved"
+                    checked={formData.reraApproved === val}
+                    onChange={() => updateField('reraApproved', val)}
+                    className="sr-only"
+                  />
+                  {val ? '✓ Yes' : '✗ No'}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {formData.reraApproved && (
+            <InputField
+              label="RERA Number"
+              name="reraNumber"
+              placeholder="e.g., P52000012345"
+              value={formData.reraNumber || ''}
+              onChange={(v) => updateField('reraNumber', v)}
+            />
+          )}
+
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-[#57534E] mb-2">
+              Project Status
+            </label>
+            <div className="flex flex-wrap gap-3">
+              {(
+                [
+                  { value: 'pre-launch', label: '🚀 Pre-Launch' },
+                  { value: 'under-construction', label: '🏗️ Under Construction' },
+                  { value: 'ready-to-move', label: '✅ Ready to Move' },
+                ] as { value: ProjectStatus; label: string }[]
+              ).map(({ value, label }) => (
+                <label
+                  key={value}
+                  className={`px-4 py-2 border rounded-lg cursor-pointer transition-all ${
+                    formData.projectStatus === value
+                      ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                      : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="projectStatus"
+                    value={value}
+                    checked={formData.projectStatus === value}
+                    onChange={(e) => updateField('projectStatus', e.target.value as ProjectStatus)}
+                    className="sr-only"
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Section 3: Amenities */}
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">3</span>
+          Amenities
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+          {(showAllAmenities ? AMENITIES : AMENITIES.slice(0, 10)).map((amenity) => (
+            <button
+              key={amenity}
+              type="button"
+              onClick={() => handleAmenityToggle(amenity)}
+              className={`p-3 border rounded-lg transition-all text-left text-sm ${
+                formData.amenities.includes(amenity)
+                  ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                  : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+              }`}
+            >
+              {formData.amenities.includes(amenity) ? '✓ ' : ''}{amenity}
+            </button>
+          ))}
+
+          {/* Custom amenities chips */}
+          {customAmenities.map((amenity) => (
+            <button
+              key={`custom-${amenity}`}
+              type="button"
+              onClick={() => handleAmenityToggle(amenity)}
+              className={`p-3 border rounded-lg transition-all text-left text-sm ${
+                formData.amenities.includes(amenity)
+                  ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                  : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+              }`}
+            >
+              {formData.amenities.includes(amenity) ? '✓ ' : ''}{amenity}
+            </button>
+          ))}
+        </div>
+
+        {AMENITIES.length > 10 && (
+          <button
+            type="button"
+            onClick={() => setShowAllAmenities(!showAllAmenities)}
+            className="mt-4 text-sm font-medium text-[#B45309] hover:text-[#92400E] transition-colors"
+          >
+            {showAllAmenities ? '− Show less' : `+ See more (${AMENITIES.length - 10} more)`}
+          </button>
+        )}
+
+        {/* Add Custom Amenity Input */}
+        <div className="mt-4 flex items-center gap-2">
+          <input
+            type="text"
+            value={customAmenity}
+            onChange={(e) => setCustomAmenity(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                handleAddCustomAmenity();
+              }
+            }}
+            placeholder="Add custom amenity..."
+            className="flex-1 max-w-xs px-4 py-2.5 border border-[#D6D3D1] rounded-lg text-sm text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent"
+          />
+          <button
+            type="button"
+            onClick={handleAddCustomAmenity}
+            disabled={!customAmenity.trim()}
+            className="px-4 py-2.5 bg-[#B45309] text-white text-sm font-medium rounded-lg hover:bg-[#92400E] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            + Add
+          </button>
+        </div>
+
+        {formErrors.amenities && (
+          <p className="text-sm text-red-600 mt-2">
+            {formErrors.amenities}
+          </p>
+        )}
+      </section>
+
+      {/* Section 4: Configuration - appears when any property type is selected */}
+      {formData.propertyType && (
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#3F6212] text-white rounded-full flex items-center justify-center text-sm font-sans">4</span>
+          Configuration
+        </h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Apartment-specific fields - show for non-plot types OR Mixed Use (optional for Mixed Use) */}
+          {(formData.category === 'Mixed Use' || (!['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) && !formData.propertyType.toLowerCase().includes('plot') && !formData.propertyType.toLowerCase().includes('land'))) && (
+          <>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-[#57534E] mb-2">
+                BHK Options
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {['1BHK', '2BHK', '3BHK', '4BHK', '5BHK'].map((bhk) => (
+                  <button
+                    key={bhk}
+                    type="button"
+                    onClick={() => handleBHKToggle(bhk)}
+                    className={`px-4 py-2 border rounded-lg transition-all ${
+                      formData.bhkOptions?.includes(bhk)
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    {bhk}
+                  </button>
+                ))}
+              </div>
+              {formErrors.bhkOptions && (
+                <p className="text-sm text-red-600 mt-2">
+                  {formErrors.bhkOptions}
+                </p>
+              )}
+            </div>
+
+            <InputField
+              label="Carpet Area Range"
+              name="carpetAreaRange"
+              placeholder="e.g., 650 - 1200 sqft"
+              value={formData.carpetAreaRange || ''}
+              onChange={(v) => updateField('carpetAreaRange', v)}
+            />
+
+            <InputField
+              label="Floor Range"
+              name="floorRange"
+              placeholder="e.g., 1-25"
+              value={formData.floorRange || ''}
+              onChange={(v) => updateField('floorRange', v)}
+            />
+          </>
+          )}
+
+          {/* Plot/Land-specific fields - show for plot types OR Mixed Use (optional for Mixed Use) */}
+          {(formData.category === 'Mixed Use' || ['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) || formData.propertyType.toLowerCase().includes('plot') || formData.propertyType.toLowerCase().includes('land')) && (
+          <>
+            <InputField
+              label="Plot Size Range (sqft)"
+              name="plotSizeRange"
+              placeholder="e.g., 1000 - 2500 sqft"
+              value={formData.plotSizeRange || ''}
+              onChange={(v) => updateField('plotSizeRange', v)}
+            />
+
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5">
+                Gated Community
+              </label>
+              <div className="flex gap-4">
+                {[true, false].map((val) => (
+                  <label
+                    key={String(val)}
+                    className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
+                      formData.gatedCommunity === val
+                        ? 'border-green-600 bg-green-50 text-green-700 font-medium'
+                        : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="gatedCommunity"
+                      checked={formData.gatedCommunity === val}
+                      onChange={() => updateField('gatedCommunity', val)}
+                      className="sr-only"
+                    />
+                    {val ? '✓ Yes' : '✗ No'}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </>
+          )}
+
+          {/* Direction - shown for ALL property types */}
+          <div className="md:col-span-2">
+            <label className="block text-sm font-medium text-[#57534E] mb-2">
+              Direction / Facing
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {['East', 'West', 'North', 'South', 'North-East', 'North-West', 'South-East', 'South-West'].map(
+                (facing) => (
+                  <button
+                    key={facing}
+                    type="button"
+                    onClick={() => handleFacingToggle(facing)}
+                    className={`px-3 py-2 border rounded-lg text-sm transition-all ${
+                      formData.facingOptions?.includes(facing)
+                        ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium'
+                        : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                    }`}
+                  >
+                    {formData.facingOptions?.includes(facing) ? '✓ ' : ''}{facing}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      </section>
+      )}
+
+      {/* Section 5: Pricing & Payment */}
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">5</span>
+          Pricing & Payment
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <InputField
+            label="Starting Price (₹)"
+            name="startingPrice"
+            type="number"
+            placeholder="e.g., 8500000"
+            required
+            value={formData.startingPrice || ''}
+            error={formErrors.startingPrice}
+            refCallback={(el) => (fieldRefs.current.startingPrice = el)}
+            onChange={(v) => updateField('startingPrice', Number(v))}
+          />
+
+          <InputField
+            label="Price Per Sq Ft (₹)"
+            name="pricePerSqFt"
+            type="number"
+            placeholder="e.g., 15000"
+            required
+            value={formData.pricePerSqFt || ''}
+            error={formErrors.pricePerSqFt}
+            refCallback={(el) => (fieldRefs.current.pricePerSqFt = el)}
+            onChange={(v) => updateField('pricePerSqFt', Number(v))}
+          />
+
+          <InputField
+            label="Price Range"
+            name="priceRange"
+            placeholder="e.g., 85L - 1.5Cr"
+            value={formData.priceRange}
+            onChange={(v) => updateField('priceRange', v)}
+          />
+
+          <InputField
+            label="Payment Plan"
+            name="paymentPlan"
+            placeholder="e.g., 10:80:10 or Flexible"
+            value={formData.paymentPlan}
+            onChange={(v) => updateField('paymentPlan', v)}
+          />
+
+          <div>
+            <label className="block text-sm font-medium text-[#57534E] mb-1.5">
+              Bank Loan Available
+            </label>
+            <div className="flex gap-4">
+              {[true, false].map((val) => (
+                <label
+                  key={String(val)}
+                  className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
+                    formData.bankLoanAvailable === val
+                      ? 'border-green-600 bg-green-50 text-green-700 font-medium'
+                      : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="bankLoanAvailable"
+                    checked={formData.bankLoanAvailable === val}
+                    onChange={() => updateField('bankLoanAvailable', val)}
+                    className="sr-only"
+                  />
+                  {val ? '✓ Yes' : '✗ No'}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Additional Charges */}
+        <div className="mt-6 pt-6 border-t border-[#E7E5E4]">
+          <p className="text-sm font-semibold text-[#57534E] mb-4 uppercase tracking-wide">
+            Additional Charges <span className="text-[#A8A29E] font-normal normal-case tracking-normal">(Optional)</span>
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+                GST
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="gstPercentage"
+                  value={formData.gstPercentage ?? ''}
+                  onChange={(e) => updateField('gstPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="e.g., 5"
+                  min={0}
+                  max={100}
+                  className="w-full px-4 py-2.5 pr-10 bg-white border border-[#D6D3D1] rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent transition-shadow"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] text-sm font-medium pointer-events-none">%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+                Stamp Duty
+              </label>
+              <div className="relative">
+                <input
+                  type="number"
+                  name="stampDutyPercentage"
+                  value={formData.stampDutyPercentage ?? ''}
+                  onChange={(e) => updateField('stampDutyPercentage', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="e.g., 6"
+                  min={0}
+                  max={100}
+                  className="w-full px-4 py-2.5 pr-10 bg-white border border-[#D6D3D1] rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent transition-shadow"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[#78716C] text-sm font-medium pointer-events-none">%</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+                Registration Charges
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#78716C] text-sm font-medium pointer-events-none">₹</span>
+                <input
+                  type="number"
+                  name="registrationCharges"
+                  value={formData.registrationCharges ?? ''}
+                  onChange={(e) => updateField('registrationCharges', e.target.value === '' ? undefined : Number(e.target.value))}
+                  placeholder="e.g., 30000"
+                  min={0}
+                  className="w-full pl-7 pr-4 py-2.5 bg-white border border-[#D6D3D1] rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309] focus:border-transparent transition-shadow"
+                />
+              </div>
+            </div>
+
+            <InputField
+              label="Maintenance Charges"
+              name="maintenanceCharges"
+              placeholder="e.g., ₹3/sq ft/month"
+              value={formData.maintenanceCharges ?? ''}
+              onChange={(v) => updateField('maintenanceCharges', v)}
+            />
+
+            <div className="md:col-span-2">
+              <InputField
+                label="Other Charges"
+                name="otherCharges"
+                placeholder="e.g., PLC charges applicable, Floor rise charges, etc."
+                value={formData.otherCharges ?? ''}
+                onChange={(v) => updateField('otherCharges', v)}
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+     {/* Section 6: Media */}
+<section className="bg-white p-6 sm:p-8 rounded-2xl border border-[#E7E5E4] shadow-sm">
+  <h2 className="text-xl font-semibold text-[#1C1917] mb-8 flex items-center gap-3">
+    <span className="w-8 h-8 bg-[#3F6212] text-white rounded-full flex items-center justify-center text-sm">
+      6
+    </span>
+    Media & Brochure
+  </h2>
+
+  <div className="space-y-8">
+
+    {/* Cover Image */}
+    <div className="border rounded-xl p-5 bg-[#FAFAF9]">
+      <div className="flex items-center justify-between mb-3">
+        <label className="text-sm font-medium text-[#44403C]">
+          Cover Image <span className="text-red-500">*</span>
+        </label>
+        <span className="text-xs text-[#78716C]">
+          JPG / PNG · Max {COVER_IMAGE_MAX_KB}KB
+        </span>
+      </div>
+
+      <label className="flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer hover:border-[#3F6212] transition">
+        <input
+          type="file"
+          accept="image/png,image/jpeg"
+          className="hidden"
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            if (!validateFileSize(file, COVER_IMAGE_MAX_KB)) {
+              toast.error(`Cover image must be under ${COVER_IMAGE_MAX_KB}KB`);
+              return;
+            }
+
+            setCoverImageFile(file); 
+            updateField('coverImage', URL.createObjectURL(file));
+          }}
+        />
+        <span className="text-sm text-[#57534E]">
+          Click to upload cover image
+        </span>
+      </label>
+
+      {formData.coverImage && (
+        <div className="mt-4 w-56 h-36 rounded-lg overflow-hidden border">
+          <img
+            src={typeof formData.coverImage === 'object' ? (formData.coverImage as any).url : formData.coverImage}
+            alt="Cover Preview"
+            className="w-full h-full object-cover"
+          />
+        </div>
+      )}
+    </div>
+
+    {/* Gallery Images */}
+    <div className="border rounded-xl p-5 bg-[#FAFAF9]">
+      <div className="flex items-center justify-between mb-4">
+        <label className="text-sm font-medium text-[#44403C]">
+          Gallery Images
+        </label>
+        <span className="text-xs text-[#78716C]">
+          JPG / PNG · Max {GALLERY_IMAGE_MAX_KB}KB each
+        </span>
+      </div>
+
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3 mb-4">
+        {formData.galleryImages.map((img, index) => (
+          <div key={index} className="relative group">
+            <img
+              src={typeof img === 'object' ? (img as any).url : img}
+              className="w-full h-24 object-cover rounded-lg border"
+            />
+            <button
+              type="button"
+              onClick={() => removeGalleryImage(index)}
+              className="absolute top-1 right-1 bg-black/70 text-white w-6 h-6 rounded-full opacity-0 group-hover:opacity-100 transition"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer bg-white hover:bg-[#F5F5F4] text-sm">
+        + Add Images
+        <input
+          type="file"
+          multiple
+          accept="image/png,image/jpeg"
+          className="hidden"
+          onChange={(e) => {
+          const files = e.target.files;
+          if (!files) return;
+
+          const validFiles: File[] = [];
+          const previews: string[] = [];
+
+          for (const file of Array.from(files)) {
+            if (!validateFileSize(file, GALLERY_IMAGE_MAX_KB)) {
+              toast.error(`${file.name} exceeds ${GALLERY_IMAGE_MAX_KB}KB`);
+              continue;
+            }
+
+            validFiles.push(file);
+            previews.push(URL.createObjectURL(file));
+          }
+
+          setGalleryFiles((prev) => [...prev, ...validFiles]); 
+
+          updateField('galleryImages', [
+            ...formData.galleryImages,
+            ...previews, 
+          ]);
+
+          e.target.value = '';
+        }}
+        />
+      </label>
+    </div>
+
+    {/* Videos */}
+    <div className="border rounded-xl p-5 bg-[#FAFAF9]">
+      <div className="flex items-center justify-between mb-4">
+        <label className="text-sm font-medium text-[#44403C]">
+          Project Videos
+        </label>
+        <span className="text-xs text-[#78716C]">
+          MP4 / WebM · Max {VIDEO_MAX_KB / 1024}MB · {MAX_VIDEOS} videos
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        {formData.videos.map((video, index) => (
+          <div key={index} className="relative border rounded-lg overflow-hidden">
+            <video
+              src={typeof video === 'object' ? (video as any).url : video}
+              controls
+              className="w-full h-44 object-cover bg-black"
+            />
+            <button
+              type="button"
+              onClick={() => removeVideo(index)}
+              className="absolute top-2 right-2 bg-black/70 text-white w-7 h-7 rounded-full"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {formData.videos.length < MAX_VIDEOS && (
+        <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer bg-white hover:bg-[#F5F5F4] text-sm">
+          + Upload Videos
+          <input
+            type="file"
+            accept="video/mp4,video/webm"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+            const files = e.target.files;
+            if (!files) return;
+
+            const slots = MAX_VIDEOS - formData.videos.length;
+            const selected = Array.from(files).slice(0, slots);
+
+            const validFiles: File[] = [];
+            const previews: string[] = [];
+
+            for (const file of selected) {
+              if (!validateFileSize(file, VIDEO_MAX_KB)) {
+                toast.error(`${file.name} exceeds size limit`);
+                continue;
+              }
+
+              validFiles.push(file);
+              previews.push(URL.createObjectURL(file));
+            }
+
+            setVideoFiles((prev) => [...prev, ...validFiles]); // ✅ store files
+
+            updateField('videos', [
+              ...formData.videos,
+              ...previews, // ✅ preview only
+            ]);
+
+            e.target.value = '';
+          }}
+          />
+        </label>
+      )}
+    </div>
+
+    {/* Brochure */}
+    <div className="border rounded-xl p-5 bg-[#FAFAF9]">
+      <label className="text-sm font-medium text-[#44403C] mb-2 block">
+        Brochure (PDF)
+      </label>
+
+      <label className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer bg-white hover:bg-[#F5F5F4] text-sm">
+        Upload PDF
+        <input
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+
+          if (!validateFileSize(file, BROCHURE_MAX_KB)) {
+            toast.error(`Brochure must be under ${BROCHURE_MAX_KB}KB`);
+            return;
+          }
+
+          setBrochureFile(file); 
+          updateField('brochureUrl', file.name); 
+        }}
+        />
+      </label>
+
+      {formData.brochureUrl && (
+        <p className="mt-2 text-sm text-green-700">
+            ✔ Uploaded: {(typeof formData.brochureUrl === 'string' ? formData.brochureUrl : formData.brochureUrl.url).split("/").pop()}
+        </p>
+      )}
+    </div>
+
+  </div>
+</section>
+
+
+      {/* Section 7: Sales CTA */}
+      <section className="bg-white p-6 sm:p-8 rounded-xl border border-[#E7E5E4] shadow-sm">
+        <h2 className="text-xl font-bold text-[#2A2A2A] mb-6 flex items-center gap-3 font-serif">
+          <span className="w-8 h-8 bg-[#B45309] text-white rounded-full flex items-center justify-center text-sm font-sans">7</span>
+          Contact Configuration
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+          <InputField
+            label="CTA Button Text"
+            name="ctaButtonText"
+            placeholder="e.g., Book Site Visit"
+            required
+            value={formData.ctaButtonText}
+            error={formErrors.ctaButtonText}
+            refCallback={(el) => (fieldRefs.current.ctaButtonText = el)}
+            onChange={(v) => updateField('ctaButtonText', v)}
+          />
+
+          <InputField
+            label="WhatsApp Number"
+            name="whatsappNumber"
+            placeholder="e.g., 919876543210"
+            required
+            value={formData.whatsappNumber}
+            error={formErrors.whatsappNumber}
+            refCallback={(el) => (fieldRefs.current.whatsappNumber = el)}
+            onChange={(v) => updateField('whatsappNumber', v.replace(/\D/g, ''))}
+            inputProps={{
+              inputMode: 'numeric',
+              pattern: '[0-9]{10,15}',
+              minLength: 10,
+              maxLength: 15,
+              title: 'Enter a valid phone number (10–15 digits)',
+            }}
+          />
+
+          <InputField
+            label="Call Number"
+            name="callNumber"
+            placeholder="e.g., 919876543210"
+            required
+            value={formData.callNumber}
+            error={formErrors.callNumber}
+            refCallback={(el) => (fieldRefs.current.callNumber = el)}
+            onChange={(v) => updateField('callNumber', v.replace(/\D/g, ''))}
+            inputProps={{
+            inputMode: 'numeric',
+            pattern: '[0-9]{10,15}',
+            minLength: 10,
+            maxLength: 15,
+            title: 'Enter a valid phone number (10–15 digits)',
+          }}
+          />
+        </div>
+      </section>
+
+      {/* Actions */}
+      <div className="sticky bottom-6 bg-white/60 backdrop-blur-xl border border-[#E7E5E4] p-6 rounded-[2rem] flex flex-col-reverse sm:flex-row gap-4 sm:justify-end z-30 shadow-2xl shadow-[#B45309]/10">
+        <button
+          type="button"
+          onClick={() => router.push('/dashboard')}
+          className="w-full sm:w-auto px-8 py-4 bg-white border border-[#E7E5E4] text-[#57534E] font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-[#FAF7F2] hover:border-[#B45309] hover:text-[#B45309] transition-all"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          disabled={loading || uploading}
+          className="w-full sm:w-auto px-8 py-4 bg-[#57534E] text-white font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-[#2A2A2A] transition-all disabled:opacity-50"
+        >
+           {uploading ? 'Uploading...' : loading ? 'Saving...' : 'Save Draft'}
+        </button>
+        <button
+          type="button"
+          onClick={(e) => handleSubmit(e, true)}
+          disabled={loading || uploading}
+          className="w-full sm:w-auto px-10 py-4 bg-[#B45309] text-white font-bold uppercase tracking-widest text-xs rounded-2xl hover:bg-[#92400E] transition-all disabled:opacity-50 shadow-lg shadow-[#B45309]/20"
+        >
+           {uploading ? 'Uploading...' : loading ? 'Publishing...' : 'Publish'}
+        </button>
+      </div>
+    </form>
+  );
+}

@@ -1,0 +1,350 @@
+'use client';
+import React, { useState, useRef, useEffect } from 'react';
+import { Project, Captain, Agent } from '@/types/project';
+import Link from 'next/link';
+import ProjectAnalyticsCard from '@/components/analytics/ProjectAnalyticsCard';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/authContext';
+import { projectsApi } from '@/lib/api';
+import CaptainCombobox from '@/components/dashboard/CaptainCombobox';
+import AgentCombobox from '@/components/dashboard/AgentCombobox';
+import toast from 'react-hot-toast';
+import { getPropertyLabel } from '@/lib/getPropertyLabel';
+
+interface ProjectTableProps {
+  projects: Project[];
+  onDelete: (project: Project) => void;
+  onCopyLink: (link: string) => void;
+  onAssignCaptain?: (projectId: string, captainId: string | null, captainName: string | null) => Promise<void>;
+  onAssignAgent?: (projectId: string, agentId: string | null, agentName: string | null) => Promise<void>;
+}
+
+export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignCaptain, onAssignAgent }: ProjectTableProps) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [captainComboboxProjectId, setCaptainComboboxProjectId] = useState<string | null>(null);
+  const [captainTriggerEl, setCaptainTriggerEl] = useState<HTMLButtonElement | null>(null);
+  const [captains, setCaptains] = useState<Captain[]>([]);
+  const [captainsLoading, setCaptainsLoading] = useState(false);
+  const [agentComboboxProjectId, setAgentComboboxProjectId] = useState<string | null>(null);
+  const [agentTriggerEl, setAgentTriggerEl] = useState<HTMLButtonElement | null>(null);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const isCaptain = user?.role === 'captain';
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const formatPrice = (price: number | undefined | null) => {
+    if (price === undefined || price === null) return 'POA';
+    if (price >= 10000000) return `₹${(price / 10000000).toFixed(1)}Cr`;
+    if (price >= 100000) return `₹${(price / 100000).toFixed(1)}L`;
+    return `₹${price.toLocaleString()}`;
+  };
+
+  const handleCaptainCellClick = async (projectId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    setCaptainTriggerEl(e.currentTarget);
+    setCaptainComboboxProjectId(projectId);
+    setCaptainsLoading(true);
+    try {
+      const data = await projectsApi.getCaptains();
+      setCaptains(data);
+    } catch {
+      toast.error('Failed to load captains');
+      setCaptainComboboxProjectId(null);
+      setCaptainTriggerEl(null);
+    } finally {
+      setCaptainsLoading(false);
+    }
+  };
+
+  const handleCaptainSelect = (captain: Captain | null, projectId: string) => {
+    setCaptainComboboxProjectId(null);
+    setCaptainTriggerEl(null);
+    if (onAssignCaptain) {
+      onAssignCaptain(projectId, captain?.id || null, captain?.name || null);
+    }
+  };
+
+  const handleAgentCellClick = async (projectId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    setAgentTriggerEl(e.currentTarget);
+    setAgentComboboxProjectId(projectId);
+    setAgentsLoading(true);
+    try {
+      const data = await projectsApi.getMyAgents();
+      setAgents(data);
+    } catch {
+      toast.error('Failed to load agents');
+      setAgentComboboxProjectId(null);
+      setAgentTriggerEl(null);
+    } finally {
+      setAgentsLoading(false);
+    }
+  };
+
+  const handleAgentSelect = (agent: Agent | null, projectId: string) => {
+    setAgentComboboxProjectId(null);
+    setAgentTriggerEl(null);
+    if (onAssignAgent) {
+      onAssignAgent(projectId, agent?.id || null, agent?.name || null);
+    }
+  };
+
+  const getAdminStatus = (project: Project) => {
+    if (project.isPublished) {
+      return (
+        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+          Published
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+        Draft
+      </span>
+    );
+  };
+
+  const getPropertyAttribute = (status: string | undefined) => {
+    if (!status) return null;
+    const labels: Record<string, string> = {
+      'pre-launch': 'Pre-Launch',
+      'under-construction': 'Under Const.',
+      'ready-to-move': 'Ready',
+    };
+    return (
+      <span className="text-xs text-gray-500">
+        {labels[status] || status}
+      </span>
+    );
+  };
+
+  return (
+    <div className="bg-white border border-[#E7E5E4] shadow-2xl shadow-[#B45309]/5 rounded-3xl overflow-hidden mb-8">
+      <div className="overflow-x-auto min-h-[400px]"> 
+        <table className="min-w-full divide-y divide-[#E7E5E4]">
+          <thead className="bg-[#FAF7F2]">
+            <tr>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Project Name</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Location</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Type</th>
+              <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Status</th>
+              {isAdmin && (
+                <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Captain</th>
+              )}
+              {isCaptain && (
+                <th scope="col" className="px-6 py-4 text-left text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Agent</th>
+              )}
+              <th scope="col" className="px-6 py-4 text-right text-[10px] font-bold text-[#A8A29E] uppercase tracking-[0.2em]">Price</th>
+              <th scope="col" className="relative px-6 py-4">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-[#E7E5E4]/50">
+            {projects.map((project) => (
+              <tr key={project.id} className="hover:bg-[#FAF7F2]/30 transition-colors group">
+                {/* Project Name & Meta */}
+                <td className="px-6 py-3.5 whitespace-nowrap">
+                  <div className="flex items-center">
+                    <div>
+                      <div className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors">{project.name}</div>
+                      <div className="text-[10px] text-[#A8A29E] mt-1 flex items-center gap-2 font-bold uppercase tracking-wider">
+                         {/* RERA Indicator */}
+                         {project.reraApproved && (
+                           <span className="text-[#B45309] flex items-center gap-1 bg-[#B45309]/5 px-1.5 py-0.5 rounded border border-[#B45309]/10" title="RERA Verified">
+                             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
+                             RERA
+                           </span>
+                         )}
+                         <span className="text-[#E7E5E4]">|</span>
+                         <span className="font-mono">UPD • {project.createdAt ? new Date(project.createdAt).toLocaleDateString() : 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                <td className="px-6 py-3.5 whitespace-nowrap">
+                  <div className="text-sm font-bold text-[#2A2A2A]">{project.city}</div>
+                  <div className="text-xs text-[#57534E] font-medium">{project.location}</div>
+                </td>
+
+                <td className="px-6 py-3.5 whitespace-nowrap">
+                  <span className="px-3 py-1 inline-flex text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#FAF7F2] text-[#57534E] border border-[#E7E5E4]">
+                    {getPropertyLabel(project)}
+                  </span>
+                </td>
+
+                <td className="px-6 py-3.5 whitespace-nowrap">
+                   <div className="flex flex-col items-start gap-1">
+                      {project.isPublished ? (
+                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#ECFDF5] text-[#065F46] border border-[#D1FAE5]">
+                           Published
+                         </span>
+                      ) : (
+                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-[#FFFBEB] text-[#92400E] border border-[#FEF3C7]">
+                           Draft
+                         </span>
+                      )}
+                      <span className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-widest pl-1">
+                        {getPropertyAttribute(project.projectStatus)}
+                      </span>
+                   </div>
+                </td>
+
+                {isAdmin && (
+                  <td className="px-6 py-3.5 whitespace-nowrap">
+                    <button
+                      onClick={(e) => handleCaptainCellClick(project.id, e)}
+                      className={`text-sm font-medium cursor-pointer hover:text-[#B45309] transition-colors ${
+                        project.owner?.name
+                          ? 'text-[#2A2A2A]'
+                          : 'text-[#A8A29E] italic'
+                      }`}
+                    >
+                      {project.owner?.name || 'Unassigned'}
+                    </button>
+                    {captainComboboxProjectId === project.id && (
+                      <CaptainCombobox
+                        captains={captains}
+                        isLoading={captainsLoading}
+                        onSelect={(captain) => handleCaptainSelect(captain, project.id)}
+                        onClose={() => { setCaptainComboboxProjectId(null); setCaptainTriggerEl(null); }}
+                        triggerEl={captainTriggerEl}
+                      />
+                    )}
+                  </td>
+                )}
+
+                {isCaptain && (
+                  <td className="px-6 py-3.5 whitespace-nowrap">
+                    <button
+                      onClick={(e) => handleAgentCellClick(project.id, e)}
+                      className={`text-sm font-medium cursor-pointer hover:text-[#B45309] transition-colors ${
+                        project.assignedAgent?.name
+                          ? 'text-[#2A2A2A]'
+                          : 'text-[#A8A29E] italic'
+                      }`}
+                    >
+                      {project.assignedAgent?.name || 'Unassigned'}
+                    </button>
+                    {agentComboboxProjectId === project.id && (
+                      <AgentCombobox
+                        agents={agents}
+                        isLoading={agentsLoading}
+                        onSelect={(agent) => handleAgentSelect(agent, project.id)}
+                        onClose={() => { setAgentComboboxProjectId(null); setAgentTriggerEl(null); }}
+                        triggerEl={agentTriggerEl}
+                      />
+                    )}
+                  </td>
+                )}
+
+                <td className="px-6 py-3.5 whitespace-nowrap text-right text-sm font-bold text-[#2A2A2A] font-mono">
+                  {formatPrice(project.startingPrice)}
+                </td>
+
+                <td className="px-6 py-3.5 whitespace-nowrap text-right text-sm font-medium">
+                  <div className="relative inline-block text-left">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOpenMenuId(openMenuId === project.id ? null : project.id);
+                      }}
+                      className="text-[#A8A29E] hover:text-[#B45309] p-2 rounded-xl hover:bg-[#B45309]/5 transition-all"
+                    >
+                      <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                      </svg>
+                    </button>
+                    
+                    {openMenuId === project.id && (
+                      <div 
+                        ref={menuRef}
+                        className="origin-top-right absolute right-0 mt-2 w-56 rounded-2xl shadow-2xl bg-white border border-[#E7E5E4] z-50 focus:outline-none overflow-hidden"
+                      >
+                        <div className="py-1">
+                          <Link 
+                            href={`/dashboard/projects/${project.id}/edit`}
+                            className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                          >
+                            Edit Details
+                          </Link>
+
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              router.push(`/dashboard/projects/${project.id}/layout-editor`);
+                            }}
+                            className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                          >
+                            Layout Editor
+                          </button>
+                          {project.isPublished && (
+                            <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              router.push(`/dashboard/analytics/${project.id}`);
+                            }}
+                            className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                          >
+                            View Analytics
+                          </button>
+
+                          )}
+                          <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onCopyLink(project.trackableLink || `/visit/${project.slug}`);
+                              }}
+                              className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                            >
+                              Copy Project Link
+                            </button>
+
+                          {project.isPublished && project.slug && (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                window.open(`/visit/${project.slug}`, '_blank');
+                              }}
+                              className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                            >
+                              Visit Project ↗
+                            </button>
+                          )}
+
+                          <div className="border-t border-[#E7E5E4] my-1"></div>
+                            <button
+                              onClick={() => {
+                                onDelete(project);
+                                setOpenMenuId(null);
+                              }}
+                              className="text-red-500 block px-4 py-3 text-sm font-bold hover:bg-red-50 w-full text-left transition-colors"
+                            >
+                              Delete Project
+                            </button>
+                          </div>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

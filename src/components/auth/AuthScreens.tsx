@@ -1,0 +1,773 @@
+'use client';
+
+import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { authApi, employeeApi, mediaApi } from '@/lib/api';
+import { useAuth } from '@/lib/authContext';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
+import { Phone, Lock, User, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+
+type Screen = 'login' | 'register' | 'forgot-phone' | 'otp' | 'reset-mpin';
+
+export default function AuthScreens() {
+    const [screen, setScreen] = useState<Screen>('login');
+    const [loading, setLoading] = useState(false);
+    
+    // Form fields
+    const [phone, setPhone] = useState('');
+    const [name, setName] = useState('');
+    const [email, setEmail] = useState('');
+    const [mpin, setMpin] = useState('');
+    const [confirmMpin, setConfirmMpin] = useState('');
+    const [otpCode, setOtpCode] = useState('');
+    const [role, setRole] = useState<'user' | 'employee' | 'captain'>('user');
+    
+    // Flow tracking
+    const [isResetFlow, setIsResetFlow] = useState(false);
+    const [forgotPhone, setForgotPhone] = useState('');
+
+    // Captain registration fields
+    const [companyName, setCompanyName] = useState('');
+    const [businessAddress, setBusinessAddress] = useState('');
+    const [businessCity, setBusinessCity] = useState('');
+    const [businessState, setBusinessState] = useState('');
+    const [businessPinCode, setBusinessPinCode] = useState('');
+    const [businessLogoUrl, setBusinessLogoUrl] = useState('');
+    const [logoUploading, setLogoUploading] = useState(false);
+
+    const { checkAuth } = useAuth();
+    const router = useRouter();
+
+    // ─── Helper: Format phone with +91 ───
+    const formatPhone = (p: string) => p.startsWith('+') ? p : `+91${p}`;
+
+    // ─── Helper: Reset all fields ───
+    const resetFields = () => {
+        setMpin('');
+        setConfirmMpin('');
+        setOtpCode('');
+        setName('');
+        setEmail('');
+        setCompanyName('');
+        setBusinessAddress('');
+        setBusinessCity('');
+        setBusinessState('');
+        setBusinessPinCode('');
+        setBusinessLogoUrl('');
+    };
+
+    // ========================================
+    const validatePhone = (p: string) => /^(?:\+91)?[6-9]\d{9}$/.test(p);
+    const validateMpin = (m: string) => /^\d{4,6}$/.test(m);
+
+    // ========================================
+    // 1. LOGIN — Phone + MPIN (Direct)
+    // ========================================
+    const onLoginSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        if (!validatePhone(phone)) {
+            toast.error('Please enter a valid phone number (e.g. 9970119846)');
+            return;
+        }
+        if (!validateMpin(mpin)) {
+            toast.error("MPIN should be 4-6 digits");
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const formattedPhone = formatPhone(phone);
+            
+            // 1. Perform Login first to identify the user role
+            const { user } = await authApi.login(formattedPhone, mpin);
+            
+            // 2. Conditional Location Logic
+            if (user.role === 'employee') {
+                if (!navigator.geolocation) {
+                    toast.error("Your device doesn't support geolocation, which is required for field workforce login.");
+                    setLoading(false);
+                    return;
+                }
+
+                const toastId = toast.loading("Verifying your location...");
+                
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        try {
+                            // Report captured location to server
+                            await employeeApi.submitLocation(pos.coords.latitude, pos.coords.longitude);
+                            toast.success("Welcome back!", { id: toastId });
+                            await checkAuth();
+                            router.push('/dashboard');
+                        } catch (locErr) {
+                            console.error('Failed to report employee location:', locErr);
+                            toast.error("Failed to verify location. Field workforce tracking is mandatory.", { id: toastId });
+                            setLoading(false);
+                        }
+                    },
+                    (err) => {
+                        console.error('Location error:', err);
+                        toast.error("Location permission is mandatory for field workforce. Please enable GPS.", { id: toastId });
+                        setLoading(false);
+                    },
+                    { enableHighAccuracy: true, timeout: 10000 }
+                );
+            } else {
+                // Non-employees (Admin, Builder, Agent, etc.) proceed directly
+                toast.success("Welcome back!");
+                await checkAuth();
+                router.push('/dashboard');
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Invalid phone or MPIN");
+            setLoading(false);
+        }
+    };
+
+    // ========================================
+    // 2. REGISTER — Name, Phone, Email, MPIN
+    // ========================================
+    const onRegisterSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!name.trim()) return toast.error("Name is required");
+        if (!validatePhone(phone)) {
+            toast.error('Please enter a valid phone number (e.g. 9970119846)');
+            return;
+        }
+        if (!validateMpin(mpin)) {
+            toast.error("MPIN should be 4-6 digits");
+            return;
+        }
+        if (mpin !== confirmMpin) return toast.error("MPINs do not match");
+        
+        if (role === 'captain' && !companyName.trim()) {
+          toast.error('Company name is required for captain registration');
+          return;
+        }
+
+        try {
+            setLoading(true);
+            const formattedPhone = formatPhone(phone);
+            setPhone(formattedPhone);
+            const regResult = await authApi.register({
+              name,
+              phone: formattedPhone,
+              mpin,
+              email,
+              role,
+              ...(role === 'captain' && {
+                companyName: companyName.trim(),
+                businessAddress: businessAddress.trim() || undefined,
+                businessCity: businessCity.trim() || undefined,
+                businessState: businessState.trim() || undefined,
+                businessPinCode: businessPinCode || undefined,
+                businessLogoUrl: businessLogoUrl || undefined,
+              }),
+            });
+
+            // DEV BYPASS: if server auto-verified, skip OTP screen
+            if ((regResult as any).bypassed) {
+                toast.success("Registered successfully!");
+                await checkAuth();
+                router.push('/dashboard');
+                return;
+            }
+
+            toast.success("OTP sent successfully");
+            setIsResetFlow(false);
+            setScreen('otp');
+        } catch (error: any) {
+            toast.error(error.message || "Registration failed");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ========================================
+    // 3. FORGOT MPIN — Enter Phone → Send OTP
+    // ========================================
+    const onForgotPhoneSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!validatePhone(forgotPhone)) {
+            toast.error('Please enter a valid registered phone number');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            const formattedPhone = formatPhone(forgotPhone);
+            setForgotPhone(formattedPhone);
+            await authApi.forgotMpin(formattedPhone);
+            setIsResetFlow(true);
+            setScreen('otp');
+            toast.success("OTP sent for verification");
+        } catch (error: any) {
+            toast.error(error.message || "Failed to send OTP");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ========================================
+    // 4. OTP VERIFICATION
+    // ========================================
+    const onOtpSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (otpCode.length < 6) return toast.error("Please enter a valid 6-digit OTP");
+
+        try {
+            setLoading(true);
+            if (isResetFlow) {
+                // Move to reset MPIN screen (OTP will be verified on final submit)
+                setScreen('reset-mpin');
+            } else {
+                // Registration OTP verification
+                await authApi.verifyOtp(phone, otpCode);
+                toast.success("Verification successful!");
+                await checkAuth();
+                router.push('/dashboard');
+            }
+        } catch (error: any) {
+            toast.error(error.message || "Invalid OTP");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ========================================
+    // 5. RESET MPIN — After OTP
+    // ========================================
+    const onResetMpinSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!validateMpin(mpin)) {
+            toast.error("New MPIN should be 4-6 digits");
+            return;
+        }
+        if (mpin !== confirmMpin) return toast.error("MPINs do not match");
+
+        try {
+            setLoading(true);
+            await authApi.resetMpin(forgotPhone, otpCode, mpin);
+            toast.success("MPIN reset successful! Please login.");
+            resetFields();
+            setForgotPhone('');
+            setIsResetFlow(false);
+            setScreen('login');
+        } catch (error: any) {
+            toast.error(error.message || "Reset failed");
+            if (error.message?.toLowerCase().includes('otp')) {
+                setScreen('otp');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // ─── Logo Upload Handler ───
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+
+      const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        toast.error('Logo must be a JPEG, PNG, or WebP image');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Logo must be 5 MB or smaller');
+        return;
+      }
+
+      try {
+        setLogoUploading(true);
+        const result = await mediaApi.uploadLogo(file);
+        setBusinessLogoUrl(result.url);
+      } catch {
+        toast.error('Logo upload failed — you can proceed without it');
+      } finally {
+        setLogoUploading(false);
+      }
+    };
+
+    // ─── Shared Input Styles ───
+    const inputBase = "w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-4 text-[#2A2A2A] placeholder:text-[#A8A29E] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all";
+    const buttonBase = "w-full bg-[#B45309] hover:bg-[#92400E] text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-[#B45309]/20 flex items-center justify-center gap-2 group disabled:opacity-50 cursor-pointer";
+    const linkBase = "text-[#B45309] hover:text-[#92400E] text-sm font-bold transition-colors cursor-pointer";
+
+    return (
+        <div className="w-full max-w-md mx-auto p-8 sm:p-10 rounded-[2.5rem] bg-white border border-[#E7E5E4] shadow-2xl shadow-[#B45309]/5 overflow-hidden relative min-h-[500px] flex flex-col justify-center">
+            {/* Subtle background texture */}
+            <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
+                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(#B45309_1px,_transparent_1px)] bg-[length:20px_20px]" />
+            </div>
+
+            <AnimatePresence mode="wait" initial={false}>
+                
+                {/* ═══════════════════════════════════════════
+                    1. LOGIN SCREEN — Phone + MPIN
+                ═══════════════════════════════════════════ */}
+                {screen === 'login' && (
+                    <motion.form 
+                        key="login"
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        onSubmit={onLoginSubmit}
+                        className="space-y-6 relative z-10"
+                    >
+                        <div className="text-center space-y-3">
+                            <h2 className="text-4xl font-bold text-[#2A2A2A] font-serif tracking-tight">Welcome</h2>
+                            <p className="text-[#57534E]">Enter your credentials to continue</p>
+                        </div>
+
+                        {/* Phone */}
+                        <div className="relative group">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] group-focus-within:text-[#B45309] transition-colors w-5 h-5" />
+                            <input 
+                                type="tel"
+                                placeholder="Mobile Number"
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                className={`${inputBase} font-mono text-lg`}
+                            />
+                        </div>
+
+                        {/* MPIN */}
+                        <div className="relative group">
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] group-focus-within:text-[#B45309] transition-colors w-5 h-5" />
+                            <input 
+                                type="password"
+                                maxLength={6}
+                                placeholder="Enter MPIN"
+                                value={mpin}
+                                onChange={(e) => setMpin(e.target.value)}
+                                className={`${inputBase} text-2xl ${mpin ? 'tracking-[0.8em]' : 'tracking-normal'} placeholder:tracking-normal placeholder:text-base`}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            <button disabled={loading} className={buttonBase}>
+                                {loading ? "Logging in..." : (
+                                    <>Login <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
+                                )}
+                            </button>
+
+                            <div className="flex justify-between items-center px-1">
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        resetFields();
+                                        setForgotPhone('');
+                                        setScreen('forgot-phone');
+                                    }}
+                                    className={linkBase}
+                                >
+                                    Forgot MPIN?
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        resetFields();
+                                        setScreen('register');
+                                    }}
+                                    className={linkBase}
+                                >
+                                    New User? Register
+                                </button>
+                            </div>
+                        </div>
+                    </motion.form>
+                )}
+
+                {/* ═══════════════════════════════════════════
+                    2. REGISTER SCREEN — Name, Phone, Email, MPIN
+                ═══════════════════════════════════════════ */}
+                {screen === 'register' && (
+                    <motion.form 
+                        key="register"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        onSubmit={onRegisterSubmit}
+                        className="space-y-5 relative z-10"
+                    >
+                        <div className="text-center space-y-2 mb-4">
+                            <h2 className="text-3xl font-bold text-[#2A2A2A] font-serif tracking-tight">Create Account</h2>
+                            <p className="text-[#57534E]">Join HomeInTown Intelligence</p>
+                        </div>
+                        
+                        {/* Name */}
+                        <div className="relative">
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                            <input 
+                                type="text"
+                                placeholder="Full Name"
+                                required
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-12 pr-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                            />
+                        </div>
+
+                        {/* Phone */}
+                        <div className="relative">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                            <input 
+                                type="tel"
+                                placeholder="Mobile Number"
+                                required
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-12 pr-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all font-mono"
+                            />
+                        </div>
+
+                        {/* Email (Optional) */}
+                        <div className="relative">
+                            <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                            <input 
+                                type="email"
+                                placeholder="Email (Optional)"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-12 pr-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                            />
+                        </div>
+
+                        {/* Role Selection */}
+                        <div className="flex gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setRole('user')}
+                                className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'user' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
+                            >
+                                Investor / User
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setRole('employee')}
+                                className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'employee' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
+                            >
+                                Field Workforce
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setRole('captain')}
+                              className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'captain' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
+                            >
+                              Builder / Captain
+                            </button>
+                        </div>
+
+                        {role === 'captain' && (
+                          <div className="space-y-3">
+                            {/* Company Name (required) */}
+                            <div className="relative">
+                              <input
+                                type="text"
+                                placeholder="Company Name *"
+                                value={companyName}
+                                onChange={(e) => setCompanyName(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                              />
+                            </div>
+
+                            {/* Business Logo Upload */}
+                            <div>
+                              <label className="block text-xs font-semibold text-[#57534E] mb-1 pl-1">Business Logo (optional)</label>
+                              <input
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                disabled={logoUploading}
+                                onChange={handleLogoUpload}
+                                className="w-full text-sm text-[#57534E] file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:font-semibold file:bg-[#B45309]/10 file:text-[#B45309] hover:file:bg-[#B45309]/20 transition-all"
+                              />
+                              {logoUploading && <p className="text-xs text-[#B45309] mt-1 pl-1">Uploading logo...</p>}
+                              {businessLogoUrl && !logoUploading && <p className="text-xs text-green-600 mt-1 pl-1">✓ Logo uploaded</p>}
+                            </div>
+
+                            {/* Business Address */}
+                            <input
+                              type="text"
+                              placeholder="Business Address (optional)"
+                              value={businessAddress}
+                              onChange={(e) => setBusinessAddress(e.target.value)}
+                              className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                            />
+
+                            {/* City + State side by side */}
+                            <div className="grid grid-cols-2 gap-3">
+                              <input
+                                type="text"
+                                placeholder="City (optional)"
+                                value={businessCity}
+                                onChange={(e) => setBusinessCity(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                              />
+                              <input
+                                type="text"
+                                placeholder="State (optional)"
+                                value={businessState}
+                                onChange={(e) => setBusinessState(e.target.value)}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                              />
+                            </div>
+
+                            {/* PIN Code */}
+                            <input
+                              type="text"
+                              placeholder="PIN Code (optional, 6 digits)"
+                              value={businessPinCode}
+                              maxLength={6}
+                              onChange={(e) => setBusinessPinCode(e.target.value.replace(/\D/g, ''))}
+                              className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 px-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all font-mono"
+                            />
+                          </div>
+                        )}
+
+                        {/* MPIN / Confirm */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
+                                <input 
+                                    type="password"
+                                    placeholder="Set MPIN"
+                                    maxLength={6}
+                                    required
+                                    value={mpin}
+                                    onChange={(e) => setMpin(e.target.value)}
+                                    className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-10 pr-4 text-[#2A2A2A] text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                                />
+                            </div>
+                            <div className="relative">
+                                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#A8A29E]" />
+                                <input 
+                                    type="password"
+                                    placeholder="Confirm MPIN"
+                                    maxLength={6}
+                                    required
+                                    value={confirmMpin}
+                                    onChange={(e) => setConfirmMpin(e.target.value)}
+                                    className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-10 pr-4 text-[#2A2A2A] text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="pt-4 flex flex-col gap-4">
+                            <button disabled={loading} className={buttonBase}>
+                                {loading ? "Please wait..." : "Register"}
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => {
+                                    resetFields();
+                                    setScreen('login');
+                                }}
+                                className="text-[#A8A29E] hover:text-[#2A2A2A] text-sm transition-colors text-center cursor-pointer"
+                            >
+                                Already have an account? <span className="text-[#B45309] font-bold">Login</span>
+                            </button>
+                        </div>
+                    </motion.form>
+                )}
+
+                {/* ═══════════════════════════════════════════
+                    3. FORGOT MPIN — Enter Phone
+                ═══════════════════════════════════════════ */}
+                {screen === 'forgot-phone' && (
+                    <motion.form 
+                        key="forgot-phone"
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -50 }}
+                        onSubmit={onForgotPhoneSubmit}
+                        className="space-y-8 relative z-10"
+                    >
+                        <div className="text-center space-y-3">
+                            <div className="mx-auto w-20 h-20 bg-[#B45309]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#B45309]/20 shadow-inner">
+                                <Lock className="w-10 h-10 text-[#B45309]" />
+                            </div>
+                            <h2 className="text-3xl font-bold text-[#2A2A2A] font-serif tracking-tight">Forgot MPIN</h2>
+                            <p className="text-[#57534E]">Enter your registered phone number</p>
+                        </div>
+
+                        <div className="relative group">
+                            <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] group-focus-within:text-[#B45309] transition-colors w-5 h-5" />
+                            <input 
+                                type="tel"
+                                placeholder="Mobile Number"
+                                value={forgotPhone}
+                                onChange={(e) => setForgotPhone(e.target.value)}
+                                className={`${inputBase} font-mono text-lg`}
+                            />
+                        </div>
+
+                        <div className="flex flex-col gap-4">
+                            <button disabled={loading} className={buttonBase}>
+                                {loading ? "Sending OTP..." : (
+                                    <>Send OTP <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" /></>
+                                )}
+                            </button>
+                            <button 
+                                type="button"
+                                onClick={() => setScreen('login')}
+                                className="text-[#A8A29E] hover:text-[#2A2A2A] text-sm transition-colors text-center cursor-pointer"
+                            >
+                                Back to <span className="text-[#B45309] font-bold">Login</span>
+                            </button>
+                        </div>
+                    </motion.form>
+                )}
+
+                {/* ═══════════════════════════════════════════
+                    4. OTP SCREEN
+                ═══════════════════════════════════════════ */}
+                {screen === 'otp' && (
+                    <motion.form 
+                        key="otp"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        onSubmit={onOtpSubmit}
+                        className="space-y-10 relative z-10"
+                    >
+                        <div className="text-center space-y-3">
+                            <div className="mx-auto w-20 h-20 bg-[#B45309]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#B45309]/20 shadow-inner">
+                                {isResetFlow ? <Lock className="w-10 h-10 text-[#B45309]" /> : <ShieldCheck className="w-10 h-10 text-[#B45309]" />}
+                            </div>
+                            <h2 className="text-4xl font-bold text-[#2A2A2A] font-serif tracking-tight">
+                                {isResetFlow ? "Reset MPIN" : "Verify Phone"}
+                            </h2>
+                            <p className="text-[#57534E]">
+                                {isResetFlow ? "Enter OTP sent to" : "Sent to"}{' '}
+                                <span className="text-[#2A2A2A] font-mono font-bold">{isResetFlow ? forgotPhone : phone}</span>
+                            </p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-[#57534E] mb-2 pl-1">
+                                    6-Digit OTP Code
+                                </label>
+                                <input 
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    maxLength={6}
+                                    placeholder="000000"
+                                    value={otpCode}
+                                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                                    className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-5 text-center text-4xl font-bold text-[#B45309] focus:outline-none focus:border-[#B45309] transition-colors placeholder:tracking-normal placeholder:text-2xl ${otpCode ? 'tracking-[0.5em]' : 'tracking-normal'}`}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-6">
+                            <button disabled={loading} className={`${buttonBase} text-lg`}>
+                                {loading ? "Verifying..." : isResetFlow ? "Next" : "Verify & Sign Up"}
+                            </button>
+                            <div className="flex justify-between items-center text-sm px-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setScreen(isResetFlow ? 'forgot-phone' : 'register')} 
+                                    className="text-[#A8A29E] hover:text-[#2A2A2A] transition-colors cursor-pointer"
+                                >
+                                    Resend Code
+                                </button>
+                                <button 
+                                    type="button"
+                                    onClick={() => {
+                                        setIsResetFlow(false);
+                                        resetFields();
+                                        setScreen('login');
+                                    }} 
+                                    className="text-[#B45309] font-bold hover:text-[#92400E] transition-colors cursor-pointer"
+                                >
+                                    Back to Login
+                                </button>
+                            </div>
+                        </div>
+                    </motion.form>
+                )}
+
+                {/* ═══════════════════════════════════════════
+                    5. RESET MPIN SCREEN
+                ═══════════════════════════════════════════ */}
+                {screen === 'reset-mpin' && (
+                    <motion.form 
+                        key="reset-mpin"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        onSubmit={onResetMpinSubmit}
+                        className="space-y-10 relative z-10"
+                    >
+                        <div className="text-center space-y-3">
+                            <div className="mx-auto w-20 h-20 bg-[#B45309]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#B45309]/20 shadow-inner">
+                                <Lock className="w-10 h-10 text-[#B45309]" />
+                            </div>
+                            <h2 className="text-4xl font-bold text-[#2A2A2A] font-serif tracking-tight">
+                                New MPIN
+                            </h2>
+                            <p className="text-[#57534E]">
+                                Create a new 6-digit MPIN for <span className="text-[#2A2A2A] font-mono font-bold">{forgotPhone}</span>
+                            </p>
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm font-medium text-[#57534E] mb-2 pl-1">
+                                    Set New 6-Digit MPIN
+                                </label>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                                    <input 
+                                        type="password"
+                                        maxLength={6}
+                                        placeholder="Enter New MPIN"
+                                        value={mpin}
+                                        onChange={(e) => setMpin(e.target.value)}
+                                        className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-4 text-[#2A2A2A] text-2xl focus:outline-none focus:border-[#B45309] transition-all placeholder:tracking-normal placeholder:text-base ${mpin ? 'tracking-[0.8em]' : 'tracking-normal'}`}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                                    <input 
+                                        type="password"
+                                        maxLength={6}
+                                        placeholder="Confirm New MPIN"
+                                        value={confirmMpin}
+                                        onChange={(e) => setConfirmMpin(e.target.value)}
+                                        className={`w-full bg-[#FAF7F2] border-2 border-[#E7E5E4] rounded-2xl py-4 pl-12 pr-4 text-[#2A2A2A] text-2xl focus:outline-none focus:border-[#B45309] transition-all placeholder:tracking-normal placeholder:text-base ${confirmMpin ? 'tracking-[0.8em]' : 'tracking-normal'}`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-6">
+                            <button disabled={loading} className={`${buttonBase} text-lg`}>
+                                {loading ? "Saving..." : "Save New MPIN"}
+                            </button>
+                            <div className="flex justify-center items-center text-sm px-2">
+                                <button 
+                                    type="button"
+                                    onClick={() => setScreen('otp')} 
+                                    className="text-[#A8A29E] hover:text-[#2A2A2A] transition-colors cursor-pointer"
+                                >
+                                    Back to OTP
+                                </button>
+                            </div>
+                        </div>
+                    </motion.form>
+                )}
+                
+            </AnimatePresence>
+        </div>
+    );
+}

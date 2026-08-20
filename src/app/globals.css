@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+
+:root {
+  /* Option 3: Warm Local Builder Theme */
+  --background: #FAF7F2; /* Cream / Off-white */
+  --foreground: #2A2A2A; /* Dark brown-gray */
+  
+  --primary: #B45309;    /* Terracotta / Brick */
+  --primary-hover: #92400E;
+  
+  --secondary: #3F6212;  /* Olive Green */
+  --accent: #E7E5E4;     /* Soft warm gray for borders */
+  
+  --card-bg: #FFFFFF;
+  --muted: #78716C;      /* Stone gray */
+  
+  /* Theme colors for Tailwind */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-inter), 'Segoe UI', system-ui, sans-serif;
+  --font-serif: var(--font-serif), 'Playfair Display', serif;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif, var(--font-sans));
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Completely hide horizontal scrollbar but keep scrolling */
+.no-scrollbar {
+  -ms-overflow-style: none;   /* IE + Edge */
+  scrollbar-width: none;      /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;              /* Chrome, Safari */
+}
+
+
+/* Hide scrollbar but keep scroll */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE + Edge */
+  scrollbar-width: none;     /* Firefox */
+}
+
+/* Global Interactive Elements */
+a, 
+button, 
+[role="button"],
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  cursor: pointer !important;
+}
+
+button:disabled,
+[role="button"][aria-disabled="true"],
+button[disabled] {
+  cursor: not-allowed !important;
+}
+
+/* Landing page premium effects */
+@keyframes gradient-shift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.landing-gradient-mesh {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(180, 83, 9, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 20%, rgba(3, 105, 161, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 50% at 60% 80%, rgba(63, 98, 18, 0.05) 0%, transparent 50%),
+    linear-gradient(180deg, #FAF7F2 0%, #F5F0E8 50%, #FAF7F2 100%);
+}
+
+.landing-hero-glow {
+  animation: gradient-shift 8s ease infinite;
+  background-size: 200% 200%;
+}
+
+.landing-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+.landing-float-delayed {
+  animation: float 6s ease-in-out 2s infinite;
+}
+
+.landing-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-card-dark {
+  background: rgba(42, 42, 42, 0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-nav {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+}
+
+.glass-nav-scrolled {
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.06);
+}
+
+

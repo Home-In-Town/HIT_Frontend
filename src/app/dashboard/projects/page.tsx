@@ -1,0 +1,440 @@
+'use client';
+
+import { useEffect, useState, useMemo } from 'react';
+import { Project } from '@/types/project';
+import { projectsApi } from '@/lib/api';
+import ConfirmationModal from '@/components/ui/ConfirmationModal';
+import toast from 'react-hot-toast';
+import DashboardHeader from '@/components/dashboard/DashboardHeader';
+import DashboardFilters from '@/components/dashboard/DashboardFilters';
+import ProjectTable from '@/components/dashboard/ProjectTable';
+import ProjectGrid from '@/components/dashboard/ProjectGrid';
+
+// Mock data (kept for fallback)
+const MOCK_PROJECTS: Project[] = [
+  {
+    id: '1',
+    name: 'Sunrise Heights',
+    type: 'flat',
+    city: 'Mumbai',
+    location: 'Andheri West',
+    googleMapLink: 'https://maps.google.com',
+    reraApproved: true,
+    reraNumber: 'P52000012345',
+    projectStatus: 'under-construction',
+    startingPrice: 8500000,
+    pricePerSqFt: 15000,
+    priceRange: '85L - 1.5Cr',
+    paymentPlan: '10:80:10',
+    bankLoanAvailable: true,
+    bhkOptions: ['2BHK', '3BHK'],
+    carpetAreaRange: '650 - 1200 sqft',
+    floorRange: '1-25',
+    amenities: ['Lift', 'Parking', 'Gym', 'Swimming Pool', 'Security'],
+    coverImage: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=800',
+    galleryImages: [],
+    videos: [],
+    ctaButtonText: 'Book Site Visit',
+    whatsappNumber: '919876543210',
+    callNumber: '919876543210',
+    slug: 'sunrise-heights',
+    trackableLink: '/visit/sunrise-heights',
+    isPublished: true,
+    createdAt: '2024-01-15T10:00:00Z',
+  },
+  {
+    id: '2',
+    name: 'Green Valley Plots',
+    type: 'plot',
+    city: 'Pune',
+    location: 'Hinjewadi',
+    googleMapLink: 'https://maps.google.com',
+    reraApproved: true,
+    reraNumber: 'P52000023456',
+    projectStatus: 'ready-to-move',
+    startingPrice: 2500000,
+    pricePerSqFt: 3500,
+    priceRange: '25L - 50L',
+    paymentPlan: 'Flexible',
+    bankLoanAvailable: true,
+    plotSizeRange: '1000 - 2500 sqft',
+    facingOptions: ['East', 'North'],
+    gatedCommunity: true,
+    amenities: ['Garden', 'Security', 'Club House', 'Children Play Area'],
+    coverImage: 'https://images.unsplash.com/photo-1500382017468-9049fed747ef?w=800',
+    galleryImages: [],
+    videos: [],
+    ctaButtonText: 'Get Price Quote',
+    whatsappNumber: '919876543211',
+    callNumber: '919876543211',
+    slug: 'green-valley-plots',
+    trackableLink: '/visit/green-valley-plots',
+    isPublished: false,
+    createdAt: '2024-02-20T14:30:00Z',
+  },
+];
+
+const PROJECTS_PER_PAGE = 10;
+
+interface FilterState {
+    searchQuery: string;
+    status: 'all' | 'published' | 'draft';
+    type: string;
+    city: string;
+    rera: 'all' | 'verified' | 'pending';
+    viewMode: 'table' | 'card';
+}
+
+export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [useMockData, setUseMockData] = useState(false);
+  
+  // Action States
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Captain Assignment States
+  const [captainModalOpen, setCaptainModalOpen] = useState(false);
+  const [captainAssignLoading, setCaptainAssignLoading] = useState(false);
+  const [pendingAssignment, setPendingAssignment] = useState<{
+    projectId: string;
+    projectName: string;
+    captainId: string | null;
+    captainName: string | null;
+  } | null>(null);
+
+  // Agent Assignment States (captain assigning agents)
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [agentAssignLoading, setAgentAssignLoading] = useState(false);
+  const [pendingAgentAssignment, setPendingAgentAssignment] = useState<{
+    projectId: string;
+    projectName: string;
+    agentId: string | null;
+    agentName: string | null;
+  } | null>(null);
+
+  // Filter State
+  const [filters, setFilters] = useState<FilterState>({
+    searchQuery: '',
+    status: 'all',
+    type: 'all',
+    city: 'all',
+    rera: 'all',
+    viewMode: 'table',
+  });
+
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        const data = await projectsApi.getAll();
+        setProjects(data);
+        setUseMockData(false);
+      } catch {
+        setProjects(MOCK_PROJECTS);
+        setUseMockData(true);
+        setError('Using local data');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchProjects();
+  }, []);
+
+  // Derived Lists
+  const cities = useMemo(() => Array.from(new Set(projects.map(p => p.city))).filter(Boolean).sort(), [projects]);
+  const types = useMemo(() => Array.from(new Set(projects.map(p => p.type))).filter(Boolean).sort(), [projects]);
+
+  const handleFilterChange = (key: keyof FilterState, value: any) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+    setCurrentPage(1); // Reset to first page when filters change
+  };
+
+  const filteredProjects = useMemo(() => {
+    return projects.filter(project => {
+      // Search
+      const query = filters.searchQuery.toLowerCase();
+      const matchesSearch = 
+        project.name.toLowerCase().includes(query) || 
+        project.city.toLowerCase().includes(query) ||
+        project.location.toLowerCase().includes(query);
+      
+      // Status
+      const matchesStatus = 
+        filters.status === 'all' ? true :
+        filters.status === 'published' ? project.isPublished :
+        filters.status === 'draft' ? !project.isPublished : true;
+
+      // Type
+      const matchesType = filters.type === 'all' ? true : project.type === filters.type;
+
+      // City
+      const matchesCity = filters.city === 'all' ? true : project.city === filters.city;
+
+      // RERA
+      const matchesRera = 
+        filters.rera === 'all' ? true :
+        filters.rera === 'verified' ? project.reraApproved :
+        filters.rera === 'pending' ? !project.reraApproved : true;
+
+      return matchesSearch && matchesStatus && matchesType && matchesCity && matchesRera;
+    });
+  }, [projects, filters]);
+
+  // Pagination derived values
+  const totalPages = Math.max(1, Math.ceil(filteredProjects.length / PROJECTS_PER_PAGE));
+  const paginatedProjects = useMemo(() => {
+    const start = (currentPage - 1) * PROJECTS_PER_PAGE;
+    return filteredProjects.slice(start, start + PROJECTS_PER_PAGE);
+  }, [filteredProjects, currentPage]);
+
+  // Reset to last valid page if current exceeds total (e.g. after delete)
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  // Actions
+  const copyLink = (link: string) => {
+    navigator.clipboard.writeText(window.location.origin + link);
+    toast.success('Link copied to clipboard');
+  };
+
+  const handleDeleteClick = (project: Project) => {
+    setProjectToDelete(project);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!projectToDelete) return;
+    
+    setDeleteLoading(true);
+    try {
+      await projectsApi.delete(projectToDelete.id);
+      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
+      toast.success('Project deleted successfully');
+    } catch {
+      if (useMockData) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
+        toast.success('Project deleted (Local)');
+      } else {
+        toast.error('Failed to delete project');
+      }
+    } finally {
+      setDeleteLoading(false);
+      setDeleteModalOpen(false);
+      setProjectToDelete(null);
+    }
+  };
+
+  const handleAssignCaptain = async (projectId: string, captainId: string | null, captainName: string | null) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    setPendingAssignment({
+      projectId,
+      projectName: project.name,
+      captainId,
+      captainName,
+    });
+    setCaptainModalOpen(true);
+  };
+
+  const handleConfirmCaptainAssignment = async () => {
+    if (!pendingAssignment) return;
+
+    setCaptainAssignLoading(true);
+    try {
+      const updatedProject = await projectsApi.assignCaptain(pendingAssignment.projectId, pendingAssignment.captainId);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === pendingAssignment.projectId ? updatedProject : p))
+      );
+      toast.success(
+        pendingAssignment.captainName
+          ? `Captain assigned successfully`
+          : `Captain unassigned successfully`
+      );
+    } catch {
+      toast.error('Failed to update captain assignment');
+    } finally {
+      setCaptainAssignLoading(false);
+      setCaptainModalOpen(false);
+      setPendingAssignment(null);
+    }
+  };
+
+  const handleAssignAgent = async (projectId: string, agentId: string | null, agentName: string | null) => {
+    const project = projects.find(p => p.id === projectId);
+    if (!project) return;
+    setPendingAgentAssignment({
+      projectId,
+      projectName: project.name,
+      agentId,
+      agentName,
+    });
+    setAgentModalOpen(true);
+  };
+
+  const handleConfirmAgentAssignment = async () => {
+    if (!pendingAgentAssignment) return;
+
+    setAgentAssignLoading(true);
+    try {
+      const updatedProject = await projectsApi.assignAgent(pendingAgentAssignment.projectId, pendingAgentAssignment.agentId);
+      setProjects((prev) =>
+        prev.map((p) => (p.id === pendingAgentAssignment.projectId ? updatedProject : p))
+      );
+      toast.success(
+        pendingAgentAssignment.agentName
+          ? `Agent assigned successfully`
+          : `Agent unassigned successfully`
+      );
+    } catch {
+      toast.error('Failed to update agent assignment');
+    } finally {
+      setAgentAssignLoading(false);
+      setAgentModalOpen(false);
+      setPendingAgentAssignment(null);
+    }
+  };
+
+  if (loading) {
+    return (
+        <div className="flex items-center justify-center h-screen bg-[#FAF7F2]">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#B45309]"></div>
+        </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#FAF7F2] pb-20">
+      <DashboardHeader projects={projects} />
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <DashboardFilters 
+            filters={filters} 
+            onFilterChange={handleFilterChange}
+            cities={cities}
+            types={types}
+        />
+
+        {error && (
+            <div className="mb-4 px-4 py-2 bg-amber-50 border border-amber-200 rounded text-amber-700 text-sm flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                {error}
+            </div>
+        )}
+
+        {filteredProjects.length === 0 ? (
+            <div className="text-center py-32 bg-white rounded-[2rem] border border-[#E7E5E4] shadow-sm shadow-[#B45309]/5">
+                <div className="w-20 h-20 bg-[#FAF7F2] rounded-3xl flex items-center justify-center mx-auto mb-6 border border-[#E7E5E4]">
+                  <span className="text-4xl grayscale opacity-30">🔍</span>
+                </div>
+                <h3 className="text-2xl font-bold text-[#2A2A2A] font-serif tracking-tight">No projects found</h3>
+                <p className="text-[#57534E] mt-2 font-medium">Try adjusting your filters to find what you're looking for</p>
+            </div>
+        ) : (
+            <>
+                {filters.viewMode === 'table' ? (
+                    <ProjectTable 
+                        projects={paginatedProjects} 
+                        onDelete={handleDeleteClick}
+                        onCopyLink={copyLink}
+                        onAssignCaptain={handleAssignCaptain}
+                        onAssignAgent={handleAssignAgent}
+                    />
+                ) : (
+                    <ProjectGrid 
+                        projects={filteredProjects}
+                        onDelete={handleDeleteClick}
+                        onCopyLink={copyLink}
+                    />
+                )}
+
+                {/* Pagination Footer — table mode only */}
+                {filters.viewMode === 'table' && filteredProjects.length > PROJECTS_PER_PAGE && (
+                  <div className="flex items-center justify-between px-4 py-3 mt-4 bg-white border border-[#E7E5E4] rounded-2xl shadow-sm">
+                    <p className="text-xs text-[#A8A29E] font-medium">
+                      Page <strong className="text-[#57534E]">{currentPage}</strong> of <strong className="text-[#57534E]">{totalPages}</strong>
+                      {' '}&middot;{' '}
+                      <strong className="text-[#57534E]">{filteredProjects.length}</strong> total projects
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage <= 1}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#57534E] bg-white border border-[#E7E5E4] rounded-lg hover:border-[#B45309]/40 hover:text-[#B45309] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" />
+                        </svg>
+                        Prev
+                      </button>
+                      <button
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-[#57534E] bg-white border border-[#E7E5E4] rounded-lg hover:border-[#B45309]/40 hover:text-[#B45309] disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                      >
+                        Next
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+            </>
+        )}
+      </div>
+
+      <ConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Project?"
+        message={`This will permanently delete "${projectToDelete?.name}". This action cannot be undone.`}
+        confirmText="Yes, Delete"
+        isLoading={deleteLoading}
+      />
+
+      <ConfirmationModal
+        isOpen={captainModalOpen}
+        onClose={() => {
+          setCaptainModalOpen(false);
+          setPendingAssignment(null);
+        }}
+        onConfirm={handleConfirmCaptainAssignment}
+        title="Confirm Captain Assignment"
+        message={
+          pendingAssignment?.captainName
+            ? `Assign ${pendingAssignment.captainName} to ${pendingAssignment.projectName}?`
+            : `Unassign captain from ${pendingAssignment?.projectName}?`
+        }
+        confirmText="Confirm"
+        isLoading={captainAssignLoading}
+      />
+
+      <ConfirmationModal
+        isOpen={agentModalOpen}
+        onClose={() => {
+          setAgentModalOpen(false);
+          setPendingAgentAssignment(null);
+        }}
+        onConfirm={handleConfirmAgentAssignment}
+        title="Confirm Agent Assignment"
+        message={
+          pendingAgentAssignment?.agentName
+            ? `Assign ${pendingAgentAssignment.agentName} to ${pendingAgentAssignment.projectName}?`
+            : `Unassign agent from ${pendingAgentAssignment?.projectName}?`
+        }
+        confirmText="Confirm"
+        isLoading={agentAssignLoading}
+      />
+    </div>
+  );
+}
