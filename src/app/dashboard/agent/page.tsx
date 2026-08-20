@@ -93,7 +93,7 @@ export default function AgentDashboardPage() {
             </Link>
 
             <button
-              onClick={handleGenerateLead}
+              onClick={() => window.open('https://sales.homeintown.in', '_blank')}
               className="group bg-white p-6 border border-[#E7E5E4] rounded-3xl shadow-sm hover:shadow-xl hover:shadow-[#B45309]/5 hover:border-[#B45309]/30 transition-all active:scale-[0.98] flex items-center gap-5 relative overflow-hidden text-left w-full"
             >
               <div className="absolute top-0 right-0 p-4 text-[#B45309] opacity-5 group-hover:opacity-20 transition-opacity">
