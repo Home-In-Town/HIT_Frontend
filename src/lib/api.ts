@@ -1122,7 +1122,7 @@ export const organizationsApi = {
 
 export interface ChatSession {
   _id: string;
-  participants: { _id: string; name: string; role: string }[];
+  participants: { _id: string; name: string; role: string; companyName?: string; businessLogoUrl?: string }[];
   project?: { _id: string; projectName: string };
   lastMessage?: { content: string; sender: string; timestamp: string };
   unreadCount?: Record<string, number>;
@@ -1142,7 +1142,7 @@ export interface ChatMessage {
 }
 
 export const chatApi = {
-  async getContacts(): Promise<{ _id: string; name: string; role: string; phone: string }[]> {
+  async getContacts(): Promise<{ _id: string; name: string; role: string; phone: string; companyName?: string; businessLogoUrl?: string }[]> {
     const response = await fetch(`${API_URL}/chat/contacts`, {
       ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
@@ -2313,6 +2313,8 @@ export interface ExtractedLeadParams {
   locationCanonical?: string | null;
   city?: string | null;
   propertyType?: string | null;
+  area?: number | null;
+  areaUnit?: 'sqft' | 'acres' | null;
   possessionNeeded?: string | null;
   loanRequired?: boolean;
   urgency?: 'normal' | 'urgent' | 'very_urgent';
