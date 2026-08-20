@@ -20,7 +20,10 @@ interface LeadConfirmModalProps {
 }
 
 const BHK_OPTIONS = ['1RK', '1BHK', '2BHK', '3BHK', '4BHK', '5BHK'];
-const PROPERTY_TYPES = ['flat', 'plot', 'villa', 'row_house', 'penthouse', 'shop', 'office', 'farmhouse'];
+const PROPERTY_TYPES = ['flat', 'plot', 'villa', 'row_house', 'penthouse', 'shop', 'office', 'farm', 'farmhouse'];
+const BHK_PROPERTY_TYPES = ['flat', 'villa', 'row_house', 'penthouse', 'farmhouse'];
+const SQFT_PROPERTY_TYPES = ['plot', 'shop', 'office'];
+const ACRE_PROPERTY_TYPES = ['farm'];
 const POSSESSION_OPTIONS = ['immediate', '6months', '1year', '2year'];
 const URGENCY_OPTIONS = ['normal', 'urgent', 'very_urgent'];
 
@@ -116,18 +119,51 @@ export default function LeadConfirmModal({
             </div>
           </div>
 
-          {/* BHK */}
+          {/* BHK / Area + Property Type */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">BHK</label>
-              <select
-                value={params.bhkType || ''}
-                onChange={e => updateParam('bhkType', e.target.value || null)}
-                className="mt-1.5 w-full px-3 py-2 text-sm bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
-              >
-                <option value="">Not specified</option>
-                {BHK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
-              </select>
+              {(!params.propertyType || BHK_PROPERTY_TYPES.includes(params.propertyType)) ? (
+                <>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">BHK</label>
+                  <select
+                    value={params.bhkType || ''}
+                    onChange={e => updateParam('bhkType', e.target.value || null)}
+                    className="mt-1.5 w-full px-3 py-2 text-sm bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
+                  >
+                    <option value="">Not specified</option>
+                    {BHK_OPTIONS.map(b => <option key={b} value={b}>{b}</option>)}
+                  </select>
+                </>
+              ) : ACRE_PROPERTY_TYPES.includes(params.propertyType!) ? (
+                <>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Area (acres)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 5"
+                    step="0.5"
+                    value={params.area || ''}
+                    onChange={e => {
+                      updateParam('area', e.target.value ? Number(e.target.value) : null);
+                      updateParam('areaUnit', 'acres');
+                    }}
+                    className="mt-1.5 w-full px-3 py-2 text-sm bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Area (sq.ft)</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 1200"
+                    value={params.area || ''}
+                    onChange={e => {
+                      updateParam('area', e.target.value ? Number(e.target.value) : null);
+                      updateParam('areaUnit', 'sqft');
+                    }}
+                    className="mt-1.5 w-full px-3 py-2 text-sm bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
+                  />
+                </>
+              )}
             </div>
             <div>
               <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Property Type</label>
