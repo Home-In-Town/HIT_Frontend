@@ -2313,6 +2313,7 @@ export interface ExtractedLeadParams {
   locationCanonical?: string | null;
   city?: string | null;
   propertyType?: string | null;
+  transactionType?: 'buy' | 'rent' | null;
   area?: number | null;
   areaUnit?: 'sqft' | 'acres' | null;
   possessionNeeded?: string | null;
