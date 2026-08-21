@@ -113,15 +113,11 @@ function BuilderNetworkView() {
         {/* Header */}
         <div className="px-4 py-3 border-b border-[#E7E5E4]">
           <div className="flex items-center gap-3">
-            {user?.businessLogoUrl ? (
-              <img src={user.businessLogoUrl} alt={user.companyName || user.name} className="w-10 h-10 rounded-full object-cover" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
-                {(user?.companyName || user?.name)?.charAt(0)?.toUpperCase() || 'B'}
-              </div>
-            )}
+            <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
+              {user?.name?.charAt(0)?.toUpperCase() || 'B'}
+            </div>
             <div>
-              <h1 className="text-lg font-bold text-[#2A2A2A] font-serif">{user?.companyName || user?.name || 'Builders Network'}</h1>
+              <h1 className="text-lg font-bold text-[#2A2A2A] font-serif">Builders Network</h1>
               <p className="text-[11px] text-[#57534E]">{pulse?.onlineNow || 0} builders online now</p>
             </div>
           </div>
@@ -661,16 +657,6 @@ function AdminChatView() {
     return partner?.role || '';
   };
 
-  const getPartnerDisplayName = (session: ChatSession) => {
-    const partner = session.participants?.find(p => p._id !== user?.id && p._id !== user?._id);
-    return partner?.companyName || partner?.name || 'Unknown';
-  };
-
-  const getPartnerLogo = (session: ChatSession) => {
-    const partner = session.participants?.find(p => p._id !== user?.id && p._id !== user?._id);
-    return partner?.businessLogoUrl || null;
-  };
-
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
@@ -722,16 +708,12 @@ function AdminChatView() {
                 onClick={() => setActiveSession(session)}
                 className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#FAF7F2] transition-colors border-b border-[#E7E5E4]/50 ${activeSession?._id === session._id ? 'bg-[#FAF7F2]' : ''}`}
               >
-                {getPartnerLogo(session) ? (
-                  <img src={getPartnerLogo(session)!} alt={getPartnerDisplayName(session)} className="w-11 h-11 rounded-full object-cover flex-shrink-0" />
-                ) : (
-                  <div className="w-11 h-11 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm flex-shrink-0">
-                    {getInitials(getPartnerDisplayName(session))}
-                  </div>
-                )}
+                <div className="w-11 h-11 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
+                  {getInitials(getPartnerName(session))}
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-[#2A2A2A] truncate">{getPartnerDisplayName(session)}</h3>
+                    <h3 className="text-sm font-medium text-[#2A2A2A] truncate">{getPartnerName(session)}</h3>
                     {session.lastMessage?.timestamp && (
                       <span className="text-[10px] text-gray-400">{formatTime(session.lastMessage.timestamp)}</span>
                     )}
@@ -756,15 +738,11 @@ function AdminChatView() {
               <button onClick={() => setActiveSession(null)} className="sm:hidden p-1 text-gray-500">
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
-              {getPartnerLogo(activeSession) ? (
-                <img src={getPartnerLogo(activeSession)!} alt={getPartnerDisplayName(activeSession)} className="w-10 h-10 rounded-full object-cover" />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
-                  {getInitials(getPartnerDisplayName(activeSession))}
-                </div>
-              )}
+              <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
+                {getInitials(getPartnerName(activeSession))}
+              </div>
               <div>
-                <h2 className="text-sm font-semibold text-[#2A2A2A]">{getPartnerDisplayName(activeSession)}</h2>
+                <h2 className="text-sm font-semibold text-[#2A2A2A]">{getPartnerName(activeSession)}</h2>
                 {Object.keys(typingUsers).length > 0 ? (
                   <p className="text-[11px] text-emerald-500">typing...</p>
                 ) : (

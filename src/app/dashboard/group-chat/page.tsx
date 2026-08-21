@@ -316,14 +316,22 @@ export default function GroupChatPage() {
               {myRooms.length > 0 && (
                 <div className="px-3 pt-3 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">My Groups</div>
               )}
-              {myRooms.map(room => (
+              {[...myRooms].sort((a, b) => {
+                if (a.isUniversal) return -1;
+                if (b.isUniversal) return 1;
+                return 0;
+              }).map(room => (
                 <button key={room._id} onClick={() => setActiveRoom(room)} className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAF7F2] transition-colors border-b border-gray-50 text-left ${activeRoom?._id === room._id ? 'bg-[#FAF7F2] border-l-2 border-l-[#B45309]' : ''}`}>
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#B45309] to-[#D97706] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                    {room.roomType === 'area' ? '📍' : '🏗️'}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${room.isUniversal ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : room.roomType === 'project' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-[#B45309] to-[#D97706]'}`}>
+                    {room.isUniversal ? '🌐' : room.roomType === 'project' ? '🏗️' : '📍'}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#2A2A2A] truncate">{room.name}</p>
-                    <p className="text-[10px] text-gray-400">{room.members?.length || 0} members · {room.roomType}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold text-[#2A2A2A] truncate">{room.name}</p>
+                      {room.isUniversal && <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">ALL</span>}
+                      {room.isAutoCreated && <span className="text-[8px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">MATCH</span>}
+                    </div>
+                    <p className="text-[10px] text-gray-400">{room.members?.length || 0} members{room.roomType === 'project' && room.project?.location ? ` · ${room.project.location}` : room.area?.city ? ` · ${room.area.city}` : ''}</p>
                   </div>
                 </button>
               ))}
@@ -375,18 +383,43 @@ export default function GroupChatPage() {
               <button onClick={() => setActiveRoom(null)} className="sm:hidden p-1 hover:bg-gray-100 rounded-lg">
                 <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
-              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#B45309] to-[#D97706] flex items-center justify-center text-white text-sm font-bold">
-                {activeRoom.roomType === 'area' ? '📍' : '🏗️'}
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ${activeRoom.isUniversal ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : activeRoom.roomType === 'project' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-[#B45309] to-[#D97706]'}`}>
+                {activeRoom.isUniversal ? '🌐' : activeRoom.roomType === 'project' ? '🏗️' : '📍'}
               </div>
               <div className="flex-1">
                 <p className="text-sm font-semibold text-[#2A2A2A]">{activeRoom.name}</p>
-                <p className="text-[10px] text-gray-400">{activeRoom.members?.length || 0} members · {activeRoom.area?.city || ''}</p>
+                <p className="text-[10px] text-gray-400">{activeRoom.members?.length || 0} members{activeRoom.area?.city ? ` · ${activeRoom.area.city}` : ''}{activeRoom.project?.location ? ` · ${activeRoom.project.location}` : ''}</p>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${socket.isConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
                 <span className="text-[10px] text-gray-400">{socket.isConnected ? 'Live' : 'Offline'}</span>
+                {activeRoom.canLeave !== false && !activeRoom.isUniversal && (
+                  <button onClick={async () => { if (!confirm('Leave this group?')) return; try { await groupChatApi.leaveRoom(activeRoom._id); toast.success('Left group'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[10px] font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Leave</button>
+                )}
+                {!activeRoom.isUniversal && (user?.role === 'admin' || user?.role === 'captain' || activeRoom.createdBy?._id === user?.id || activeRoom.createdBy?._id === (user as any)?._id) && (
+                  <button onClick={async () => { if (!confirm('Delete this group? (Property sold)')) return; try { await groupChatApi.deleteRoom(activeRoom._id); toast.success('Group deleted'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">Delete</button>
+                )}
               </div>
             </div>
+
+            {/* Project Details Banner */}
+            {activeRoom.roomType === 'project' && activeRoom.project && (
+              <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-blue-800 truncate">{activeRoom.project.projectName}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {activeRoom.project.location && <span className="text-[10px] text-blue-600">📍 {activeRoom.project.location}{activeRoom.project.city ? `, ${activeRoom.project.city}` : ''}</span>}
+                      {activeRoom.project.pricing?.startingPrice && <span className="text-[10px] text-blue-600">💰 ₹{(activeRoom.project.pricing.startingPrice / 100000).toFixed(0)}L+</span>}
+                      {activeRoom.project.configuration?.bhkOptions && activeRoom.project.configuration.bhkOptions.length > 0 && <span className="text-[10px] text-blue-600">🏠 {activeRoom.project.configuration.bhkOptions.join(', ')}</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Messages Area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FAF7F2]">

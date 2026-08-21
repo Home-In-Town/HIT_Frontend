@@ -1122,7 +1122,7 @@ export const organizationsApi = {
 
 export interface ChatSession {
   _id: string;
-  participants: { _id: string; name: string; role: string; companyName?: string; businessLogoUrl?: string }[];
+  participants: { _id: string; name: string; role: string }[];
   project?: { _id: string; projectName: string };
   lastMessage?: { content: string; sender: string; timestamp: string };
   unreadCount?: Record<string, number>;
@@ -1142,7 +1142,7 @@ export interface ChatMessage {
 }
 
 export const chatApi = {
-  async getContacts(): Promise<{ _id: string; name: string; role: string; phone: string; companyName?: string; businessLogoUrl?: string }[]> {
+  async getContacts(): Promise<{ _id: string; name: string; role: string; phone: string }[]> {
     const response = await fetch(`${API_URL}/chat/contacts`, {
       ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
@@ -1798,13 +1798,16 @@ export const crmBridgeApi = {
 export interface GroupRoom {
   _id: string;
   name: string;
-  roomType: 'project' | 'area';
-  project?: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number } };
+  roomType: 'project' | 'area' | 'universal';
+  project?: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number }; configuration?: { bhkOptions?: string[] }; reraNumber?: string; projectStatus?: string };
   area?: { city: string; location: string };
   createdBy: { _id: string; name: string };
   members: Array<{ user: { _id: string; name: string; role: string; companyName?: string }; role: string; joinedAt: string }>;
   description: string;
   active: boolean;
+  isUniversal?: boolean;
+  canLeave?: boolean;
+  isAutoCreated?: boolean;
   lastActivity: string;
   createdAt: string;
 }
@@ -1922,6 +1925,15 @@ export const groupChatApi = {
     const response = await fetch(`${API_URL}/group-chat/rooms/${roomId}/leave`, {
       ...COMMON_FETCH_OPTIONS,
       method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    await handleResponse(response);
+  },
+
+  async deleteRoom(roomId: string): Promise<void> {
+    const response = await fetch(`${API_URL}/group-chat/rooms/${roomId}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'DELETE',
       headers: getAuthHeaders(),
     });
     await handleResponse(response);
@@ -2313,11 +2325,11 @@ export interface ExtractedLeadParams {
   locationCanonical?: string | null;
   city?: string | null;
   propertyType?: string | null;
-  area?: number | null;
-  areaUnit?: 'sqft' | 'acres' | null;
   possessionNeeded?: string | null;
   loanRequired?: boolean;
   urgency?: 'normal' | 'urgent' | 'very_urgent';
+  area?: number | null;
+  areaUnit?: string | null;
 }
 
 export interface ExtractedLeadMatch {
