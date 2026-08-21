@@ -20,9 +20,9 @@ interface LeadConfirmModalProps {
 }
 
 const BHK_OPTIONS = ['1RK', '1BHK', '2BHK', '3BHK', '4BHK', '5BHK'];
-const PROPERTY_TYPES = ['flat', 'plot', 'villa', 'row_house', 'penthouse', 'shop', 'office', 'farm', 'farmhouse'];
+const PROPERTY_TYPES = ['flat', 'plot', 'villa', 'row_house', 'penthouse', 'shop', 'office', 'farm', 'farmhouse', 'warehouse'];
 const BHK_PROPERTY_TYPES = ['flat', 'villa', 'row_house', 'penthouse', 'farmhouse'];
-const SQFT_PROPERTY_TYPES = ['plot', 'shop', 'office'];
+const SQFT_PROPERTY_TYPES = ['plot', 'shop', 'office', 'warehouse'];
 const ACRE_PROPERTY_TYPES = ['farm'];
 const POSSESSION_OPTIONS = ['immediate', '6months', '1year', '2year'];
 const URGENCY_OPTIONS = ['normal', 'urgent', 'very_urgent'];
@@ -119,6 +119,28 @@ export default function LeadConfirmModal({
             </div>
           </div>
 
+          {/* Transaction type: Buy / Rent */}
+          <div>
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Transaction</label>
+            <div className="flex gap-2 mt-1.5">
+              {(['buy', 'rent'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => updateParam('transactionType', t)}
+                  className={`flex-1 py-2 text-xs font-semibold rounded-xl border transition-all ${
+                    (params.transactionType || 'buy') === t
+                      ? t === 'rent'
+                        ? 'bg-blue-500 text-white border-blue-500'
+                        : 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  {t === 'buy' ? '🏠 Buy' : '🔑 Rent'}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* BHK / Area + Property Type */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -182,7 +204,9 @@ export default function LeadConfirmModal({
 
           {/* Budget */}
           <div>
-            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Budget</label>
+            <label className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">
+              Budget {(params.transactionType || 'buy') === 'rent' ? '(Monthly)' : ''}
+            </label>
             <div className="flex items-center gap-2 mt-1.5">
               <div className="flex-1 relative">
                 <input
@@ -203,7 +227,7 @@ export default function LeadConfirmModal({
                   className="w-full px-3 py-2 text-sm bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
                 />
               </div>
-              <span className="text-xs font-bold text-gray-400 shrink-0">Lakhs</span>
+              <span className="text-xs font-bold text-gray-400 shrink-0">{(params.transactionType || 'buy') === 'rent' ? '₹/mo' : 'Lakhs'}</span>
             </div>
           </div>
 

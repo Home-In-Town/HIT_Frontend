@@ -2325,11 +2325,12 @@ export interface ExtractedLeadParams {
   locationCanonical?: string | null;
   city?: string | null;
   propertyType?: string | null;
+  transactionType?: 'buy' | 'rent' | null;
   possessionNeeded?: string | null;
   loanRequired?: boolean;
   urgency?: 'normal' | 'urgent' | 'very_urgent';
   area?: number | null;
-  areaUnit?: string | null;
+  areaUnit?: 'sqft' | 'acres' | null;
 }
 
 export interface ExtractedLeadMatch {
