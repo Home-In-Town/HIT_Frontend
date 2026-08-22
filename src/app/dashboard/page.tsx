@@ -26,7 +26,7 @@ export default function DashboardPage() {
         router.replace('/dashboard/builder');
         break;
       case 'agent':
-        router.replace('/dashboard/agent');
+        router.replace('/dashboard/employee');
         break;
       case 'employee':
         if (user.isEmployerConfirmed) {

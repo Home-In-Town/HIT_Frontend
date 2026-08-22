@@ -96,7 +96,7 @@ export default function EmployeeDashboard() {
                  setPointedLocation(current);
                  
                  // Initial Geocode
-                 if (typeof google !== 'undefined') {
+                 if (typeof google !== 'undefined' && google.maps?.Geocoder) {
                      const geocoder = new google.maps.Geocoder();
                      geocoder.geocode({ location: current }, (results, status) => {
                          if (status === 'OK' && results?.[0]) {
