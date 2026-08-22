@@ -84,7 +84,7 @@ export default function AuthScreens() {
             const { user } = await authApi.login(formattedPhone, mpin);
             
             // 2. Conditional Location Logic
-            if (user.role === 'employee') {
+            if (user.role === 'employee' || user.role === 'agent') {
                 if (!navigator.geolocation) {
                     toast.error("Your device doesn't support geolocation, which is required for field workforce login.");
                     setLoading(false);
@@ -115,7 +115,7 @@ export default function AuthScreens() {
                     { enableHighAccuracy: true, timeout: 10000 }
                 );
             } else {
-                // Non-employees (Admin, Builder, Agent, etc.) proceed directly
+                // Non-employees (Admin, Builder, Captain) proceed directly
                 toast.success("Welcome back!");
                 await checkAuth();
                 router.push('/dashboard');
