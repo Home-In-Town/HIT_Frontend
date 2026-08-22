@@ -452,7 +452,7 @@ export default function AuthScreens() {
                                 onClick={() => setRole('employee')}
                                 className={`flex-1 py-3 rounded-2xl border-2 transition-all font-bold text-sm ${role === 'employee' ? 'border-[#B45309] bg-[#B45309]/5 text-[#B45309]' : 'border-[#E7E5E4] text-[#A8A29E]'}`}
                             >
-                                Field Workforce
+                                Agent
                             </button>
                             <button
                               type="button"
