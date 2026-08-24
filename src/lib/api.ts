@@ -662,6 +662,9 @@ export interface AuthUser {
   businessAddress?: string;
   businessCity?: string;
   businessState?: string;
+  rating?: number;
+  ratingCount?: number;
+  verificationStatus?: { builder?: string; agent?: string };
 }    
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -813,6 +816,28 @@ export const usersApi = {
   async verifyUser(phone: string) {
     const response = await fetch(`${API_URL}/projects/verify-user/${phone}`, COMMON_FETCH_OPTIONS);
     return handleResponse<any>(response);
+  },
+
+  // Set rating for a captain (admin only)
+  async setRating(userId: string, rating: number): Promise<{ message: string; user: { id: string; name: string; rating: number; ratingCount: number } }> {
+    const response = await fetch(`${API_URL}/users/${userId}/rating`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating }),
+    });
+    return handleResponse(response);
+  },
+
+  // Set verification status for a captain (admin only)
+  async setVerification(userId: string, status: 'verified' | 'pending' | 'unverified'): Promise<{ message: string; user: any }> {
+    const response = await fetch(`${API_URL}/users/${userId}/verify`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    return handleResponse(response);
   },
 };
 

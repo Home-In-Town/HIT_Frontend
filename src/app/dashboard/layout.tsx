@@ -457,6 +457,25 @@ const orgPath = user
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">CRM</span>}
               </Link>
               )}
+
+              {/* User Management — admin only */}
+              {user?.role === 'admin' && (
+              <Link
+                href="/dashboard/admin/users"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/admin/users')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Users" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Users</span>}
+              </Link>
+              )}
             </>
           )}
 

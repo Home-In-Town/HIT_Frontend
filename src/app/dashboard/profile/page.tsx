@@ -356,6 +356,18 @@ export default function ProfilePage() {
                     {user.companyName}
                   </span>
                 )}
+                {(user.role === 'captain' || user.role === 'builder') && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-0.5">
+                      {[1,2,3,4,5].map(i => (
+                        <svg key={i} className={`w-3.5 h-3.5 ${i <= ((user as any).rating || 0) ? 'text-amber-400' : 'text-gray-200'}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        </svg>
+                      ))}
+                    </span>
+                    <span className="text-[#57534E] text-xs">{(user as any).rating > 0 ? ((user as any).rating).toFixed(1) : 'Not rated'}</span>
+                  </span>
+                )}
                 <span className="flex items-center gap-1.5 text-[#A8A29E]">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
