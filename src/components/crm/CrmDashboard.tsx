@@ -5,6 +5,7 @@ import { crmBridgeApi, CrmAnalytics, CrmLead, CrmLeadsParams, CrmLeadsResponse, 
 import CrmMetricsBar from './CrmMetricsBar';
 import CrmLeadTable from './CrmLeadTable';
 import CrmLeadDrawer from './CrmLeadDrawer';
+import HumanLeadManager from './HumanLeadManager';
 
 type Tab = 'leads' | 'campaigns' | 'whatsapp';
 
@@ -41,6 +42,9 @@ export default function CrmDashboard() {
   const [activeTab, setActiveTab] = useState<Tab>('leads');
   const [ssoLoadingTab, setSsoLoadingTab] = useState<Tab | null>(null);
   const [ssoError, setSsoError] = useState<string | null>(null);
+
+  // Manager mode: 'ai' or 'human'
+  const [managerMode, setManagerMode] = useState<'ai' | 'human'>('ai');
 
   // Drawer state
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -174,90 +178,132 @@ export default function CrmDashboard() {
         </div>
       </div>
 
-      {/* Metrics bar */}
-      {analyticsLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-[#E7E5E4] p-4 h-24 animate-pulse" />
-          ))}
-        </div>
-      ) : (
-        <CrmMetricsBar analytics={analytics} />
-      )}
-
-      {/* Tabs */}
-      <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden">
-        {/* Tab nav */}
-        <div className="flex border-b border-[#E7E5E4] bg-[#FAF7F2]">
-          {TABS.map(({ key, label, redirectPath }) => {
-            const isLeads = key === 'leads';
-            const isActive = activeTab === key;
-            const isLoading = ssoLoadingTab === key;
-
-            return (
-              <button
-                key={key}
-                onClick={() => handleTabClick(key, redirectPath)}
-                disabled={isLoading}
-                className={`flex items-center gap-2 px-5 py-3.5 text-sm font-bold border-b-2 transition-all disabled:opacity-50 disabled:cursor-wait ${
-                  isActive && isLeads
-                    ? 'border-[#B45309] text-[#B45309] bg-white'
-                    : 'border-transparent text-[#A8A29E] hover:text-[#57534E] hover:bg-white/60'
-                }`}
-              >
-                {isLoading && (
-                  <span className="w-3.5 h-3.5 border-2 border-[#B45309]/40 border-t-[#B45309] rounded-full animate-spin" />
-                )}
-                {label}
-                {!isLeads && (
-                  <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
-                      d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* SSO error */}
-        {ssoError && (
-          <div className="flex items-center gap-2 px-5 py-3 bg-red-50 border-b border-red-100 text-sm text-red-700">
-            <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-            </svg>
-            <span className="font-medium">{ssoError}</span>
-            <button onClick={() => setSsoError(null)} className="ml-auto text-red-400 hover:text-red-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        )}
-
-        {/* Tab content */}
-        <div className="p-5">
-          {activeTab === 'leads' && (
-            <CrmLeadTable
-              leads={leadsData.leads}
-              total={leadsData.total}
-              page={leadsData.page}
-              pages={leadsData.pages}
-              loading={leadsLoading}
-              onFilterChange={handleFilterChange}
-              onLeadClick={handleLeadClick}
-            />
-          )}
-        </div>
+      {/* Manager Mode Toggle */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setManagerMode('ai')}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+            managerMode === 'ai'
+              ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/25'
+              : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40 hover:text-[#B45309]'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          AI Leads Manager
+        </button>
+        <button
+          onClick={() => setManagerMode('human')}
+          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+            managerMode === 'human'
+              ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/25'
+              : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40 hover:text-[#B45309]'
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+          </svg>
+          Human Lead Manager
+        </button>
       </div>
 
-      {/* Lead detail drawer */}
-      <CrmLeadDrawer
-        lead={drawerLoading ? null : selectedLead}
-        open={drawerOpen}
-        onClose={handleDrawerClose}
-      />
+      {/* AI Leads Manager Content */}
+      {managerMode === 'ai' && (
+        <>
+          {/* Metrics bar */}
+          {analyticsLoading ? (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl border border-[#E7E5E4] p-4 h-24 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <CrmMetricsBar analytics={analytics} />
+          )}
+
+          {/* Tabs */}
+          <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden">
+            {/* Tab nav */}
+            <div className="flex border-b border-[#E7E5E4] bg-[#FAF7F2]">
+              {TABS.map(({ key, label, redirectPath }) => {
+                const isLeads = key === 'leads';
+                const isActive = activeTab === key;
+                const isLoading = ssoLoadingTab === key;
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => handleTabClick(key, redirectPath)}
+                    disabled={isLoading}
+                    className={`flex items-center gap-2 px-5 py-3.5 text-sm font-bold border-b-2 transition-all disabled:opacity-50 disabled:cursor-wait ${
+                      isActive && isLeads
+                        ? 'border-[#B45309] text-[#B45309] bg-white'
+                        : 'border-transparent text-[#A8A29E] hover:text-[#57534E] hover:bg-white/60'
+                    }`}
+                  >
+                    {isLoading && (
+                      <span className="w-3.5 h-3.5 border-2 border-[#B45309]/40 border-t-[#B45309] rounded-full animate-spin" />
+                    )}
+                    {label}
+                    {!isLeads && (
+                      <svg className="w-3 h-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}
+                          d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* SSO error */}
+            {ssoError && (
+              <div className="flex items-center gap-2 px-5 py-3 bg-red-50 border-b border-red-100 text-sm text-red-700">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+                <span className="font-medium">{ssoError}</span>
+                <button onClick={() => setSsoError(null)} className="ml-auto text-red-400 hover:text-red-600">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Tab content */}
+            <div className="p-5">
+              {activeTab === 'leads' && (
+                <CrmLeadTable
+                  leads={leadsData.leads}
+                  total={leadsData.total}
+                  page={leadsData.page}
+                  pages={leadsData.pages}
+                  loading={leadsLoading}
+                  onFilterChange={handleFilterChange}
+                  onLeadClick={handleLeadClick}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* Lead detail drawer */}
+          <CrmLeadDrawer
+            lead={drawerLoading ? null : selectedLead}
+            open={drawerOpen}
+            onClose={handleDrawerClose}
+          />
+        </>
+      )}
+
+      {/* Human Lead Manager Content */}
+      {managerMode === 'human' && (
+        <HumanLeadManager />
+      )}
     </div>
   );
 }
