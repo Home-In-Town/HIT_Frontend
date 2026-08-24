@@ -57,6 +57,15 @@ function BuilderNetworkView() {
     fetchBuilders();
   }, [fetchBuilders]);
 
+  // Hide the layout's mobile header on this page (full-screen chat experience)
+  useEffect(() => {
+    const layoutHeader = document.querySelector('header.lg\\:hidden') as HTMLElement | null;
+    if (layoutHeader) layoutHeader.style.display = 'none';
+    return () => {
+      if (layoutHeader) layoutHeader.style.display = '';
+    };
+  }, []);
+
   const handleSearch = (value: string) => {
     setSearchTerm(value);
     clearTimeout(searchTimeoutRef.current);
@@ -107,48 +116,61 @@ function BuilderNetworkView() {
   };
 
   return (
-    <div className="h-[calc(100vh-0px)] lg:h-screen flex bg-[#FAF7F2]">
+    <div className="h-[100dvh] lg:h-screen flex bg-[#FAF7F2] -mt-16 lg:mt-0">
       {/* Left Panel — Builder List */}
       <div className={`w-full sm:w-[420px] flex flex-col bg-white border-r border-[#E7E5E4] ${selectedBuilder ? 'hidden sm:flex' : 'flex'}`}>
         {/* Header */}
-        <div className="px-4 py-3 border-b border-[#E7E5E4]">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
-              {user?.name?.charAt(0)?.toUpperCase() || 'B'}
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-[#075E54]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <a href="/dashboard" className="p-1 hover:bg-white/10 rounded-lg transition-colors sm:hidden">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </a>
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-white/10 flex items-center justify-center text-white font-bold text-sm">
+                {user?.name?.charAt(0)?.toUpperCase() || 'B'}
+              </div>
+              <div>
+                <h1 className="text-[15px] sm:text-base font-bold text-white font-serif">Builders Network</h1>
+                <p className="text-[9px] sm:text-[10px] text-white/60">{pulse?.onlineNow || 0} online</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-[#2A2A2A] font-serif">Builders Network</h1>
-              <p className="text-[11px] text-[#57534E]">{pulse?.onlineNow || 0} builders online now</p>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full bg-white text-[#075E54]">
+                Chat
+              </span>
+              <a href="/dashboard/lead-matching?tab=groups" className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all">
+                Groups
+              </a>
             </div>
           </div>
         </div>
 
         {/* Platform Pulse Stats */}
         {pulse && (
-          <div className="px-3 py-2.5 bg-[#FAF7F2] border-b border-[#E7E5E4]">
+          <div className="px-2 py-2 sm:px-3 sm:py-2.5 bg-[#FAF7F2] border-b border-[#E7E5E4]">
             <div className="grid grid-cols-4 gap-1">
-              <div className="text-center py-1.5 bg-white rounded-lg">
-                <p className="text-sm font-bold text-emerald-600">{pulse.onlineNow}</p>
-                <p className="text-[9px] text-[#57534E]">Online</p>
+              <div className="text-center py-1 sm:py-1.5 bg-white rounded-lg">
+                <p className="text-[13px] sm:text-sm font-bold text-emerald-600">{pulse.onlineNow}</p>
+                <p className="text-[8px] sm:text-[9px] text-[#57534E]">Online</p>
               </div>
-              <div className="text-center py-1.5 bg-white rounded-lg">
-                <p className="text-sm font-bold text-amber-600">{pulse.activeLeadsToday}</p>
-                <p className="text-[9px] text-[#57534E]">Leads Today</p>
+              <div className="text-center py-1 sm:py-1.5 bg-white rounded-lg">
+                <p className="text-[13px] sm:text-sm font-bold text-amber-600">{pulse.activeLeadsToday}</p>
+                <p className="text-[8px] sm:text-[9px] text-[#57534E]">Leads</p>
               </div>
-              <div className="text-center py-1.5 bg-white rounded-lg">
-                <p className="text-sm font-bold text-blue-600">{pulse.newProjectsToday}</p>
-                <p className="text-[9px] text-[#57534E]">New Projects</p>
+              <div className="text-center py-1 sm:py-1.5 bg-white rounded-lg">
+                <p className="text-[13px] sm:text-sm font-bold text-blue-600">{pulse.newProjectsToday}</p>
+                <p className="text-[8px] sm:text-[9px] text-[#57534E]">Projects</p>
               </div>
-              <div className="text-center py-1.5 bg-white rounded-lg">
-                <p className="text-sm font-bold text-green-600">{pulse.dealsClosedToday}</p>
-                <p className="text-[9px] text-[#57534E]">Deals Today</p>
+              <div className="text-center py-1 sm:py-1.5 bg-white rounded-lg">
+                <p className="text-[13px] sm:text-sm font-bold text-green-600">{pulse.dealsClosedToday}</p>
+                <p className="text-[8px] sm:text-[9px] text-[#57534E]">Deals</p>
               </div>
             </div>
           </div>
         )}
 
         {/* Search */}
-        <div className="px-3 py-2">
+        <div className="px-3 py-1.5 sm:py-2">
           <div className="relative">
             <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#57534E]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -158,7 +180,7 @@ function BuilderNetworkView() {
               value={searchTerm}
               onChange={e => handleSearch(e.target.value)}
               placeholder="Search builders..."
-              className="w-full pl-10 pr-4 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-sm text-[#2A2A2A] placeholder-[#57534E] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
+              className="w-full pl-10 pr-4 py-1.5 sm:py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-full text-sm text-[#2A2A2A] placeholder-[#57534E] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
             />
           </div>
         </div>
@@ -171,7 +193,7 @@ function BuilderNetworkView() {
             </div>
           ) : builders.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-[#57534E]">
-              <svg className="w-12 h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-10 h-10 sm:w-12 sm:h-12 mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
               </svg>
               <p className="text-sm">No builders found</p>
@@ -184,7 +206,7 @@ function BuilderNetworkView() {
                 <div
                   key={builder._id}
                   onClick={() => setSelectedBuilder(builder)}
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#FAF7F2] transition-colors border-b border-[#E7E5E4]/50 ${selectedBuilder?._id === builder._id ? 'bg-[#FAF7F2]' : ''}`}
+                  className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer hover:bg-[#FAF7F2] active:bg-[#F0EDE8] transition-colors border-b border-[#E7E5E4]/50 ${selectedBuilder?._id === builder._id ? 'bg-[#FAF7F2]' : ''}`}
                 >
                   {/* Avatar */}
                   <div className="relative flex-shrink-0">
@@ -289,34 +311,34 @@ function BuilderProfilePanel({ builder, onBack, renderStars, formatLastSeen }: {
   return (
     <div className="flex-1 flex flex-col bg-[#FAF7F2]">
       {/* Header */}
-      <div className="px-4 py-3 bg-white border-b border-[#E7E5E4] flex items-center gap-3">
-        <button onClick={onBack} className="sm:hidden p-1 text-[#57534E] hover:text-[#2A2A2A]">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="px-2 py-2 sm:px-4 sm:py-2.5 bg-[#075E54] flex items-center gap-2 sm:gap-3">
+        <button onClick={onBack} className="sm:hidden p-1 text-white/80 hover:text-white">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
         </button>
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           {builder.businessLogoUrl ? (
-            <img src={builder.businessLogoUrl} alt={builder.name} className="w-10 h-10 rounded-full object-cover" />
+            <img src={builder.businessLogoUrl} alt={builder.name} className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-semibold">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-white/10 flex items-center justify-center text-white font-semibold">
               {builder.name.charAt(0).toUpperCase()}
             </div>
           )}
           {builder.isOnline && (
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 rounded-full border-2 border-white" />
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-[#25D366] rounded-full border-2 border-[#075E54]" />
           )}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <h2 className="text-base font-semibold text-[#2A2A2A] truncate">{builder.companyName || builder.name}</h2>
+            <h2 className="text-[13px] sm:text-base font-semibold text-white truncate">{builder.companyName || builder.name}</h2>
             {builder.isVerified && (
-              <svg className="w-4 h-4 flex-shrink-0 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 flex-shrink-0 text-blue-300" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
               </svg>
             )}
           </div>
-          <p className="text-[12px] text-[#57534E]">
+          <p className="text-[12px] text-white/60">
             {builder.isOnline ? 'online' : formatLastSeen(builder.lastSeen, false)}
           </p>
         </div>
@@ -490,6 +512,15 @@ function AdminChatView() {
   useEffect(() => {
     fetchSessions();
   }, [fetchSessions]);
+
+  // Hide the layout's mobile header on this page (full-screen chat experience)
+  useEffect(() => {
+    const layoutHeader = document.querySelector('header.lg\\:hidden') as HTMLElement | null;
+    if (layoutHeader) layoutHeader.style.display = 'none';
+    return () => {
+      if (layoutHeader) layoutHeader.style.display = '';
+    };
+  }, []);
 
   // Handle direct partner chat from URL params
   useEffect(() => {
@@ -677,17 +708,30 @@ function AdminChatView() {
   });
 
   return (
-    <div className="h-[calc(100vh-0px)] lg:h-screen flex bg-[#FAF7F2]">
+    <div className="h-[100dvh] lg:h-screen flex bg-[#FAF7F2] -mt-16 lg:mt-0">
       {/* Left Sidebar — Session List */}
       <div className={`w-full sm:w-80 lg:w-96 bg-white border-r border-[#E7E5E4] flex flex-col ${activeSession ? 'hidden sm:flex' : 'flex'}`}>
-        <div className="p-4 border-b border-[#E7E5E4]">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-[#2A2A2A] font-serif">Chat</h1>
-            <button onClick={loadContacts} className="p-2 bg-[#B45309] text-white rounded-xl hover:bg-[#92400E] transition-colors shadow-lg shadow-[#B45309]/20" title="New Chat">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            </button>
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-[#075E54]">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <div className="flex items-center gap-2">
+              <a href="/dashboard" className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </a>
+              <h1 className="text-lg font-bold text-white font-serif">Chats</h1>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full bg-white text-[#075E54]">
+                Chat
+              </span>
+              <a href="/dashboard/lead-matching?tab=groups" className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all">
+                Groups
+              </a>
+              <button onClick={loadContacts} className="p-1.5 sm:p-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors" title="New Chat">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+            </div>
           </div>
-          <input type="text" placeholder="Search conversations..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full px-4 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20" />
+          <input type="text" placeholder="Search conversations..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full px-4 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-full text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30" />
         </div>
 
         {/* Sessions */}
@@ -706,21 +750,21 @@ function AdminChatView() {
               <div
                 key={session._id}
                 onClick={() => setActiveSession(session)}
-                className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-[#FAF7F2] transition-colors border-b border-[#E7E5E4]/50 ${activeSession?._id === session._id ? 'bg-[#FAF7F2]' : ''}`}
+                className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer hover:bg-[#FAF7F2] active:bg-[#F0EDE8] transition-colors border-b border-[#E7E5E4]/50 ${activeSession?._id === session._id ? 'bg-[#FAF7F2]' : ''}`}
               >
-                <div className="w-11 h-11 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
+                <div className="w-12 h-12 sm:w-11 sm:h-11 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm flex-shrink-0">
                   {getInitials(getPartnerName(session))}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-medium text-[#2A2A2A] truncate">{getPartnerName(session)}</h3>
+                    <h3 className="text-[15px] sm:text-sm font-medium text-[#2A2A2A] truncate">{getPartnerName(session)}</h3>
                     {session.lastMessage?.timestamp && (
-                      <span className="text-[10px] text-gray-400">{formatTime(session.lastMessage.timestamp)}</span>
+                      <span className="text-[11px] sm:text-[10px] text-gray-400 flex-shrink-0 ml-2">{formatTime(session.lastMessage.timestamp)}</span>
                     )}
                   </div>
                   <div className="flex items-center justify-between mt-0.5">
-                    <p className="text-xs text-gray-400 truncate">{session.lastMessage?.content || 'No messages yet'}</p>
-                    <span className="text-[10px] bg-[#B45309]/10 text-[#B45309] px-1.5 py-0.5 rounded-full capitalize">{getPartnerRole(session)}</span>
+                    <p className="text-[13px] sm:text-xs text-gray-400 truncate">{session.lastMessage?.content || 'No messages yet'}</p>
+                    <span className="text-[9px] sm:text-[10px] bg-[#B45309]/10 text-[#B45309] px-1.5 py-0.5 rounded-full capitalize flex-shrink-0 ml-2">{getPartnerRole(session)}</span>
                   </div>
                 </div>
               </div>
@@ -734,32 +778,32 @@ function AdminChatView() {
         {activeSession ? (
           <>
             {/* Chat Header */}
-            <div className="px-4 py-3 bg-white border-b border-[#E7E5E4] flex items-center gap-3">
-              <button onClick={() => setActiveSession(null)} className="sm:hidden p-1 text-gray-500">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            <div className="px-2 py-2 sm:px-4 sm:py-2.5 bg-[#075E54] flex items-center gap-2 sm:gap-3">
+              <button onClick={() => setActiveSession(null)} className="p-1 text-white/80 sm:hidden">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
-              <div className="w-10 h-10 rounded-full bg-[#B45309]/10 flex items-center justify-center text-[#B45309] font-bold text-sm">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#25D366]/20 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                 {getInitials(getPartnerName(activeSession))}
               </div>
-              <div>
-                <h2 className="text-sm font-semibold text-[#2A2A2A]">{getPartnerName(activeSession)}</h2>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-[13px] sm:text-sm font-semibold text-white truncate">{getPartnerName(activeSession)}</h2>
                 {Object.keys(typingUsers).length > 0 ? (
-                  <p className="text-[11px] text-emerald-500">typing...</p>
+                  <p className="text-[10px] sm:text-[11px] text-[#25D366]">typing...</p>
                 ) : (
-                  <p className="text-[11px] text-gray-400 capitalize">{getPartnerRole(activeSession)}</p>
+                  <p className="text-[10px] sm:text-[11px] text-white/60 capitalize">{getPartnerRole(activeSession)}</p>
                 )}
               </div>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 bg-[#FAF7F2] space-y-3">
+            <div className="flex-1 overflow-y-auto px-3 py-3 sm:p-4 space-y-1.5 sm:space-y-2 bg-[#ECE5DD]">
               {messages.map(msg => {
                 const isMe = msg.sender._id === user?.id || msg.sender._id === user?._id;
                 return (
                   <div key={msg._id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${isMe ? 'bg-[#B45309] text-white rounded-br-md' : 'bg-white text-[#2A2A2A] border border-[#E7E5E4] rounded-bl-md shadow-sm'}`}>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-                      <p className={`text-[10px] mt-1 ${isMe ? 'text-white/60' : 'text-gray-400'} text-right`}>
+                    <div className={`max-w-[75%] rounded-lg px-3 py-2 shadow-sm relative ${isMe ? 'bg-[#DCF8C6] text-[#111B21] rounded-tr-none' : 'bg-white text-[#111B21] rounded-tl-none'}`}>
+                      <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+                      <p className={`text-[11px] mt-0.5 text-[#667781] text-right`}>
                         {new Date(msg.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -770,30 +814,32 @@ function AdminChatView() {
             </div>
 
             {/* Message Input */}
-            <div className="px-4 py-3 bg-white border-t border-[#E7E5E4]">
+            <div className="px-2 py-1.5 sm:px-3 sm:py-2 bg-[#F0F2F5]">
               <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={e => handleTyping(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Type a message..."
-                  className="flex-1 px-4 py-2.5 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20"
-                />
-                <button onClick={handleSendMessage} disabled={!newMessage.trim()} className="p-2.5 bg-[#B45309] text-white rounded-xl hover:bg-[#92400E] transition-colors disabled:opacity-40 shadow-lg shadow-[#B45309]/20">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                <div className="flex-1 flex items-center bg-white rounded-full px-3 sm:px-4 py-2 shadow-sm">
+                  <input
+                    type="text"
+                    value={newMessage}
+                    onChange={e => handleTyping(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                    placeholder="Type a message"
+                    className="flex-1 text-sm text-[#111B21] placeholder-[#667781] bg-transparent focus:outline-none"
+                  />
+                </div>
+                <button onClick={handleSendMessage} disabled={!newMessage.trim()} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#075E54] text-white rounded-full flex items-center justify-center hover:bg-[#064E46] transition-colors disabled:opacity-40 shadow-sm flex-shrink-0">
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                 </button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center bg-[#FAF7F2]">
-            <div className="w-16 h-16 mb-4 rounded-full bg-[#B45309]/10 flex items-center justify-center">
-              <svg className="w-8 h-8 text-[#B45309]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex-1 flex flex-col items-center justify-center" style={{ backgroundColor: '#ECE5DD' }}>
+            <div className="w-16 h-16 mb-4 rounded-full bg-[#075E54]/10 flex items-center justify-center">
+              <svg className="w-8 h-8 text-[#075E54]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </div>
-            <p className="text-gray-500 text-sm">Select a conversation to start chatting</p>
+            <p className="text-[#667781] text-sm">Select a conversation to start chatting</p>
           </div>
         )}
       </div>

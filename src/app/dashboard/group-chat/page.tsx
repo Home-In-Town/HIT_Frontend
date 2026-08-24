@@ -73,6 +73,15 @@ export default function GroupChatPage() {
 
   useEffect(() => { fetchRooms(); }, [fetchRooms]);
 
+  // Hide the layout's mobile header on this page (full-screen chat experience)
+  useEffect(() => {
+    const layoutHeader = document.querySelector('header.lg\\:hidden') as HTMLElement | null;
+    if (layoutHeader) layoutHeader.style.display = 'none';
+    return () => {
+      if (layoutHeader) layoutHeader.style.display = '';
+    };
+  }, []);
+
   // Load messages when room changes
   useEffect(() => {
     if (!activeRoom) return;
@@ -259,31 +268,44 @@ export default function GroupChatPage() {
   };
 
   return (
-    <div className="h-[calc(100vh-0px)] lg:h-screen flex bg-[#FAF7F2]">
+    <div className="h-[100dvh] lg:h-screen flex bg-[#FAF7F2] -mt-16 lg:mt-0">
       {/* Left Sidebar — Room List */}
       <div className={`w-full sm:w-80 lg:w-96 bg-white border-r border-[#E7E5E4] flex flex-col ${activeRoom ? 'hidden sm:flex' : 'flex'}`}>
-        <div className="p-4 border-b border-[#E7E5E4]">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-[#2A2A2A] font-serif">Groups</h1>
-            <button onClick={() => setShowCreateRoom(true)} className="p-2 bg-[#B45309] text-white rounded-xl hover:bg-[#92400E] transition-colors shadow-lg shadow-[#B45309]/20" title="Create Room">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            </button>
+        <div className="px-3 py-2.5 sm:p-4 bg-[#075E54]">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <div className="flex items-center gap-2">
+              <a href="/dashboard" className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              </a>
+              <h1 className="text-lg sm:text-xl font-bold text-white font-serif">Groups</h1>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <a href="/dashboard/lead-matching?tab=chats" className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full bg-white/10 text-white/70 hover:bg-white/20 hover:text-white transition-all">
+                Chat
+              </a>
+              <span className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-[11px] font-bold rounded-full bg-white text-[#075E54]">
+                Groups
+              </span>
+              <button onClick={() => setShowCreateRoom(true)} className="p-1.5 sm:p-2 bg-white/10 text-white rounded-full hover:bg-white/20 transition-colors" title="Create Room">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+            </div>
           </div>
 
           {/* Tab buttons */}
-          <div className="flex gap-1 mb-3 p-1 bg-[#FAF7F2] rounded-xl">
-            <button onClick={() => setActiveTab('rooms')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+          <div className="flex gap-0.5 sm:gap-1 mb-2 sm:mb-3 p-0.5 sm:p-1 bg-white/10 rounded-lg sm:rounded-xl">
+            <button onClick={() => setActiveTab('rooms')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
               Chats
             </button>
-            <button onClick={() => setActiveTab('deals')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'deals' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+            <button onClick={() => setActiveTab('deals')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'deals' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
               Deals
             </button>
             {user?.role === 'admin' && (
               <>
-                <button onClick={() => setActiveTab('leads')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'leads' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+                <button onClick={() => setActiveTab('leads')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'leads' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
                   Leads
                 </button>
-                <button onClick={() => setActiveTab('stats')} className={`flex-1 px-2 py-1.5 text-[11px] font-semibold rounded-lg transition-all ${activeTab === 'stats' ? 'bg-white text-[#B45309] shadow-sm' : 'text-gray-500 hover:text-[#B45309]'}`}>
+                <button onClick={() => setActiveTab('stats')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'stats' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
                   Stats
                 </button>
               </>
@@ -292,8 +314,8 @@ export default function GroupChatPage() {
 
           {activeTab === 'rooms' && (
           <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input type="text" placeholder="Search groups..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20" />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input type="text" placeholder="Search groups..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-1.5 sm:py-2 bg-white/10 border border-white/20 rounded-full text-sm text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30" />
           </div>
           )}
         </div>
@@ -321,8 +343,8 @@ export default function GroupChatPage() {
                 if (b.isUniversal) return 1;
                 return 0;
               }).map(room => (
-                <button key={room._id} onClick={() => setActiveRoom(room)} className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-[#FAF7F2] transition-colors border-b border-gray-50 text-left ${activeRoom?._id === room._id ? 'bg-[#FAF7F2] border-l-2 border-l-[#B45309]' : ''}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${room.isUniversal ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : room.roomType === 'project' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-[#B45309] to-[#D97706]'}`}>
+                <button key={room._id} onClick={() => setActiveRoom(room)} className={`w-full flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 hover:bg-[#FAF7F2] active:bg-[#F0EDE8] transition-colors border-b border-gray-50 text-left ${activeRoom?._id === room._id ? 'bg-[#FAF7F2] border-l-2 border-l-[#B45309]' : ''}`}>
+                  <div className={`w-11 h-11 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${room.isUniversal ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : room.roomType === 'project' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-[#B45309] to-[#D97706]'}`}>
                     {room.isUniversal ? '🌐' : room.roomType === 'project' ? '🏗️' : '📍'}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -369,35 +391,35 @@ export default function GroupChatPage() {
       {/* Main Chat Area */}
       <div className={`flex-1 flex flex-col ${!activeRoom ? 'hidden sm:flex' : 'flex'}`}>
         {!activeRoom ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-            <div className="w-20 h-20 bg-[#FAF7F2] rounded-2xl flex items-center justify-center mb-4">
-              <svg className="w-10 h-10 text-[#B45309]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          <div className="flex-1 flex flex-col items-center justify-center" style={{ backgroundColor: '#ECE5DD' }}>
+            <div className="w-20 h-20 bg-white/80 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
+              <svg className="w-10 h-10 text-[#075E54]/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             </div>
-            <p className="text-sm font-medium">Select a group</p>
-            <p className="text-xs mt-1">Post requirements & get instant matches</p>
+            <p className="text-sm font-medium text-[#111B21]">Select a group</p>
+            <p className="text-xs mt-1 text-[#667781]">Post requirements & get instant matches</p>
           </div>
         ) : (
           <>
             {/* Room Header */}
-            <div className="px-4 py-3 bg-white border-b border-[#E7E5E4] flex items-center gap-3">
-              <button onClick={() => setActiveRoom(null)} className="sm:hidden p-1 hover:bg-gray-100 rounded-lg">
-                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            <div className="px-2 py-2 sm:px-4 sm:py-2.5 bg-[#075E54] flex items-center gap-2 sm:gap-3">
+              <button onClick={() => setActiveRoom(null)} className="p-1 hover:bg-white/10 rounded-lg sm:hidden">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               </button>
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-sm font-bold ${activeRoom.isUniversal ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : activeRoom.roomType === 'project' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-[#B45309] to-[#D97706]'}`}>
+              <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${activeRoom.isUniversal ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' : activeRoom.roomType === 'project' ? 'bg-gradient-to-br from-blue-500 to-blue-600' : 'bg-gradient-to-br from-[#25D366] to-[#128C7E]'}`}>
                 {activeRoom.isUniversal ? '🌐' : activeRoom.roomType === 'project' ? '🏗️' : '📍'}
               </div>
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-[#2A2A2A]">{activeRoom.name}</p>
-                <p className="text-[10px] text-gray-400">{activeRoom.members?.length || 0} members{activeRoom.area?.city ? ` · ${activeRoom.area.city}` : ''}{activeRoom.project?.location ? ` · ${activeRoom.project.location}` : ''}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] sm:text-sm font-semibold text-white truncate">{activeRoom.name}</p>
+                <p className="text-[9px] sm:text-[10px] text-white/60 truncate">{activeRoom.members?.length || 0} members{activeRoom.area?.city ? ` · ${activeRoom.area.city}` : ''}{activeRoom.project?.location ? ` · ${activeRoom.project.location}` : ''}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${socket.isConnected ? 'bg-green-500' : 'bg-gray-300'}`} />
-                <span className="text-[10px] text-gray-400">{socket.isConnected ? 'Live' : 'Offline'}</span>
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <span className={`w-2 h-2 rounded-full hidden sm:block ${socket.isConnected ? 'bg-[#25D366]' : 'bg-white/30'}`} />
+                <span className="text-[9px] text-white/60 hidden sm:block">{socket.isConnected ? 'Live' : 'Offline'}</span>
                 {activeRoom.canLeave !== false && !activeRoom.isUniversal && (
-                  <button onClick={async () => { if (!confirm('Leave this group?')) return; try { await groupChatApi.leaveRoom(activeRoom._id); toast.success('Left group'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[10px] font-medium text-red-500 border border-red-200 rounded-lg hover:bg-red-50">Leave</button>
+                  <button onClick={async () => { if (!confirm('Leave this group?')) return; try { await groupChatApi.leaveRoom(activeRoom._id); toast.success('Left group'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[9px] sm:text-[10px] font-medium text-white/80 border border-white/30 rounded-md sm:rounded-lg hover:bg-white/10">Leave</button>
                 )}
                 {!activeRoom.isUniversal && (user?.role === 'admin' || user?.role === 'captain' || activeRoom.createdBy?._id === user?.id || activeRoom.createdBy?._id === (user as any)?._id) && (
-                  <button onClick={async () => { if (!confirm('Delete this group? (Property sold)')) return; try { await groupChatApi.deleteRoom(activeRoom._id); toast.success('Group deleted'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[10px] font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100">Delete</button>
+                  <button onClick={async () => { if (!confirm('Delete this group? (Property sold)')) return; try { await groupChatApi.deleteRoom(activeRoom._id); toast.success('Group deleted'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[9px] sm:text-[10px] font-medium text-red-300 border border-red-300/50 rounded-md sm:rounded-lg hover:bg-red-500/20">Del</button>
                 )}
               </div>
             </div>
@@ -422,7 +444,7 @@ export default function GroupChatPage() {
             )}
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#FAF7F2]">
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-[#ECE5DD]">
               {messages.map(msg => (
                 <MessageBubble key={msg._id} msg={msg} userId={user?.id || user?._id || ''} onInterested={handleInterested} formatPrice={formatPrice} />
               ))}
@@ -430,23 +452,25 @@ export default function GroupChatPage() {
             </div>
 
             {/* Input Area */}
-            <div className="px-4 py-3 bg-white border-t border-[#E7E5E4]">
+            <div className="px-2 py-1.5 sm:px-3 sm:py-2 bg-[#F0F2F5]">
               {/* Mode switcher */}
-              <div className="flex items-center gap-2 mb-2">
-                <button onClick={() => setPostMode('text')} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${postMode === 'text' ? 'bg-[#B45309] text-white' : 'bg-[#FAF7F2] text-gray-600'}`}>Text</button>
+              <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 overflow-x-auto scrollbar-hide">
+                <button onClick={() => setPostMode('text')} className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${postMode === 'text' ? 'bg-[#075E54] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>Text</button>
                 {(user?.role === 'agent' || user?.role === 'admin' || user?.role === 'captain') && (
-                  <button onClick={() => setPostMode('requirement')} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${postMode === 'requirement' ? 'bg-orange-600 text-white' : 'bg-[#FAF7F2] text-gray-600'}`}>🔍 Post Requirement</button>
+                  <button onClick={() => setPostMode('requirement')} className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${postMode === 'requirement' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>🔍 Requirement</button>
                 )}
                 {(user?.role === 'builder' || user?.role === 'admin' || user?.role === 'captain' || user?.role === 'agent') && (
-                  <button onClick={() => setPostMode('inventory')} className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${postMode === 'inventory' ? 'bg-emerald-600 text-white' : 'bg-[#FAF7F2] text-gray-600'}`}>🏠 Post Inventory</button>
+                  <button onClick={() => setPostMode('inventory')} className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${postMode === 'inventory' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>🏠 Inventory</button>
                 )}
               </div>
 
               {postMode === 'text' && (
                 <div className="flex items-center gap-2">
-                  <input type="text" value={textMsg} onChange={e => setTextMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendText()} placeholder="Type a message..." className="flex-1 px-4 py-2.5 bg-[#FAF7F2] border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20" />
-                  <button onClick={handleSendText} disabled={!textMsg.trim()} className="p-2.5 bg-[#B45309] text-white rounded-xl hover:bg-[#92400E] transition-colors disabled:opacity-40 shadow-lg shadow-[#B45309]/20">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                  <div className="flex-1 flex items-center bg-white rounded-full px-3 sm:px-4 py-2 shadow-sm">
+                    <input type="text" value={textMsg} onChange={e => setTextMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendText()} placeholder="Type a message" className="flex-1 text-sm text-[#111B21] placeholder-[#667781] bg-transparent focus:outline-none" />
+                  </div>
+                  <button onClick={handleSendText} disabled={!textMsg.trim()} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#075E54] text-white rounded-full flex items-center justify-center hover:bg-[#064E46] transition-colors disabled:opacity-40 shadow-sm flex-shrink-0">
+                    <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                   </button>
                 </div>
               )}
@@ -639,10 +663,10 @@ function MessageBubble({ msg, userId, onInterested, formatPrice }: {
   // Default: text message
   return (
     <div className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[75%] rounded-2xl px-4 py-2.5 ${isMe ? 'bg-[#B45309] text-white rounded-br-md' : 'bg-white text-[#2A2A2A] border border-[#E7E5E4] rounded-bl-md shadow-sm'}`}>
-        {!isMe && <p className="text-[10px] font-bold text-[#B45309] mb-0.5">{msg.sender?.name} <span className="text-gray-400 font-normal">· {msg.sender?.role}</span></p>}
-        <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</p>
-        <p className={`text-[10px] mt-1 ${isMe ? 'text-white/60' : 'text-gray-400'} text-right`}>{time}</p>
+      <div className={`max-w-[75%] rounded-lg px-3 py-2 shadow-sm ${isMe ? 'bg-[#DCF8C6] text-[#111B21] rounded-tr-none' : 'bg-white text-[#111B21] rounded-tl-none'}`}>
+        {!isMe && <p className="text-[10px] font-bold text-[#075E54] mb-0.5">{msg.sender?.name} <span className="text-[#667781] font-normal">· {msg.sender?.role}</span></p>}
+        <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{msg.content}</p>
+        <p className="text-[11px] mt-0.5 text-[#667781] text-right">{time}</p>
       </div>
     </div>
   );

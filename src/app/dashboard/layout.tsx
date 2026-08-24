@@ -87,13 +87,13 @@ const orgPath = user
       {/* Mobile Overlay */}
       {sidebarOpen && (
         <div 
-          className="lg:hidden fixed inset-0 z-40 bg-black/20 backdrop-blur-sm"
+          className="lg:hidden fixed inset-0 z-[60] bg-black/20 backdrop-blur-sm"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside className={`
-        fixed left-0 h-full bg-white border-r border-[#E7E5E4] p-3 z-50 shadow-2xl shadow-[#B45309]/5
+        fixed left-0 h-full bg-white border-r border-[#E7E5E4] p-3 z-[70] shadow-2xl shadow-[#B45309]/5
         transform transition-all duration-300 ease-in-out
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0
@@ -153,7 +153,7 @@ const orgPath = user
         </div>
 
         
-        <nav className="space-y-1 flex-1 overflow-y-auto">
+        <nav className="space-y-1 flex-1 overflow-y-auto min-h-0">
           {!isCollapsed && (
             <div className="px-2 mb-2 text-xs font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap transition-all duration-300">
               Overview
@@ -300,6 +300,8 @@ const orgPath = user
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Archive</span>}
               </Link>
 
+              {user?.role === 'agent' && (
+              <>
               <Link
                 href="/dashboard/chat"
                 onClick={() => setSidebarOpen(false)}
@@ -331,6 +333,8 @@ const orgPath = user
                 </svg>
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Group Chat</span>}
               </Link>
+              </>
+              )}
             </>
           )}
 
@@ -402,44 +406,10 @@ const orgPath = user
             </>
           )}
 
-          {/* Chat Link */}
+          {/* CRM — admin only (builders/agents/captains have their own CRM link) */}
           {(user?.role === 'admin' || user?.role === 'builder' || user?.role === 'captain') && (
             <>
 
-              <Link
-                href="/dashboard/chat"
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                  isActive('/dashboard/chat')
-                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
-                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
-                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
-                title={isCollapsed ? "Chat" : ""}
-              >
-                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Chat</span>}
-              </Link>
-
-              {/* Group Chat — Smart Match */}
-              <Link
-                href="/dashboard/group-chat"
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
-                  isActive('/dashboard/group-chat')
-                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
-                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
-                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
-                title={isCollapsed ? "Group Chat" : ""}
-              >
-                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Group Chat</span>}
-              </Link>
-
-              {/* CRM — admin only (builders/agents/captains have their own CRM link) */}
               {user?.role === 'admin' && (
               <Link
                 href="/dashboard/crm"
@@ -515,29 +485,29 @@ const orgPath = user
             {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Profile</span>}
           </Link>
 
-
+          {/* Sign Out — inside nav so it's always visible after menu items */}
+          <div className="border-t border-gray-200 mt-4 pt-3">
+            <button
+              onClick={() => {
+                logout();
+                window.location.href = '/login';
+              }}
+              className={`
+                w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all
+                text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309] group
+                ${isCollapsed ? 'justify-center px-0' : ''}
+              `}
+              title={isCollapsed ? "Sign Out" : ""}
+            >
+              <svg className="flex-shrink-0 w-6 h-6 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+              {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Sign Out</span>}
+            </button>
+          </div>
 
         </nav>
         
-        <div className="border-t border-gray-200 pt-4 pb-2 lg:pb-2 pb-20">
-          <button
-            onClick={() => {
-              logout();
-              window.location.href = '/login';
-            }}
-            className={`
-              w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all
-              text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309] group
-              ${isCollapsed ? 'justify-center px-0' : ''}
-            `}
-            title={isCollapsed ? "Sign Out" : ""}
-          >
-            <svg className="flex-shrink-0 w-6 h-6 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-            </svg>
-            {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Sign Out</span>}
-          </button>
-        </div>
       </aside>
 
       {/* Main Content */}
