@@ -491,7 +491,7 @@ export default function AdminDashboardPage() {
               <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
                 <Zap className="w-4 h-4 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
+              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Lead Matching</span>
             </Link>
             <Link
               href="/dashboard/marketplace"
