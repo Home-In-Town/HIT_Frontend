@@ -155,6 +155,17 @@ export default function MarketplacePage() {
   const [sellAndEarn, setSellAndEarn] = useState(false);
   const [selectedCity, setSelectedCity] = useState('All Cities');
   const [searchTerm, setSearchTerm] = useState('');
+  // Discovery filters — the #1 marketplace action is finding by budget/locality/BHK/possession.
+  const [budgetMin, setBudgetMin] = useState<string>(''); // in lakhs
+  const [budgetMax, setBudgetMax] = useState<string>(''); // in lakhs
+  const [bhkFilter, setBhkFilter] = useState<string>('All'); // 'All' | '1' | '2' | '3' | '4' | '5+'
+  const [possessionFilter, setPossessionFilter] = useState<string>('All'); // 'All' | 'ready' | 'under-construction'
+  const [showFilters, setShowFilters] = useState(false);
+  // Render cap so the grid stays fast even with hundreds of listings.
+  const PAGE_SIZE = 24;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  // Which card's "..." overflow menu is open (only one at a time). Null = none.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState<MarketplaceListing | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
@@ -264,6 +275,25 @@ export default function MarketplacePage() {
     });
     return Array.from(list).sort();
   }, [projects, listings]);
+
+  // How many discovery filters are active (drives the badge + "clear all").
+  const activeFilterCount = useMemo(() => {
+    let n = 0;
+    if (selectedCity !== 'All Cities') n++;
+    if (budgetMin) n++;
+    if (budgetMax) n++;
+    if (bhkFilter !== 'All') n++;
+    if (possessionFilter !== 'All') n++;
+    return n;
+  }, [selectedCity, budgetMin, budgetMax, bhkFilter, possessionFilter]);
+
+  const clearFilters = () => {
+    setSelectedCity('All Cities');
+    setBudgetMin('');
+    setBudgetMax('');
+    setBhkFilter('All');
+    setPossessionFilter('All');
+  };
 
   const unlistedProjects = useMemo(() => {
     // Build set of project IDs already listed in the marketplace
@@ -387,11 +417,67 @@ export default function MarketplacePage() {
         );
       }
 
+      // 7. Budget (values entered in lakhs; item.price is in rupees)
+      const minRupees = budgetMin ? Number(budgetMin) * 100000 : null;
+      const maxRupees = budgetMax ? Number(budgetMax) * 100000 : null;
+      if (minRupees !== null || maxRupees !== null) {
+        processed = processed.filter(item => {
+          const price = Number(item.price) || 0;
+          if (price <= 0) return false; // can't budget-filter items with no price
+          if (minRupees !== null && price < minRupees) return false;
+          if (maxRupees !== null && price > maxRupees) return false;
+          return true;
+        });
+      }
+
+      // 8. BHK
+      if (bhkFilter !== 'All') {
+        processed = processed.filter(item => {
+          const opts: string[] = item.bhkOptions || [];
+          if (opts.length === 0) return false;
+          return opts.some(o => {
+            const n = parseInt(String(o), 10);
+            if (Number.isNaN(n)) return false;
+            return bhkFilter === '5+' ? n >= 5 : n === Number(bhkFilter);
+          });
+        });
+      }
+
+      // 9. Possession status
+      if (possessionFilter !== 'All') {
+        processed = processed.filter(item => {
+          const status = String(item.projectStatus || '').toLowerCase().replace(/\s+/g, '-');
+          if (possessionFilter === 'ready') {
+            return status.includes('ready') || status.includes('completed');
+          }
+          // under-construction bucket = anything not ready (pre-launch, under-construction, nearing)
+          return status && !status.includes('ready') && !status.includes('completed');
+        });
+      }
+
       setFilteredItems(processed);
     };
 
     filterAndProcessItems();
-  }, [activeTab, activeView, searchTerm, selectedCity, sellAndEarn, listings, projects, user, myListedProjects]);
+  }, [activeTab, activeView, searchTerm, selectedCity, sellAndEarn, listings, projects, user, myListedProjects, budgetMin, budgetMax, bhkFilter, possessionFilter]);
+
+  // Reset the render cap whenever the result set changes so users start from the top.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [searchTerm, selectedCity, activeView, budgetMin, budgetMax, bhkFilter, possessionFilter]);
+
+  // Close the card overflow menu on any outside click or Escape.
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = () => setOpenMenuId(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenMenuId(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openMenuId]);
 
   useEffect(() => {
     if (activeTab === 'admin' && isAdmin) {
@@ -709,19 +795,139 @@ export default function MarketplacePage() {
                 ))}
               </div>
 
-              {/* Search Bar */}
-              <div className="flex-1 w-full relative group">
-                <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 md:w-4.5 h-4 md:h-4.5 text-zinc-300 group-focus-within:text-[#B45309] transition-colors" />
+              {/* Unified Search + Filters — one pill to save horizontal space.
+                  Search input on the left, inline Filters button tucked on the right. */}
+              <div className="flex-1 w-full relative group flex items-center bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg focus-within:border-[#B45309] focus-within:ring-2 focus-within:ring-[#B45309]/5 transition-all">
+                <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 md:w-4.5 h-4 md:h-4.5 text-zinc-300 group-focus-within:text-[#B45309] transition-colors pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="Search projects..."
-                  className="w-full pl-9 md:pl-10 pr-4 py-2 md:py-2.5 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-xs md:text-sm focus:ring-2 focus:ring-[#B45309]/5 focus:border-[#B45309] transition-all outline-none placeholder:text-zinc-300 font-medium"
+                  placeholder="Search by name, locality..."
+                  className="flex-1 min-w-0 bg-transparent pl-9 md:pl-10 pr-2 py-2 md:py-2.5 text-xs md:text-sm outline-none placeholder:text-zinc-300 font-medium"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="p-1 text-zinc-300 hover:text-[#B45309] transition-colors shrink-0"
+                    title="Clear search"
+                    aria-label="Clear search"
+                  >
+                    <XMarkIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
+                <div className="w-px self-stretch my-1.5 bg-[#E7E5E4]" />
+                <button
+                  onClick={() => setShowFilters(v => !v)}
+                  className={`flex items-center gap-1 md:gap-1.5 px-2.5 md:px-3.5 py-2 md:py-2.5 rounded-r-lg text-xs md:text-sm font-bold transition-all shrink-0 ${
+                    showFilters || activeFilterCount > 0
+                      ? 'text-[#B45309]'
+                      : 'text-[#57534E] hover:text-[#B45309]'
+                  }`}
+                  title="Filters"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L14 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 018 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+                  </svg>
+                  <span className="hidden xs:inline">Filters</span>
+                  {activeFilterCount > 0 && (
+                    <span className="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[9px] font-black bg-[#B45309] text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
               </div>
-
             </div>
+
+            {/* Discovery filter panel */}
+            {showFilters && (
+              <div className="mt-1.5 md:mt-2 pt-2 md:pt-3 border-t border-[#E7E5E4]">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-3">
+                  {/* City */}
+                  <div>
+                    <label className="text-[9px] uppercase font-black text-gray-400 mb-1 block tracking-widest pl-0.5">Locality / City</label>
+                    <select
+                      value={selectedCity}
+                      onChange={(e) => setSelectedCity(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-[11px] font-bold text-[#1C1917] outline-none focus:border-[#B45309] transition-all"
+                    >
+                      {cities.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+
+                  {/* Budget Min */}
+                  <div>
+                    <label className="text-[9px] uppercase font-black text-gray-400 mb-1 block tracking-widest pl-0.5">Min Budget (L)</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="e.g. 40"
+                      value={budgetMin}
+                      onChange={(e) => setBudgetMin(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-[11px] font-bold text-[#1C1917] outline-none focus:border-[#B45309] transition-all placeholder:text-zinc-300"
+                    />
+                  </div>
+
+                  {/* Budget Max */}
+                  <div>
+                    <label className="text-[9px] uppercase font-black text-gray-400 mb-1 block tracking-widest pl-0.5">Max Budget (L)</label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="e.g. 90"
+                      value={budgetMax}
+                      onChange={(e) => setBudgetMax(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-[11px] font-bold text-[#1C1917] outline-none focus:border-[#B45309] transition-all placeholder:text-zinc-300"
+                    />
+                  </div>
+
+                  {/* BHK */}
+                  <div>
+                    <label className="text-[9px] uppercase font-black text-gray-400 mb-1 block tracking-widest pl-0.5">BHK</label>
+                    <select
+                      value={bhkFilter}
+                      onChange={(e) => setBhkFilter(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-[11px] font-bold text-[#1C1917] outline-none focus:border-[#B45309] transition-all"
+                    >
+                      <option value="All">Any</option>
+                      <option value="1">1 BHK</option>
+                      <option value="2">2 BHK</option>
+                      <option value="3">3 BHK</option>
+                      <option value="4">4 BHK</option>
+                      <option value="5+">5+ BHK</option>
+                    </select>
+                  </div>
+
+                  {/* Possession */}
+                  <div>
+                    <label className="text-[9px] uppercase font-black text-gray-400 mb-1 block tracking-widest pl-0.5">Possession</label>
+                    <select
+                      value={possessionFilter}
+                      onChange={(e) => setPossessionFilter(e.target.value)}
+                      className="w-full px-2.5 py-2 bg-[#FAF9F8] border border-[#E7E5E4] rounded-lg text-[11px] font-bold text-[#1C1917] outline-none focus:border-[#B45309] transition-all"
+                    >
+                      <option value="All">Any</option>
+                      <option value="ready">Ready to Move</option>
+                      <option value="under-construction">Under Construction</option>
+                    </select>
+                  </div>
+                </div>
+
+                {activeFilterCount > 0 && (
+                  <div className="flex items-center justify-between mt-2.5">
+                    <span className="text-[10px] text-zinc-400 font-medium pl-0.5">
+                      {filteredItems.length} result{filteredItems.length === 1 ? '' : 's'}
+                    </span>
+                    <button
+                      onClick={clearFilters}
+                      className="text-[10px] font-bold text-[#B45309] hover:underline"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         )}
 
@@ -736,7 +942,7 @@ export default function MarketplacePage() {
 
             <div className={activeView === 'Sell' ? "space-y-3" : "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4"}>
               <AnimatePresence mode="popLayout">
-                {filteredItems.map((item, idx) => {
+                {filteredItems.slice(0, visibleCount).map((item, idx) => {
                   const details = getProjectDetails(item);
                   const isListing = item.isListing;
                   return (
@@ -746,7 +952,7 @@ export default function MarketplacePage() {
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.9 }}
-                      transition={{ delay: idx * 0.05 }}
+                      transition={{ delay: Math.min(idx, 12) * 0.03 }}
                       className={activeView === 'Sell'
                         ? `group bg-white rounded-xl border border-[#E7E5E4] p-3 transition-all flex items-center gap-4 ${details.type === 'requirement' ? 'cursor-not-allowed opacity-80' : 'hover:shadow-[0_20px_40px_-12px_rgba(180,83,9,0.12)] hover:border-[#B45309]/30 cursor-pointer'}`
                         : "group bg-white rounded-xl border border-[#E7E5E4] overflow-hidden hover:shadow-[0_40px_80px_-15px_rgba(28,25,23,0.1)] hover:-translate-y-1 transition-all duration-700 flex flex-row md:flex-col relative"
@@ -831,44 +1037,71 @@ export default function MarketplacePage() {
                               <h3 className="text-sm md:text-base font-black text-[#1C1917] font-serif leading-tight tracking-tight group-hover:text-[#B45309] transition-colors line-clamp-1 flex-1">
                                 {details.name}
                               </h3>
-                              <div className="flex items-center gap-0.5 shrink-0">
-                                {details.slug && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleShareProject(e, details); }}
-                                    className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
-                                    title="Copy link"
-                                  >
-                                    <ShareIcon className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                                  </button>
-                                )}
+                              {/* Secondary actions collapsed into a single overflow menu to keep
+                                  the card's primary action (View) uncluttered. */}
+                              <div className="relative shrink-0">
                                 <button
-                                  onClick={(e) => { e.stopPropagation(); handleDownloadPDF(e, details, item); }}
-                                  className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
-                                  title="Download PDF"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuId(openMenuId === details._id ? null : details._id);
+                                  }}
+                                  className={`w-5 h-5 md:w-6 md:h-6 rounded-md border flex items-center justify-center transition-all active:scale-90 ${
+                                    openMenuId === details._id
+                                      ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
+                                      : 'border-zinc-100 text-zinc-400 hover:text-[#B45309] bg-[#FAF9F8]'
+                                  }`}
+                                  title="More actions"
+                                  aria-label="More actions"
                                 >
-                                  <svg className="w-2.5 h-2.5 md:w-3 md:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="5" cy="12" r="1.6" />
+                                    <circle cx="12" cy="12" r="1.6" />
+                                    <circle cx="19" cy="12" r="1.6" />
                                   </svg>
                                 </button>
-                                {details.slug && (
-                                  <button
-                                    onClick={(e) => handleGenerateQR(e, details.slug, details.name)}
-                                    className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
-                                    title="Download QR"
+
+                                {openMenuId === details._id && (
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute right-0 top-full mt-1 z-20 w-36 bg-white border border-[#E7E5E4] rounded-lg shadow-xl py-1 text-left"
                                   >
-                                    <svg className="w-2.5 h-2.5 md:w-3 md:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-                                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM6.75 16.5h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75zM13.5 19.5h.75v.75h-.75v-.75zM19.5 13.5h.75v.75h-.75v-.75zM19.5 19.5h.75v.75h-.75v-.75zM16.5 16.5h.75v.75H16.5v-.75z" />
-                                    </svg>
-                                  </button>
+                                    {details.slug && (
+                                      <button
+                                        onClick={(e) => { setOpenMenuId(null); handleShareProject(e, details); }}
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                      >
+                                        <ShareIcon className="w-3.5 h-3.5" /> Copy link
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => { setOpenMenuId(null); handleDownloadPDF(e, details, item); }}
+                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                      Download PDF
+                                    </button>
+                                    {details.slug && (
+                                      <button
+                                        onClick={(e) => { setOpenMenuId(null); handleGenerateQR(e, details.slug, details.name); }}
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75z" />
+                                        </svg>
+                                        Download QR
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => { setOpenMenuId(null); handleDownloadGallery(e, details._id, details.name); }}
+                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                    >
+                                      <Images className="w-3.5 h-3.5" /> Download gallery
+                                    </button>
+                                  </div>
                                 )}
-                                <button
-                                  onClick={(e) => handleDownloadGallery(e, details._id, details.name)}
-                                  className="w-5 h-5 md:w-6 md:h-6 rounded-md border border-zinc-100 flex items-center justify-center text-zinc-400 hover:text-[#B45309] active:scale-90 bg-[#FAF9F8]"
-                                  title="Download Gallery"
-                                >
-                                  <Images className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                                </button>
                               </div>
                             </div>
 
@@ -947,8 +1180,9 @@ export default function MarketplacePage() {
                               )}
                             </div>
 
-                            {/* Action Buttons Row */}
-                            <div className="mt-auto flex items-center gap-1 md:gap-1.5 border-t border-[#E7E5E4]/50 pt-1.5 flex-wrap">
+                            {/* Action Row — single primary action. Chat/Call live on the
+                                detail view to keep the card focused on discovery. */}
+                            <div className="mt-auto border-t border-[#E7E5E4]/50 pt-1.5">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -958,29 +1192,10 @@ export default function MarketplacePage() {
                                     window.open(`/visit/${details.slug}`, '_blank');
                                   }
                                 }}
-                                className="flex items-center justify-center gap-0.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-md text-[8px] md:text-[9px] font-bold transition-all active:scale-95 bg-white border border-[#E7E5E4] text-[#1C1917] hover:border-[#B45309]/30 hover:text-[#B45309] shadow-sm"
+                                className="w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
                               >
-                                <EyeIcon className="w-2.5 h-2.5 md:w-3 md:h-3" />
-                                <span>View</span>
-                              </button>
-                              
-                              <button
-                                onClick={(e) => { e.stopPropagation(); router.push('/dashboard/group-chat'); }}
-                                className="flex items-center justify-center gap-0.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-md text-[8px] md:text-[9px] font-bold bg-[#25D366] text-white shadow-sm active:scale-95 transition-all"
-                              >
-                                <svg className="w-2.5 h-2.5 md:w-3 md:h-3" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                                </svg>
-                                <span>Chat</span>
-                              </button>
-                              <button
-                                onClick={(e) => { e.stopPropagation(); router.push('/dashboard/group-chat'); }}
-                                className="flex items-center justify-center gap-0.5 px-2 md:px-2.5 py-1 md:py-1.5 rounded-md text-[8px] md:text-[9px] font-bold bg-[#2563EB] text-white shadow-sm active:scale-95 transition-all"
-                              >
-                                <svg className="w-2.5 h-2.5 md:w-3 md:h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                </svg>
-                                <span>Call</span>
+                                <EyeIcon className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                <span>View Details</span>
                               </button>
                             </div>
                           </div>
@@ -991,6 +1206,42 @@ export default function MarketplacePage() {
                 })}
               </AnimatePresence>
             </div>
+
+            {/* Empty state */}
+            {filteredItems.length === 0 && (
+              <div className="text-center py-16 md:py-24">
+                <div className="w-14 h-14 md:w-16 md:h-16 bg-[#FAF9F8] rounded-2xl mx-auto flex items-center justify-center mb-4 border border-[#E7E5E4]">
+                  <MagnifyingGlassIcon className="w-7 h-7 md:w-8 md:h-8 text-zinc-300" />
+                </div>
+                <p className="text-sm font-bold text-[#1C1917]">No matching projects</p>
+                <p className="text-xs text-zinc-400 mt-1 font-medium">
+                  {activeFilterCount > 0 || searchTerm ? 'Try widening your search or filters.' : 'Nothing to show here yet.'}
+                </p>
+                {(activeFilterCount > 0 || searchTerm) && (
+                  <button
+                    onClick={() => { clearFilters(); setSearchTerm(''); }}
+                    className="mt-3 text-xs font-bold text-[#B45309] hover:underline"
+                  >
+                    Clear search & filters
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Show more — keeps the grid fast at scale by capping rendered cards */}
+            {filteredItems.length > visibleCount && (
+              <div className="flex flex-col items-center gap-2 pt-2 pb-4">
+                <span className="text-[10px] text-zinc-400 font-medium">
+                  Showing {visibleCount} of {filteredItems.length}
+                </span>
+                <button
+                  onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+                  className="px-5 py-2 bg-white border border-[#E7E5E4] rounded-lg text-xs font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] active:scale-95 transition-all shadow-sm"
+                >
+                  Show more
+                </button>
+              </div>
+            )}
           </section>
         )}
 
