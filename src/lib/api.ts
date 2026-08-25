@@ -659,6 +659,7 @@ export interface AuthUser {
   employerId?: string | { id?: string; _id?: string; name: string; phone?: string; role?: string };
   isAlreadyAssigned?: boolean;
   businessLogoUrl?: string;
+  profilePictureUrl?: string;
   businessAddress?: string;
   businessCity?: string;
   businessState?: string;
@@ -2041,6 +2042,7 @@ export const profileApi = {
     email?: string;
     companyName?: string;
     businessLogoUrl?: string;
+    profilePictureUrl?: string;
   }): Promise<AuthUser> {
     const response = await fetch(`${API_URL}/users/profile`, {
       ...COMMON_FETCH_OPTIONS,
@@ -2051,6 +2053,13 @@ export const profileApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result = await handleResponse<{ user: any }>(response);
     return transformUserBackendToFrontend(result.user);
+  },
+
+  async uploadProfilePicture(file: File): Promise<AuthUser> {
+    // Reuse the logo upload endpoint for profile pictures (same R2 bucket, same format)
+    const uploaded = await mediaApi.uploadLogo(file);
+    // Then update the user profile with the new URL
+    return profileApi.update({ profilePictureUrl: uploaded.url });
   },
 };
 

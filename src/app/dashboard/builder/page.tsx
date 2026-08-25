@@ -485,7 +485,7 @@ export default function BuilderDashboardPage() {
         <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-2 py-2 safe-area-pb">
           <div className="grid grid-cols-4 gap-1">
             <Link
-              href="#"
+              href="/dashboard/lead-matching"
               className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
             >
               <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
@@ -596,9 +596,9 @@ export default function BuilderDashboardPage() {
 
           {/* 4 Action Cards */}
           <div className="grid grid-cols-4 gap-4">
-            {/* Lead Matching — no redirect, placeholder */}
-            <div className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm overflow-hidden text-left opacity-70 cursor-default select-none">
-              <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-[#B45309]/5 to-[#B45309]/10 rounded-full blur-xl" />
+            <button onClick={() => window.location.href = '/dashboard/lead-matching'} className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden text-left">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
+              <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-[#B45309]/5 to-[#B45309]/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
               <div className="relative z-10">
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 shadow-sm">
                   <Zap className="w-6 h-6" />
@@ -606,7 +606,7 @@ export default function BuilderDashboardPage() {
                 <h3 className="text-base font-bold text-[#1C1917] font-serif">Lead Matching</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Generate Leads</p>
               </div>
-            </div>
+            </button>
 
             <Link href="/dashboard/marketplace" className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
