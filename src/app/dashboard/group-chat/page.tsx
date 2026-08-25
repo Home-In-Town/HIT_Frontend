@@ -25,6 +25,7 @@ export default function GroupChatPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('rooms');
   const [showCreateRoom, setShowCreateRoom] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showRoomMenu, setShowRoomMenu] = useState(false);
 
   // Message input state
   const [postMode, setPostMode] = useState<PostMode>('text');
@@ -84,6 +85,7 @@ export default function GroupChatPage() {
 
   // Load messages when room changes
   useEffect(() => {
+    setShowRoomMenu(false);
     if (!activeRoom) return;
     const load = async () => {
       try {
@@ -292,25 +294,20 @@ export default function GroupChatPage() {
             </div>
           </div>
 
-          {/* Tab buttons */}
-          <div className="flex gap-0.5 sm:gap-1 mb-2 sm:mb-3 p-0.5 sm:p-1 bg-white/10 rounded-lg sm:rounded-xl">
-            <button onClick={() => setActiveTab('rooms')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
-              Chats
-            </button>
-            <button onClick={() => setActiveTab('deals')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'deals' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
-              Deals
-            </button>
-            {user?.role === 'admin' && (
-              <>
-                <button onClick={() => setActiveTab('leads')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'leads' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
-                  Leads
-                </button>
-                <button onClick={() => setActiveTab('stats')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'stats' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
-                  Stats
-                </button>
-              </>
-            )}
-          </div>
+          {/* Tab buttons — admin only (Chats / Leads / Stats) */}
+          {user?.role === 'admin' && (
+            <div className="flex gap-0.5 sm:gap-1 mb-2 sm:mb-3 p-0.5 sm:p-1 bg-white/10 rounded-lg sm:rounded-xl">
+              <button onClick={() => setActiveTab('rooms')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'rooms' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
+                Chats
+              </button>
+              <button onClick={() => setActiveTab('leads')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'leads' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
+                Leads
+              </button>
+              <button onClick={() => setActiveTab('stats')} className={`flex-1 px-2 py-1 sm:py-1.5 text-[10px] sm:text-[11px] font-semibold rounded-md sm:rounded-lg transition-all ${activeTab === 'stats' ? 'bg-white text-[#075E54] shadow-sm' : 'text-white/70 hover:text-white'}`}>
+                Stats
+              </button>
+            </div>
+          )}
 
           {activeTab === 'rooms' && (
           <div className="relative">
@@ -389,7 +386,7 @@ export default function GroupChatPage() {
       </div>
 
       {/* Main Chat Area */}
-      <div className={`flex-1 flex flex-col ${!activeRoom ? 'hidden sm:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 overflow-x-hidden ${!activeRoom ? 'hidden sm:flex' : 'flex'}`}>
         {!activeRoom ? (
           <div className="flex-1 flex flex-col items-center justify-center" style={{ backgroundColor: '#ECE5DD' }}>
             <div className="w-20 h-20 bg-white/80 rounded-2xl flex items-center justify-center mb-4 shadow-sm">
@@ -415,28 +412,75 @@ export default function GroupChatPage() {
               <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
                 <span className={`w-2 h-2 rounded-full hidden sm:block ${socket.isConnected ? 'bg-[#25D366]' : 'bg-white/30'}`} />
                 <span className="text-[9px] text-white/60 hidden sm:block">{socket.isConnected ? 'Live' : 'Offline'}</span>
-                {activeRoom.canLeave !== false && !activeRoom.isUniversal && (
-                  <button onClick={async () => { if (!confirm('Leave this group?')) return; try { await groupChatApi.leaveRoom(activeRoom._id); toast.success('Left group'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[9px] sm:text-[10px] font-medium text-white/80 border border-white/30 rounded-md sm:rounded-lg hover:bg-white/10">Leave</button>
-                )}
-                {!activeRoom.isUniversal && (user?.role === 'admin' || user?.role === 'captain' || activeRoom.createdBy?._id === user?.id || activeRoom.createdBy?._id === (user as any)?._id) && (
-                  <button onClick={async () => { if (!confirm('Delete this group? (Property sold)')) return; try { await groupChatApi.deleteRoom(activeRoom._id); toast.success('Group deleted'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); } }} className="px-2 py-1 text-[9px] sm:text-[10px] font-medium text-red-300 border border-red-300/50 rounded-md sm:rounded-lg hover:bg-red-500/20">Del</button>
-                )}
+
+                {(() => {
+                  const canLeave = activeRoom.canLeave !== false && !activeRoom.isUniversal;
+                  const canDelete = !activeRoom.isUniversal && (user?.role === 'admin' || user?.role === 'captain' || activeRoom.createdBy?._id === user?.id || activeRoom.createdBy?._id === (user as any)?._id);
+                  if (!canLeave && !canDelete) return null;
+                  return (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowRoomMenu(v => !v)}
+                        className="p-1.5 hover:bg-white/10 rounded-full transition-colors"
+                        title="Options"
+                      >
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 8a2 2 0 100-4 2 2 0 000 4zm0 2a2 2 0 100 4 2 2 0 000-4zm0 6a2 2 0 100 4 2 2 0 000-4z" />
+                        </svg>
+                      </button>
+                      {showRoomMenu && (
+                        <>
+                          {/* Click-away backdrop */}
+                          <div className="fixed inset-0 z-40" onClick={() => setShowRoomMenu(false)} />
+                          <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-2xl border border-gray-100 py-1 z-50 overflow-hidden">
+                            {canLeave && (
+                              <button
+                                onClick={async () => {
+                                  setShowRoomMenu(false);
+                                  if (!confirm('Leave this group?')) return;
+                                  try { await groupChatApi.leaveRoom(activeRoom._id); toast.success('Left group'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); }
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium text-[#2A2A2A] hover:bg-[#FAF7F2] transition-colors"
+                              >
+                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                                Leave group
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                onClick={async () => {
+                                  setShowRoomMenu(false);
+                                  if (!confirm('Delete this group? (Property sold)')) return;
+                                  try { await groupChatApi.deleteRoom(activeRoom._id); toast.success('Group deleted'); setActiveRoom(null); fetchRooms(); } catch (err: any) { toast.error(err.message || 'Failed'); }
+                                }}
+                                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[13px] font-medium text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                Delete group
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
             {/* Project Details Banner */}
             {activeRoom.roomType === 'project' && activeRoom.project && (
-              <div className="px-4 py-2.5 bg-blue-50 border-b border-blue-100">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <div className="px-3 py-2 sm:px-4 sm:py-2.5 bg-blue-50 border-b border-blue-100 overflow-hidden">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                     <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-bold text-blue-800 truncate">{activeRoom.project.projectName}</p>
                     <div className="flex items-center gap-2 flex-wrap">
-                      {activeRoom.project.location && <span className="text-[10px] text-blue-600">📍 {activeRoom.project.location}{activeRoom.project.city ? `, ${activeRoom.project.city}` : ''}</span>}
-                      {activeRoom.project.pricing?.startingPrice && <span className="text-[10px] text-blue-600">💰 ₹{(activeRoom.project.pricing.startingPrice / 100000).toFixed(0)}L+</span>}
-                      {activeRoom.project.configuration?.bhkOptions && activeRoom.project.configuration.bhkOptions.length > 0 && <span className="text-[10px] text-blue-600">🏠 {activeRoom.project.configuration.bhkOptions.join(', ')}</span>}
+                      {activeRoom.project.location && <span className="text-[10px] text-blue-600 truncate max-w-full">📍 {activeRoom.project.location}{activeRoom.project.city ? `, ${activeRoom.project.city}` : ''}</span>}
+                      {activeRoom.project.pricing?.startingPrice && <span className="text-[10px] text-blue-600 whitespace-nowrap">💰 ₹{(activeRoom.project.pricing.startingPrice / 100000).toFixed(0)}L+</span>}
+                      {activeRoom.project.configuration?.bhkOptions && activeRoom.project.configuration.bhkOptions.length > 0 && <span className="text-[10px] text-blue-600 whitespace-nowrap">🏠 {activeRoom.project.configuration.bhkOptions.join(', ')}</span>}
                     </div>
                   </div>
                 </div>
@@ -465,9 +509,9 @@ export default function GroupChatPage() {
               </div>
 
               {postMode === 'text' && (
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 flex items-center bg-white rounded-full px-3 sm:px-4 py-2 shadow-sm">
-                    <input type="text" value={textMsg} onChange={e => setTextMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendText()} placeholder="Type a message" className="flex-1 text-sm text-[#111B21] placeholder-[#667781] bg-transparent focus:outline-none" />
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex-1 min-w-0 flex items-center bg-white rounded-full px-3 sm:px-4 py-2 shadow-sm">
+                    <input type="text" value={textMsg} onChange={e => setTextMsg(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleSendText()} placeholder="Type a message" className="flex-1 min-w-0 text-sm text-[#111B21] placeholder-[#667781] bg-transparent focus:outline-none" />
                   </div>
                   <button onClick={handleSendText} disabled={!textMsg.trim()} className="w-9 h-9 sm:w-10 sm:h-10 bg-[#075E54] text-white rounded-full flex items-center justify-center hover:bg-[#064E46] transition-colors disabled:opacity-40 shadow-sm flex-shrink-0">
                     <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
@@ -585,9 +629,13 @@ function MessageBubble({ msg, userId, onInterested, formatPrice }: {
 
   // System message
   if (msg.messageType === 'system') {
+    // Hide the auto-generated project-details system message — it duplicates the blue banner
+    if (msg.content?.startsWith('📋 Project:')) {
+      return null;
+    }
     return (
-      <div className="flex justify-center">
-        <span className="text-[10px] text-gray-400 bg-gray-100 px-3 py-1 rounded-full">{msg.content}</span>
+      <div className="flex justify-center px-2">
+        <span className="text-[10px] text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-center max-w-[85%]">{msg.content}</span>
       </div>
     );
   }

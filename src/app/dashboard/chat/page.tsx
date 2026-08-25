@@ -774,7 +774,7 @@ function AdminChatView() {
       </div>
 
       {/* Right — Messages */}
-      <div className={`flex-1 flex flex-col ${activeSession ? 'flex' : 'hidden sm:flex'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 overflow-x-hidden ${activeSession ? 'flex' : 'hidden sm:flex'}`}>
         {activeSession ? (
           <>
             {/* Chat Header */}
