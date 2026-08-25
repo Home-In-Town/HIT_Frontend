@@ -491,7 +491,7 @@ export default function BuilderDashboardPage() {
               <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
                 <Zap className="w-4 h-4 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Lead Matching</span>
+              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
             </Link>
             <Link
               href="/dashboard/marketplace"
@@ -600,15 +600,11 @@ export default function BuilderDashboardPage() {
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
               <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-[#B45309]/5 to-[#B45309]/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
               <div className="relative z-10">
-                <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 shadow-sm">
+                <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 shadow-sm">
                   <Zap className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Lead Matching</h3>
+                <h3 className="text-base font-bold text-[#1C1917] font-serif">Lead Matching</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Generate Leads</p>
-                <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
-                  <span className="text-[10px] font-bold">Open</span>
-                  <ArrowUpRight className="w-3 h-3" />
-                </div>
               </div>
             </button>
 

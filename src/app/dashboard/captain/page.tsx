@@ -510,7 +510,7 @@ export default function CaptainDashboardPage() {
               <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
                 <Zap className="w-4 h-4 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Lead Matching</span>
+              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
             </Link>
 
             <Link
@@ -629,10 +629,6 @@ export default function CaptainDashboardPage() {
                 </div>
                 <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Lead Matching</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Generate Leads</p>
-                <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
-                  <span className="text-[10px] font-bold">Open</span>
-                  <ArrowUpRight className="w-3 h-3" />
-                </div>
               </div>
             </button>
 
