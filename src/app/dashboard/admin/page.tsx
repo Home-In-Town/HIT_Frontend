@@ -491,7 +491,7 @@ export default function AdminDashboardPage() {
               <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
                 <Zap className="w-4 h-4 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Lead Matching</span>
+              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
             </Link>
             <Link
               href="/dashboard/marketplace"
@@ -596,7 +596,7 @@ export default function AdminDashboardPage() {
 
           {/* 4 Action Cards */}
           <div className="grid grid-cols-4 gap-4">
-            <button onClick={() => window.open('https://sales.homeintown.in', '_blank')} className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden text-left">
+            <div className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 overflow-hidden text-left cursor-default">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
               <div className="absolute -top-3 -right-3 w-20 h-20 bg-gradient-to-br from-[#B45309]/5 to-[#B45309]/10 rounded-full blur-xl group-hover:scale-150 transition-transform duration-700" />
               <div className="relative z-10">
@@ -605,12 +605,8 @@ export default function AdminDashboardPage() {
                 </div>
                 <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Lead Matching</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Generate Leads</p>
-                <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
-                  <span className="text-[10px] font-bold">Open</span>
-                  <ArrowUpRight className="w-3 h-3" />
-                </div>
               </div>
-            </button>
+            </div>
 
             <Link href="/dashboard/marketplace" className="group relative bg-white rounded-3xl border border-[#E7E5E4] p-5 shadow-sm hover:shadow-2xl hover:shadow-[#B45309]/10 hover:-translate-y-1 hover:border-[#B45309]/40 transition-all duration-300 active:scale-[0.96] overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-amber-500/0 to-amber-500/0 group-hover:from-amber-500/5 group-hover:to-amber-500/10 transition-all duration-500 rounded-3xl" />
