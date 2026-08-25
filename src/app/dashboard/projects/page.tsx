@@ -9,6 +9,7 @@ import DashboardHeader from '@/components/dashboard/DashboardHeader';
 import DashboardFilters from '@/components/dashboard/DashboardFilters';
 import ProjectTable from '@/components/dashboard/ProjectTable';
 import ProjectGrid from '@/components/dashboard/ProjectGrid';
+import InventoryManager from '@/components/dashboard/InventoryManager';
 
 // Mock data (kept for fallback)
 const MOCK_PROJECTS: Project[] = [
@@ -126,6 +127,9 @@ export default function ProjectsPage() {
     viewMode: 'table',
   });
 
+  // Inventory Management State
+  const [inventoryProject, setInventoryProject] = useState<Project | null>(null);
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
 
@@ -209,6 +213,14 @@ export default function ProjectsPage() {
   const handleDeleteClick = (project: Project) => {
     setProjectToDelete(project);
     setDeleteModalOpen(true);
+  };
+
+  const handleManageInventory = (project: Project) => {
+    setInventoryProject(project);
+  };
+
+  const handleInventorySaved = (updated: Project) => {
+    setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   };
 
   const handleConfirmDelete = async () => {
@@ -345,6 +357,7 @@ export default function ProjectsPage() {
                         projects={paginatedProjects} 
                         onDelete={handleDeleteClick}
                         onCopyLink={copyLink}
+                        onManageInventory={handleManageInventory}
                         onAssignCaptain={handleAssignCaptain}
                         onAssignAgent={handleAssignAgent}
                     />
@@ -434,6 +447,13 @@ export default function ProjectsPage() {
         }
         confirmText="Confirm"
         isLoading={agentAssignLoading}
+      />
+
+      <InventoryManager
+        isOpen={!!inventoryProject}
+        project={inventoryProject}
+        onClose={() => setInventoryProject(null)}
+        onSaved={handleInventorySaved}
       />
     </div>
   );

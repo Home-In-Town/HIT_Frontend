@@ -6,8 +6,8 @@ export function getLeadGenUrl() {
   return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
 }
 
-import { Project, ProjectFormData, FileData, LayoutEntity, Landmark, Captain, Agent } from '@/types/project';
-export type { Project, ProjectFormData, FileData, LayoutEntity, Captain, Agent };
+import { Project, ProjectFormData, FileData, LayoutEntity, Landmark, Captain, Agent, Inventory, UnitTypeInventory } from '@/types/project';
+export type { Project, ProjectFormData, FileData, LayoutEntity, Captain, Agent, Inventory, UnitTypeInventory };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
@@ -113,6 +113,7 @@ export function transformBackendToFrontend(backendProject: any): Project {
     isPublished: backendProject.status === 'published' || backendProject.isPublished,
     landmarks: backendProject.landmarks || [],
     layoutEntities: backendProject.layoutEntities || [],
+    inventory: backendProject.inventory || undefined,
     owner: backendProject.owner ? {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
@@ -356,6 +357,39 @@ export const projectsApi = {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any>(response);
     return transformBackendToFrontend(data);
+  },
+
+  // --- INVENTORY ---
+
+  // Get inventory breakdown (seeded from bhkOptions if not yet configured)
+  async getInventory(projectId: string): Promise<{ inventory: Inventory; configured: boolean }> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/inventory`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<{ inventory: Inventory; configured: boolean }>(response);
+  },
+
+  // Set / replace inventory (builder setup or correction)
+  async setInventory(projectId: string, unitTypes: UnitTypeInventory[]): Promise<{ inventory: Inventory }> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/inventory`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unitTypes }),
+    });
+    return handleResponse<{ inventory: Inventory }>(response);
+  },
+
+  // Manually record a unit sale (offline deals / corrections)
+  async sellUnit(projectId: string, unitType: string, quantity = 1): Promise<{ inventory: Inventory }> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/inventory/sell`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unitType, quantity }),
+    });
+    return handleResponse<{ inventory: Inventory }>(response);
   },
 };
 

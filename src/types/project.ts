@@ -2,6 +2,25 @@
 //sales-website-private-dev\frontend\src\types\project.ts
 export type ProjectType = 'flat' | 'plot';
 
+// Inventory tracking
+export interface UnitTypeInventory {
+  label: string;          // e.g. "2BHK", "3BHK", "1200 sqft Plot", "Villa"
+  totalUnits: number;
+  availableUnits: number;
+  bookedUnits: number;
+  soldUnits: number;
+  pricePerUnit?: number;
+}
+
+export interface Inventory {
+  unitTypes: UnitTypeInventory[];
+  totalUnits: number;
+  availableUnits: number;
+  bookedUnits: number;
+  soldUnits: number;
+  lastUpdatedAt?: string | null;
+}
+
 export type ProjectStatus = 'pre-launch' | 'under-construction' | 'ready-to-move';
 export interface Landmark {
   name: string;
@@ -89,6 +108,9 @@ export interface Project {
 
   // Layout entities (map polygons, plots, roads, boundaries)
   layoutEntities?: LayoutEntity[];
+
+  // Inventory tracking (unit-type counts, auto-decremented on deal close)
+  inventory?: Inventory;
 
   // Sales CTA
   ctaButtonText: string;

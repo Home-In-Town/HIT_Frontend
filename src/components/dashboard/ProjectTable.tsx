@@ -15,11 +15,12 @@ interface ProjectTableProps {
   projects: Project[];
   onDelete: (project: Project) => void;
   onCopyLink: (link: string) => void;
+  onManageInventory?: (project: Project) => void;
   onAssignCaptain?: (projectId: string, captainId: string | null, captainName: string | null) => Promise<void>;
   onAssignAgent?: (projectId: string, agentId: string | null, agentName: string | null) => Promise<void>;
 }
 
-export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignCaptain, onAssignAgent }: ProjectTableProps) {
+export default function ProjectTable({ projects, onDelete, onCopyLink, onManageInventory, onAssignCaptain, onAssignAgent }: ProjectTableProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [captainComboboxProjectId, setCaptainComboboxProjectId] = useState<string | null>(null);
   const [captainTriggerEl, setCaptainTriggerEl] = useState<HTMLButtonElement | null>(null);
@@ -160,6 +161,22 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
                   <div className="flex items-center">
                     <div>
                       <div className="text-sm font-bold text-[#2A2A2A] font-serif group-hover:text-[#B45309] transition-colors">{project.name}</div>
+                      {project.inventory && project.inventory.totalUnits > 0 && (
+                        <div className="mt-1">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              project.inventory.availableUnits > 0
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : 'bg-red-50 text-red-600 border-red-200'
+                            }`}
+                            title={`${project.inventory.availableUnits} available of ${project.inventory.totalUnits} total`}
+                          >
+                            {project.inventory.availableUnits > 0
+                              ? `${project.inventory.availableUnits} / ${project.inventory.totalUnits} available`
+                              : 'Sold out'}
+                          </span>
+                        </div>
+                      )}
                       <div className="text-[10px] text-[#A8A29E] mt-1 flex items-center gap-2 font-bold uppercase tracking-wider">
                          {/* RERA Indicator */}
                          {project.reraApproved && (
@@ -322,6 +339,18 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
                               className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
                             >
                               Visit Project ↗
+                            </button>
+                          )}
+
+                          {onManageInventory && (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                onManageInventory(project);
+                              }}
+                              className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                            >
+                              Manage Inventory
                             </button>
                           )}
 
