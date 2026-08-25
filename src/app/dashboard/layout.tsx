@@ -196,6 +196,25 @@ const orgPath = user
 
           {(user?.role === 'admin' || user?.role === 'builder') && (
             <Link
+              href="/dashboard/lead-matching"
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                isActive('/dashboard/lead-matching')
+                  ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                  : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+              } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+              title={isCollapsed ? "Lead Matching" : ""}
+            >
+              <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                <circle cx="10" cy="10" r="2.5" strokeWidth={2} />
+              </svg>
+              {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Lead Matching</span>}
+            </Link>
+          )}
+
+          {(user?.role === 'admin' || user?.role === 'builder') && (
+            <Link
               href="/dashboard/projects"
               onClick={() => setSidebarOpen(false)}
               className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
@@ -303,6 +322,23 @@ const orgPath = user
               {user?.role === 'agent' && (
               <>
               <Link
+                href="/dashboard/lead-matching"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/lead-matching')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Lead Matching" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <circle cx="10" cy="10" r="2.5" strokeWidth={2} />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Lead Matching</span>}
+              </Link>
+
+              <Link
                 href="/dashboard/chat"
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
@@ -354,6 +390,23 @@ const orgPath = user
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
                 </svg>
                 {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Marketplace</span>}
+              </Link>
+
+              <Link
+                href="/dashboard/lead-matching"
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+                  isActive('/dashboard/lead-matching')
+                    ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                    : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+                } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+                title={isCollapsed ? "Lead Matching" : ""}
+              >
+                <svg className="flex-shrink-0 w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <circle cx="10" cy="10" r="2.5" strokeWidth={2} />
+                </svg>
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Lead Matching</span>}
               </Link>
 
               <Link

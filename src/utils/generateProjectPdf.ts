@@ -1,4 +1,5 @@
 import { ShareContactInfo } from '@/lib/api';
+import { derivePricePerSqFt } from '@/utils/pricePerSqFt';
 
 interface ProjectDataForPdf {
   id: string;
@@ -190,7 +191,7 @@ export async function generateProjectPdf(
     { label: 'Type', value: (property.type || 'Flat').charAt(0).toUpperCase() + (property.type || 'flat').slice(1) },
     { label: 'Configuration', value: property.bhkOptions?.length ? property.bhkOptions.join(', ') : '-' },
     { label: 'Starting Price', value: pdfPrice(price) },
-    { label: 'Rate', value: property.pricePerSqFt ? `Rs. ${property.pricePerSqFt.toLocaleString('en-IN')}/sqft` : 'On Request' },
+    { label: 'Rate', value: (() => { const r = derivePricePerSqFt(price, property.area); return r ? `Rs. ${r.toLocaleString('en-IN')}/sqft` : 'On Request'; })() },
     { label: 'Carpet Area', value: property.area || 'On Request' },
     { label: 'Floors', value: property.floorRange || '-' },
     { label: 'Status', value: statusLabel(property.projectStatus) || '-' },

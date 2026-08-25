@@ -2498,6 +2498,26 @@ export const leadMatchingApi = {
     });
     return handleResponse(response);
   },
+
+  // Count live buyer leads matching each project (for the "N buyers match" card signal).
+  // Returns a map of projectId -> count. Never throws for the caller's convenience;
+  // returns an empty map on failure so cards can degrade gracefully.
+  async getMatchCounts(projectIds: string[]): Promise<Record<string, number>> {
+    const ids = (projectIds || []).filter(Boolean);
+    if (ids.length === 0) return {};
+    try {
+      const response = await fetch(`${API_URL}/lead-matching/match-counts`, {
+        ...COMMON_FETCH_OPTIONS,
+        method: 'POST',
+        headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectIds: ids }),
+      });
+      const data = await handleResponse<{ counts: Record<string, number> }>(response);
+      return data.counts || {};
+    } catch {
+      return {};
+    }
+  },
 };
 
 // ── Lead Matching: Confirm (user-reviewed params) ──────────────────────────

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi } from '@/lib/api';
+import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi, leadMatchingApi } from '@/lib/api';
 import {
   Zap,
   ShoppingBag,
@@ -25,6 +25,7 @@ import {
   Images,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatDerivedPricePerSqFt } from '@/utils/pricePerSqFt';
 
 interface ProjectCard {
   id: string;
@@ -65,6 +66,7 @@ export default function CaptainDashboardPage() {
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const [properties, setProperties] = useState<ProjectCard[]>([]);
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'captain')) {
@@ -150,6 +152,19 @@ export default function CaptainDashboardPage() {
 
     fetchData();
   }, [user]);
+
+  // Fetch "N buyers match" counts once projects are loaded.
+  useEffect(() => {
+    const ids = properties.map((p) => p.id).filter(Boolean);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    leadMatchingApi.getMatchCounts(ids).then((counts) => {
+      if (!cancelled) setMatchCounts(counts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [properties]);
 
   // Hide the layout's mobile header on this page
   useEffect(() => {
@@ -440,12 +455,24 @@ export default function CaptainDashboardPage() {
                       {property.city.split(',')[0]}
                     </span>
                   </div>
-                  {property.pricePerSqFt > 0 && (
+                  {formatDerivedPricePerSqFt(property.price, property.area) && (
                     <span className="text-[9px] text-zinc-400 font-semibold shrink-0">
-                      {'\u20B9'}{property.pricePerSqFt.toLocaleString('en-IN')}/sqft
+                      {formatDerivedPricePerSqFt(property.price, property.area)}
                     </span>
                   )}
                 </div>
+
+                {/* Matching signal — the product differentiator: this isn't just a listing,
+                    it knows who's actually looking. Only shown when there are live matches. */}
+                {matchCounts[property.id] > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-[#3F6212]">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3F6212] opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#3F6212]"></span>
+                    </span>
+                    {matchCounts[property.id]} live {matchCounts[property.id] === 1 ? 'buyer matches' : 'buyers match'} this
+                  </div>
+                )}
 
                 {/* Tags */}
                 <div className="flex items-center flex-wrap gap-1">

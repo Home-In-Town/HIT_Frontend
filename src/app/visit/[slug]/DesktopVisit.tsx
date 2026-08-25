@@ -10,6 +10,7 @@ import ProjectMap from "@/components/public/ProjectMap";
 import {  MapPinAreaIcon } from "@phosphor-icons/react/dist/ssr";
 import AmenitiesSection from "@/components/public/AmenitiesSection";
 import { buildMediaItems } from "@/utils/buildMediaItems";
+import { derivePricePerSqFt } from "@/utils/pricePerSqFt";
 import MediaGallery from "@/components/public/MediaGallery";
 import dynamic from "next/dynamic";
 type FloorPlan = {
@@ -273,7 +274,7 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
               </div>
 
               {/* RIGHT — Price + Breakdown */}
-            {(project.startingPrice || project.pricePerSqFt) && (
+            {project.startingPrice && (
               <div className="text-left shrink-0 relative">
 
                 {/* Price */}
@@ -283,11 +284,17 @@ const getImageUrl = (val: any) => typeof val === 'object' && val !== null ? val.
                   {project.startingPrice &&
                     `₹${formatIndianPrice(project.startingPrice)}`}
 
-                  {project.pricePerSqFt && (
-                    <span className="ml-1 text-[17px] font-normal text-gray-600 align-sub">
-                      @ ₹{project.pricePerSqFt} / sq.ft.
-                    </span>
-                  )}
+                  {(() => {
+                    const rate = derivePricePerSqFt(
+                      project.startingPrice,
+                      project.carpetAreaRange || project.plotSizeRange || project.projectArea
+                    );
+                    return rate ? (
+                      <span className="ml-1 text-[17px] font-normal text-gray-600 align-sub">
+                        @ ₹{rate.toLocaleString("en-IN")} / sq.ft.
+                      </span>
+                    ) : null;
+                  })()}
                 </p>
 
                   {/* toggle button */}

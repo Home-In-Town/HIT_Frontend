@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { marketplaceApi, projectsApi, shareApi, MarketplaceListing, MarketplaceAction } from '@/lib/api';
+import { marketplaceApi, projectsApi, shareApi, leadMatchingApi, MarketplaceListing, MarketplaceAction } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
+import { formatDerivedPricePerSqFt, derivePricePerSqFt } from '@/utils/pricePerSqFt';
 import {
   PlusIcon,
   MapPinIcon,
@@ -161,6 +162,7 @@ export default function MarketplacePage() {
   const [activeTab, setActiveTab] = useState<'browse' | 'listings' | 'admin'>('browse');
   const [activeView, setActiveView] = useState<'All' | 'Buy' | 'Sell'>('All');
   const [filteredItems, setFilteredItems] = useState<any[]>([]);
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
   const [adminActions, setAdminActions] = useState<any[]>([]);
   const [updatingActionId, setUpdatingActionId] = useState<string | null>(null);
   const [myCommissions, setMyCommissions] = useState<{
@@ -397,6 +399,27 @@ export default function MarketplacePage() {
     }
   }, [activeTab, isAdmin, fetchAdminActions]);
 
+  // Fetch "N live buyers match" counts for the real project listings on screen.
+  // Requirement cards (buyer wants, not projects) are excluded — they have no project to match.
+  useEffect(() => {
+    const ids = Array.from(
+      new Set(
+        filteredItems
+          .filter((item) => item.type !== 'requirement')
+          .map((item) => String(item._id || item.id || ''))
+          .filter(Boolean)
+      )
+    );
+    if (ids.length === 0) return;
+    let cancelled = false;
+    leadMatchingApi.getMatchCounts(ids).then((counts) => {
+      if (!cancelled) setMatchCounts((prev) => ({ ...prev, ...counts }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [filteredItems]);
+
   const handleCreateListing = async () => {
     // Validation
     if (formData.listingType === 'selling' && !formData.project) {
@@ -573,7 +596,7 @@ export default function MarketplacePage() {
         location: details.location,
         price: details.price,
         startingPrice: details.price,
-        pricePerSqFt: details.pricePerSqFt,
+        pricePerSqFt: derivePricePerSqFt(details.price, details.area) ?? undefined,
         priceRange: details.priceRange || '',
         area: details.area,
         bhkOptions: details.bhkOptions || [],
@@ -876,12 +899,24 @@ export default function MarketplacePage() {
                               <span className="text-sm md:text-base font-black text-[#B45309] tracking-tight leading-none">
                                 {formatPrice(details.price)}
                               </span>
-                              {details.pricePerSqFt > 0 && (
+                              {formatDerivedPricePerSqFt(details.price, details.area) && (
                                 <span className="text-[8px] md:text-[9px] text-zinc-400 font-semibold">
-                                  ₹{details.pricePerSqFt.toLocaleString('en-IN')}/sqft
+                                  {formatDerivedPricePerSqFt(details.price, details.area)}
                                 </span>
                               )}
                             </div>
+
+                            {/* Matching signal — real live-buyer demand for this project.
+                                Only shown for projects (not buyer requirements) with matches > 0. */}
+                            {details.type !== 'requirement' && matchCounts[details._id] > 0 && (
+                              <div className="flex items-center gap-1 text-[9px] md:text-[10px] font-bold text-[#3F6212] mb-1.5">
+                                <span className="relative flex h-1.5 w-1.5">
+                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3F6212] opacity-60"></span>
+                                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#3F6212]"></span>
+                                </span>
+                                {matchCounts[details._id]} live {matchCounts[details._id] === 1 ? 'buyer matches' : 'buyers match'} this
+                              </div>
+                            )}
 
                             {/* Tags Row: RERA, Gated, Loan, Status */}
                             <div className="flex items-center flex-wrap gap-1 mb-2">
