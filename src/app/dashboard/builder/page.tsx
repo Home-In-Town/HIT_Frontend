@@ -368,33 +368,30 @@ export default function BuilderDashboardPage() {
           </div>
         </div>
 
-        {/* Quick Actions — CRM & Team (moved from bottom nav) */}
+        {/* Quick Actions — AI Lead Matching & Marketplace (primary discovery) */}
         <div className="shrink-0 mx-3 mt-3 grid grid-cols-2 gap-2">
           <Link
-            href="/dashboard/crm"
-            className="relative flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
-          >
-            <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
-              <BarChart3 className="w-4.5 h-4.5 text-[#B45309]" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">CRM</p>
-              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Pipeline</p>
-            </div>
-            {stats.crmHot > 0 && (
-              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
-            )}
-          </Link>
-          <Link
-            href="https://www.oneemployee.in/"
+            href="/dashboard/lead-matching"
             className="flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
           >
             <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
-              <Users className="w-4.5 h-4.5 text-[#B45309]" />
+              <Zap className="w-4.5 h-4.5 text-[#B45309]" />
             </div>
             <div className="min-w-0">
-              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Team</p>
-              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">One Employee</p>
+              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">AI Lead Matching</p>
+              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Match & Connect</p>
+            </div>
+          </Link>
+          <Link
+            href="/dashboard/marketplace"
+            className="flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-4.5 h-4.5 text-[#B45309]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Marketplace</p>
+              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Sell & Earn</p>
             </div>
           </Link>
         </div>
@@ -511,7 +508,7 @@ export default function BuilderDashboardPage() {
                         className={`w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold border transition-all active:scale-95 ${
                           openMenuId === property.id
                             ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
-                            : 'border-[#E7E5E4] text-[#57534E] hover:text-[#B45309] bg-white'
+                            : 'border-[#B45309]/20 text-[#B45309] bg-amber-50/60 hover:bg-[#FAF7F2]'
                         }`}
                         aria-label="Share"
                       >
@@ -562,27 +559,30 @@ export default function BuilderDashboardPage() {
         <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-3 py-2 safe-area-pb">
           <div className="grid grid-cols-2 gap-2">
             <Link
-              href="/dashboard/lead-matching"
-              className="flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
+              href="/dashboard/crm"
+              className="relative flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
             >
               <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
-                <Zap className="w-4.5 h-4.5 text-[#B45309]" />
+                <BarChart3 className="w-4.5 h-4.5 text-[#B45309]" />
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Lead Matching</p>
-                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Match & Connect</p>
+                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">CRM</p>
+                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Pipeline</p>
               </div>
+              {stats.crmHot > 0 && (
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
+              )}
             </Link>
             <Link
-              href="/dashboard/marketplace"
+              href="https://www.oneemployee.in/"
               className="flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
             >
               <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
-                <ShoppingBag className="w-4.5 h-4.5 text-[#B45309]" />
+                <Users className="w-4.5 h-4.5 text-[#B45309]" />
               </div>
               <div className="min-w-0">
-                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Sell & Earn</p>
-                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Marketplace</p>
+                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Team</p>
+                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">One Employee</p>
               </div>
             </Link>
           </div>
@@ -665,7 +665,7 @@ export default function BuilderDashboardPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 shadow-sm">
                   <Zap className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Lead Matching</h3>
+                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">AI Lead Matching</h3>
                 <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Match & Connect</p>
                 <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
                   <span className="text-[10px] font-bold">Open</span>
@@ -681,8 +681,8 @@ export default function BuilderDashboardPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-sm">
                   <ShoppingBag className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Sell & Earn</h3>
-                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Marketplace</p>
+                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Marketplace</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Sell & Earn</p>
                 <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
                   <span className="text-[10px] font-bold">Open</span>
                   <ArrowUpRight className="w-3 h-3" />

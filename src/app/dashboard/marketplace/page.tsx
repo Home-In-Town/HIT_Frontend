@@ -1139,7 +1139,7 @@ export default function MarketplacePage() {
                                   className={`w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold border transition-all active:scale-95 ${
                                     openMenuId === details._id
                                       ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
-                                      : 'border-[#E7E5E4] text-[#57534E] hover:text-[#B45309] bg-white'
+                                      : 'border-[#B45309]/20 text-[#B45309] bg-amber-50/60 hover:bg-[#FAF7F2]'
                                   }`}
                                   aria-label="Share"
                                 >

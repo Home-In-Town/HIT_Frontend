@@ -209,7 +209,7 @@ const orgPath = user
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 <circle cx="10" cy="10" r="2.5" strokeWidth={2} />
               </svg>
-              {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Lead Matching</span>}
+              {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">AI Lead Matching</span>}
             </Link>
           )}
 
@@ -335,7 +335,7 @@ const orgPath = user
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   <circle cx="10" cy="10" r="2.5" strokeWidth={2} />
                 </svg>
-                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Lead Matching</span>}
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">AI Lead Matching</span>}
               </Link>
 
               <Link
@@ -406,7 +406,7 @@ const orgPath = user
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   <circle cx="10" cy="10" r="2.5" strokeWidth={2} />
                 </svg>
-                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Lead Matching</span>}
+                {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">AI Lead Matching</span>}
               </Link>
 
               <Link

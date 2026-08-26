@@ -1825,7 +1825,7 @@ export interface GroupRoom {
   _id: string;
   name: string;
   roomType: 'project' | 'area' | 'universal';
-  project?: { _id: string; projectName: string; city?: string; location?: string; pricing?: { startingPrice?: number }; configuration?: { bhkOptions?: string[] }; reraNumber?: string; projectStatus?: string };
+  project?: { _id: string; projectName: string; city?: string; location?: string; slug?: string; pricing?: { startingPrice?: number }; media?: { coverImage?: { url: string } }; configuration?: { bhkOptions?: string[] }; reraNumber?: string; projectStatus?: string };
   area?: { city: string; location: string };
   createdBy: { _id: string; name: string };
   members: Array<{ user: { _id: string; name: string; role: string; companyName?: string }; role: string; joinedAt: string }>;
