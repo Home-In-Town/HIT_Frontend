@@ -513,27 +513,27 @@ export default function CaptainDashboardPage() {
 
                 {/* View Details + Share (with all sharing options) */}
                 {property.slug && (
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5">
                     <Link
                       href={`/visit/${property.slug}`}
-                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#1C1917] text-white rounded-lg text-[10px] font-bold active:scale-95 hover:bg-[#B45309] transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
                     >
-                      <Eye className="w-3.5 h-3.5" />View Details
+                      <Eye className="w-3 h-3 md:w-3.5 md:h-3.5" />View Details
                     </Link>
-                    <div className="relative">
+                    <div className="relative flex-1">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setOpenMenuId(openMenuId === property.id ? null : property.id);
                         }}
-                        className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border active:scale-95 transition-all ${
+                        className={`w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold border transition-all active:scale-95 ${
                           openMenuId === property.id
-                            ? 'bg-[#FAF7F2] border-[#B45309]/30 text-[#B45309]'
-                            : 'bg-white border-[#E7E5E4] text-[#57534E] hover:text-[#B45309]'
+                            ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
+                            : 'border-[#E7E5E4] text-[#57534E] hover:text-[#B45309] bg-white'
                         }`}
                         aria-label="Share"
                       >
-                        <Share2 className="w-3.5 h-3.5" />Share
+                        <Share2 className="w-3 h-3 md:w-3.5 md:h-3.5" />Share
                       </button>
 
                       {openMenuId === property.id && (
