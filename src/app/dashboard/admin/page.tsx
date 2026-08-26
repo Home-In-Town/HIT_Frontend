@@ -572,6 +572,7 @@ export default function AdminDashboardPage() {
                 <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Lead Matching</p>
                 <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Match & Connect</p>
               </div>
+              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
             </Link>
             <Link
               href="/dashboard/marketplace"
