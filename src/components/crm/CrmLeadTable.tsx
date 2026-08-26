@@ -66,8 +66,6 @@ export default function CrmLeadTable({
   onLeadClick,
 }: CrmLeadTableProps) {
   const [status, setStatus] = useState('');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
   const [activeStage, setActiveStage] = useState('All');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,8 +77,6 @@ export default function CrmLeadTable({
     onFilterChange({
       page: 1,
       status: stage.status || undefined,
-      startDate: startDate || undefined,
-      endDate: endDate || undefined,
       search: search || undefined,
     });
   };
@@ -90,21 +86,15 @@ export default function CrmLeadTable({
     setSearch(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      onFilterChange({ page: 1, status: status || undefined, startDate: startDate || undefined, endDate: endDate || undefined, search: value || undefined });
+      onFilterChange({ page: 1, status: status || undefined, search: value || undefined });
     }, 300);
   };
 
-  // Immediate filter changes (status, dates)
-  const handleImmediateChange = (overrides: Partial<{ status: string; startDate: string; endDate: string }>) => {
-    const next = {
-      status: 'status' in overrides ? overrides.status! : status,
-      startDate: 'startDate' in overrides ? overrides.startDate! : startDate,
-      endDate: 'endDate' in overrides ? overrides.endDate! : endDate,
-    };
-    if ('status' in overrides)    { setStatus(next.status); setActiveStage('All'); }
-    if ('startDate' in overrides) setStartDate(next.startDate);
-    if ('endDate' in overrides)   setEndDate(next.endDate);
-    onFilterChange({ page: 1, status: next.status || undefined, startDate: next.startDate || undefined, endDate: next.endDate || undefined, search: search || undefined });
+  // Immediate filter changes (status)
+  const handleImmediateChange = (overrides: Partial<{ status: string }>) => {
+    const nextStatus = 'status' in overrides ? overrides.status! : status;
+    if ('status' in overrides) { setStatus(nextStatus); setActiveStage('All'); }
+    onFilterChange({ page: 1, status: nextStatus || undefined, search: search || undefined });
   };
 
   // Clean up debounce timer on unmount
@@ -115,11 +105,11 @@ export default function CrmLeadTable({
   }, []);
 
   const handlePrev = () => {
-    if (page > 1) onFilterChange({ page: page - 1, status: status || undefined, startDate: startDate || undefined, endDate: endDate || undefined, search: search || undefined });
+    if (page > 1) onFilterChange({ page: page - 1, status: status || undefined, search: search || undefined });
   };
 
   const handleNext = () => {
-    if (page < pages) onFilterChange({ page: page + 1, status: status || undefined, startDate: startDate || undefined, endDate: endDate || undefined, search: search || undefined });
+    if (page < pages) onFilterChange({ page: page + 1, status: status || undefined, search: search || undefined });
   };
 
   return (
@@ -151,20 +141,6 @@ export default function CrmLeadTable({
             <option key={s} value={s}>{s}</option>
           ))}
         </select>
-
-        {/* Date range */}
-        <input
-          type="date"
-          value={startDate}
-          onChange={(e) => handleImmediateChange({ startDate: e.target.value })}
-          className="px-3 py-2 bg-white border border-[#E7E5E4] rounded-xl text-sm text-[#57534E] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
-        />
-        <input
-          type="date"
-          value={endDate}
-          onChange={(e) => handleImmediateChange({ endDate: e.target.value })}
-          className="px-3 py-2 bg-white border border-[#E7E5E4] rounded-xl text-sm text-[#57534E] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
-        />
       </div>
 
       {/* Pipeline stage filter pills — matches Human Lead Manager */}
