@@ -368,6 +368,37 @@ export default function BuilderDashboardPage() {
           </div>
         </div>
 
+        {/* Quick Actions — CRM & Team (moved from bottom nav) */}
+        <div className="shrink-0 mx-3 mt-3 grid grid-cols-2 gap-2">
+          <Link
+            href="/dashboard/crm"
+            className="relative flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+              <BarChart3 className="w-4.5 h-4.5 text-[#B45309]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">CRM</p>
+              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Pipeline</p>
+            </div>
+            {stats.crmHot > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
+            )}
+          </Link>
+          <Link
+            href="https://www.oneemployee.in/"
+            className="flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+              <Users className="w-4.5 h-4.5 text-[#B45309]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Team</p>
+              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">One Employee</p>
+            </div>
+          </Link>
+        </div>
+
         {/* Property Reels - shows 3 at a time, scrollable */}
         <div className="flex-1 overflow-y-scroll snap-y snap-mandatory mt-3 px-3 pb-20 scrollbar-hide">
           {properties.length === 0 && !statsLoading && (
@@ -396,7 +427,7 @@ export default function BuilderDashboardPage() {
               {/* Content Area */}
               <div className="flex-1 p-3 flex flex-col min-w-0 justify-between">
 
-                {/* Name + Price + Actions */}
+                {/* Name + Price */}
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -407,62 +438,6 @@ export default function BuilderDashboardPage() {
                         {formatPrice(property.price)}
                       </span>
                     </div>
-
-                    {property.slug && (
-                      <div className="relative shrink-0">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOpenMenuId(openMenuId === property.id ? null : property.id);
-                          }}
-                          className={`w-6 h-6 rounded-md border flex items-center justify-center active:scale-90 transition-all ${
-                            openMenuId === property.id
-                              ? 'bg-[#FAF7F2] border-[#B45309]/30 text-[#B45309]'
-                              : 'bg-[#FAF7F2] border-[#E7E5E4] text-[#57534E]'
-                          }`}
-                          title="More actions"
-                          aria-label="More actions"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                            <circle cx="5" cy="12" r="1.6" />
-                            <circle cx="12" cy="12" r="1.6" />
-                            <circle cx="19" cy="12" r="1.6" />
-                          </svg>
-                        </button>
-
-                        {openMenuId === property.id && (
-                          <div
-                            onClick={(e) => e.stopPropagation()}
-                            className="absolute right-0 top-full mt-1 z-20 w-36 bg-white border border-[#E7E5E4] rounded-lg shadow-xl py-1 text-left"
-                          >
-                            <button
-                              onClick={() => { setOpenMenuId(null); handleShare(property.slug, property.name); }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                            >
-                              <Share2 className="w-3.5 h-3.5" /> Copy link
-                            </button>
-                            <button
-                              onClick={() => { setOpenMenuId(null); handleDownloadPDF(property); }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                            >
-                              <Download className="w-3.5 h-3.5" /> Download PDF
-                            </button>
-                            <button
-                              onClick={() => { setOpenMenuId(null); handleGenerateQR(property.slug, property.name); }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                            >
-                              <QrCode className="w-3.5 h-3.5" /> Download QR
-                            </button>
-                            <button
-                              onClick={() => { setOpenMenuId(null); handleDownloadGallery(property.id, property.name); }}
-                              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                            >
-                              <Images className="w-3.5 h-3.5" /> Download gallery
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -518,15 +493,63 @@ export default function BuilderDashboardPage() {
                   )}
                 </div>
 
-                {/* Primary action only — secondary actions live in the "..." menu above. */}
+                {/* View Details + Share (with all sharing options) */}
                 {property.slug && (
-                  <div>
+                  <div className="flex items-center gap-2">
                     <Link
                       href={`/visit/${property.slug}`}
-                      className="w-full flex items-center justify-center gap-1 px-2 py-1.5 bg-[#1C1917] text-white rounded-lg text-[10px] font-bold active:scale-95 hover:bg-[#B45309] transition-colors"
+                      className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-[#1C1917] text-white rounded-lg text-[10px] font-bold active:scale-95 hover:bg-[#B45309] transition-colors"
                     >
                       <Eye className="w-3.5 h-3.5" />View Details
                     </Link>
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === property.id ? null : property.id);
+                        }}
+                        className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border active:scale-95 transition-all ${
+                          openMenuId === property.id
+                            ? 'bg-[#FAF7F2] border-[#B45309]/30 text-[#B45309]'
+                            : 'bg-white border-[#E7E5E4] text-[#57534E] hover:text-[#B45309]'
+                        }`}
+                        aria-label="Share"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />Share
+                      </button>
+
+                      {openMenuId === property.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 bottom-full mb-1 z-20 w-36 bg-white border border-[#E7E5E4] rounded-lg shadow-xl py-1 text-left"
+                        >
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleShare(property.slug, property.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <Share2 className="w-3.5 h-3.5" /> Copy link
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleDownloadPDF(property); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download PDF
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleGenerateQR(property.slug, property.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <QrCode className="w-3.5 h-3.5" /> Download QR
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleDownloadGallery(property.id, property.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <Images className="w-3.5 h-3.5" /> Download gallery
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -535,47 +558,32 @@ export default function BuilderDashboardPage() {
           ))}
         </div>
 
-        {/* Fixed Bottom Navigation */}
-        <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-2 py-2 safe-area-pb">
-          <div className="grid grid-cols-4 gap-1">
+        {/* Fixed Bottom Navigation — 2 primary actions (card-style, matches quick-action cards) */}
+        <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-3 py-2 safe-area-pb">
+          <div className="grid grid-cols-2 gap-2">
             <Link
               href="/dashboard/lead-matching"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
+              className="flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
             >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <Zap className="w-4 h-4 text-[#B45309]" />
+              <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+                <Zap className="w-4.5 h-4.5 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Lead Matching</span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Lead Matching</p>
+                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Match & Connect</p>
+              </div>
             </Link>
             <Link
               href="/dashboard/marketplace"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
+              className="flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
             >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <ShoppingBag className="w-4 h-4 text-[#B45309]" />
+              <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+                <ShoppingBag className="w-4.5 h-4.5 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Sell</span>
-            </Link>
-            <Link
-              href="/dashboard/crm"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors relative"
-            >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 text-[#B45309]" />
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Sell & Earn</p>
+                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Marketplace</p>
               </div>
-              {stats.crmHot > 0 && (
-                <span className="absolute top-1 right-1/4 w-2 h-2 bg-red-500 rounded-full border border-white" />
-              )}
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">CRM</span>
-            </Link>
-            <Link
-              href="https://www.oneemployee.in/"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
-            >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <Users className="w-4 h-4 text-[#B45309]" />
-              </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Team</span>
             </Link>
           </div>
         </div>
@@ -658,7 +666,7 @@ export default function BuilderDashboardPage() {
                   <Zap className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Lead Matching</h3>
-                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Generate Leads</p>
+                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Match & Connect</p>
                 <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
                   <span className="text-[10px] font-bold">Open</span>
                   <ArrowUpRight className="w-3 h-3" />

@@ -1037,72 +1037,6 @@ export default function MarketplacePage() {
                               <h3 className="text-sm md:text-base font-black text-[#1C1917] font-serif leading-tight tracking-tight group-hover:text-[#B45309] transition-colors line-clamp-1 flex-1">
                                 {details.name}
                               </h3>
-                              {/* Secondary actions collapsed into a single overflow menu to keep
-                                  the card's primary action (View) uncluttered. */}
-                              <div className="relative shrink-0">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuId(openMenuId === details._id ? null : details._id);
-                                  }}
-                                  className={`w-5 h-5 md:w-6 md:h-6 rounded-md border flex items-center justify-center transition-all active:scale-90 ${
-                                    openMenuId === details._id
-                                      ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
-                                      : 'border-zinc-100 text-zinc-400 hover:text-[#B45309] bg-[#FAF9F8]'
-                                  }`}
-                                  title="More actions"
-                                  aria-label="More actions"
-                                >
-                                  <svg className="w-3 h-3 md:w-3.5 md:h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="5" cy="12" r="1.6" />
-                                    <circle cx="12" cy="12" r="1.6" />
-                                    <circle cx="19" cy="12" r="1.6" />
-                                  </svg>
-                                </button>
-
-                                {openMenuId === details._id && (
-                                  <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="absolute right-0 top-full mt-1 z-20 w-36 bg-white border border-[#E7E5E4] rounded-lg shadow-xl py-1 text-left"
-                                  >
-                                    {details.slug && (
-                                      <button
-                                        onClick={(e) => { setOpenMenuId(null); handleShareProject(e, details); }}
-                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                                      >
-                                        <ShareIcon className="w-3.5 h-3.5" /> Copy link
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={(e) => { setOpenMenuId(null); handleDownloadPDF(e, details, item); }}
-                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                                    >
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                      </svg>
-                                      Download PDF
-                                    </button>
-                                    {details.slug && (
-                                      <button
-                                        onClick={(e) => { setOpenMenuId(null); handleGenerateQR(e, details.slug, details.name); }}
-                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                                      >
-                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
-                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75z" />
-                                        </svg>
-                                        Download QR
-                                      </button>
-                                    )}
-                                    <button
-                                      onClick={(e) => { setOpenMenuId(null); handleDownloadGallery(e, details._id, details.name); }}
-                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
-                                    >
-                                      <Images className="w-3.5 h-3.5" /> Download gallery
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
                             </div>
 
                             {/* Location */}
@@ -1180,9 +1114,8 @@ export default function MarketplacePage() {
                               )}
                             </div>
 
-                            {/* Action Row — single primary action. Chat/Call live on the
-                                detail view to keep the card focused on discovery. */}
-                            <div className="mt-auto border-t border-[#E7E5E4]/50 pt-1.5">
+                            {/* Action Row — View Details + Share (with all sharing options) */}
+                            <div className="mt-auto border-t border-[#E7E5E4]/50 pt-1.5 flex items-center gap-1.5">
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -1192,11 +1125,71 @@ export default function MarketplacePage() {
                                     window.open(`/visit/${details.slug}`, '_blank');
                                   }
                                 }}
-                                className="w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
+                                className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
                               >
                                 <EyeIcon className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                 <span>View Details</span>
                               </button>
+                              <div className="relative">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setOpenMenuId(openMenuId === details._id ? null : details._id);
+                                  }}
+                                  className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold border transition-all active:scale-95 ${
+                                    openMenuId === details._id
+                                      ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
+                                      : 'border-[#E7E5E4] text-[#57534E] hover:text-[#B45309] bg-white'
+                                  }`}
+                                  aria-label="Share"
+                                >
+                                  <ShareIcon className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                  <span>Share</span>
+                                </button>
+
+                                {openMenuId === details._id && (
+                                  <div
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute right-0 bottom-full mb-1 z-20 w-36 bg-white border border-[#E7E5E4] rounded-lg shadow-xl py-1 text-left"
+                                  >
+                                    {details.slug && (
+                                      <button
+                                        onClick={(e) => { setOpenMenuId(null); handleShareProject(e, details); }}
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                      >
+                                        <ShareIcon className="w-3.5 h-3.5" /> Copy link
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => { setOpenMenuId(null); handleDownloadPDF(e, details, item); }}
+                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                    >
+                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                      </svg>
+                                      Download PDF
+                                    </button>
+                                    {details.slug && (
+                                      <button
+                                        onClick={(e) => { setOpenMenuId(null); handleGenerateQR(e, details.slug, details.name); }}
+                                        className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                      >
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" />
+                                          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75z" />
+                                        </svg>
+                                        Download QR
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={(e) => { setOpenMenuId(null); handleDownloadGallery(e, details._id, details.name); }}
+                                      className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                                    >
+                                      <Images className="w-3.5 h-3.5" /> Download gallery
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </>
