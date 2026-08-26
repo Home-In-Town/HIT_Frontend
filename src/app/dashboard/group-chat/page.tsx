@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { groupChatApi, leadMatchingApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
+import { groupChatApi, leadMatchingApi, shareApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
 import { useSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
 import LeadsTab from './LeadsTab';
@@ -31,6 +31,30 @@ export default function GroupChatPage() {
   const [postMode, setPostMode] = useState<PostMode>('text');
   const [textMsg, setTextMsg] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Project media menu (3-dots in sub-group banner)
+  const [showBannerMenu, setShowBannerMenu] = useState(false);
+
+  // Download project gallery
+  const handleDownloadGallery = async () => {
+    if (!activeRoom?.project?._id) return;
+    setShowBannerMenu(false);
+    toast.loading('Downloading gallery...', { id: 'gallery-dl' });
+    try {
+      await shareApi.downloadGallery(activeRoom.project._id, activeRoom.project.projectName);
+      toast.success('Gallery downloaded!', { id: 'gallery-dl' });
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to download gallery', { id: 'gallery-dl' });
+    }
+  };
+
+  // Close banner menu on outside click
+  useEffect(() => {
+    if (!showBannerMenu) return;
+    const close = () => setShowBannerMenu(false);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [showBannerMenu]);
 
   // Requirement card form
   const [reqForm, setReqForm] = useState<RequirementCard>({
@@ -470,7 +494,7 @@ export default function GroupChatPage() {
 
             {/* Project Details Banner */}
             {activeRoom.roomType === 'project' && activeRoom.project && (
-              <div className="px-3 py-2 sm:px-4 sm:py-2.5 bg-blue-50 border-b border-blue-100 overflow-hidden">
+              <div className="relative z-30 px-3 py-2 sm:px-4 sm:py-2.5 bg-blue-50 border-b border-blue-100">
                 <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
                     <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
@@ -482,6 +506,30 @@ export default function GroupChatPage() {
                       {activeRoom.project.pricing?.startingPrice && <span className="text-[10px] text-blue-600 whitespace-nowrap">💰 ₹{(activeRoom.project.pricing.startingPrice / 100000).toFixed(0)}L+</span>}
                       {activeRoom.project.configuration?.bhkOptions && activeRoom.project.configuration.bhkOptions.length > 0 && <span className="text-[10px] text-blue-600 whitespace-nowrap">🏠 {activeRoom.project.configuration.bhkOptions.join(', ')}</span>}
                     </div>
+                  </div>
+
+                  {/* 3-dots menu — download project media */}
+                  <div className="relative flex-shrink-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowBannerMenu(v => !v); }}
+                      className="w-8 h-8 rounded-lg flex items-center justify-center text-blue-500 hover:bg-blue-100 transition-colors"
+                      title="Project media"
+                    >
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+                      </svg>
+                    </button>
+                    {showBannerMenu && (
+                      <div onClick={(e) => e.stopPropagation()} className="absolute right-0 top-9 z-20 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden py-1">
+                        <button
+                          onClick={handleDownloadGallery}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                          Download Gallery
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
