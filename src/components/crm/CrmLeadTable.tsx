@@ -15,6 +15,21 @@ interface CrmLeadTableProps {
 
 const STATUS_OPTIONS = ['', 'HOT', 'WARM', 'COLD', 'CREATED'] as const;
 
+// Pipeline stage pills — matches the Human Lead Manager.
+// Each stage maps to the closest AI lead status for filtering.
+const PIPELINE_STAGES: { label: string; status: string }[] = [
+  { label: 'All',                  status: '' },
+  { label: 'New Lead',             status: 'CREATED' },
+  { label: 'Contacted',            status: 'COLD' },
+  { label: 'Qualified',            status: 'WARM' },
+  { label: 'Site Visit Scheduled', status: 'WARM' },
+  { label: 'Site Visit Done',      status: 'WARM' },
+  { label: 'Negotiation',          status: 'HOT' },
+  { label: 'Booking',              status: 'HOT' },
+  { label: 'Won',                  status: 'HOT' },
+  { label: 'Lost',                 status: 'COLD' },
+];
+
 function StatusBadge({ status }: { status: CrmLead['status'] }) {
   const map: Record<CrmLead['status'], { bg: string; text: string; border: string; label: string }> = {
     HOT:     { bg: 'bg-red-50',    text: 'text-red-700',    border: 'border-red-100',    label: 'HOT'     },
@@ -54,7 +69,21 @@ export default function CrmLeadTable({
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
+  const [activeStage, setActiveStage] = useState('All');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Handle clicking a pipeline stage pill
+  const handleStageClick = (stage: { label: string; status: string }) => {
+    setActiveStage(stage.label);
+    setStatus(stage.status);
+    onFilterChange({
+      page: 1,
+      status: stage.status || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      search: search || undefined,
+    });
+  };
 
   // Debounced search — triggers re-fetch 300ms after last keystroke
   const handleSearchChange = (value: string) => {
@@ -72,7 +101,7 @@ export default function CrmLeadTable({
       startDate: 'startDate' in overrides ? overrides.startDate! : startDate,
       endDate: 'endDate' in overrides ? overrides.endDate! : endDate,
     };
-    if ('status' in overrides)    setStatus(next.status);
+    if ('status' in overrides)    { setStatus(next.status); setActiveStage('All'); }
     if ('startDate' in overrides) setStartDate(next.startDate);
     if ('endDate' in overrides)   setEndDate(next.endDate);
     onFilterChange({ page: 1, status: next.status || undefined, startDate: next.startDate || undefined, endDate: next.endDate || undefined, search: search || undefined });
@@ -136,6 +165,23 @@ export default function CrmLeadTable({
           onChange={(e) => handleImmediateChange({ endDate: e.target.value })}
           className="px-3 py-2 bg-white border border-[#E7E5E4] rounded-xl text-sm text-[#57534E] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
         />
+      </div>
+
+      {/* Pipeline stage filter pills — matches Human Lead Manager */}
+      <div className="flex gap-1.5 overflow-x-auto px-4 py-3 border-b border-[#E7E5E4] scrollbar-hide">
+        {PIPELINE_STAGES.map((stage) => (
+          <button
+            key={stage.label}
+            onClick={() => handleStageClick(stage)}
+            className={`shrink-0 px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+              activeStage === stage.label
+                ? 'bg-[#B45309] text-white'
+                : 'bg-[#FAF7F2] text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40'
+            }`}
+          >
+            {stage.label}
+          </button>
+        ))}
       </div>
 
       {/* Table */}
