@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/lib/authContext';
+import AiGuideChat from './AiGuideChat';
 
 interface DemoLead {
   id: string;
@@ -227,10 +228,16 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
         <p className="text-xs text-[#A8A29E] mb-3 italic">
           {journeyType === 'inbound' && 'Inbound ka poora rasta lagbhag 23 din. Client ne khud enquiry ki hai.'}
           {journeyType === 'outbound' && 'Outbound rasta 30+ din. Cold leads — trust build karo pehle.'}
-          {journeyType === 'ai' && 'AI-assisted — fastest close ~15 din. AI handles repetitive, human handles relationship.'}
+          {journeyType === 'ai' && 'AI Sales Assistant — Ask any question about the current stage. Get instant guidance.'}
         </p>
 
-        {/* Stages */}
+        {/* AI Guide — Chat interface */}
+        {journeyType === 'ai' && (
+          <AiGuideChat currentStage={lead.stage} leadName={lead.name} projectName={lead.project} />
+        )}
+
+        {/* Stages — only for Inbound and Outbound */}
+        {journeyType !== 'ai' && (
         <div className="space-y-2">
           {currentStages.map((stage, idx) => {
             const isExpanded = expandedStage === stage.id;
@@ -390,6 +397,7 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* Activity */}
