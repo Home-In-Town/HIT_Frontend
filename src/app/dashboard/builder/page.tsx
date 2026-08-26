@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi } from '@/lib/api';
+import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi, leadMatchingApi } from '@/lib/api';
 import {
   Zap,
   ShoppingBag,
@@ -25,6 +25,7 @@ import {
   Images,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatDerivedPricePerSqFt } from '@/utils/pricePerSqFt';
 
 interface ProjectCard {
   id: string;
@@ -65,6 +66,9 @@ export default function BuilderDashboardPage() {
   });
   const [statsLoading, setStatsLoading] = useState(true);
   const [properties, setProperties] = useState<ProjectCard[]>([]);
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
+  // Which card's "..." overflow menu is open (only one at a time). Null = none.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'builder')) {
@@ -137,6 +141,32 @@ export default function BuilderDashboardPage() {
 
     fetchData();
   }, [user]);
+
+  // Fetch "N buyers match" counts once projects are loaded.
+  useEffect(() => {
+    const ids = properties.map((p) => p.id).filter(Boolean);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    leadMatchingApi.getMatchCounts(ids).then((counts) => {
+      if (!cancelled) setMatchCounts(counts);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [properties]);
+
+  // Close the card overflow menu on any outside click or Escape.
+  useEffect(() => {
+    if (!openMenuId) return;
+    const close = () => setOpenMenuId(null);
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpenMenuId(null); };
+    window.addEventListener('click', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('click', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [openMenuId]);
 
   // Hide the layout's mobile header on this page
   useEffect(() => {
@@ -338,6 +368,34 @@ export default function BuilderDashboardPage() {
           </div>
         </div>
 
+        {/* Quick Actions — AI Lead Matching & Marketplace (primary discovery) */}
+        <div className="shrink-0 mx-3 mt-3 grid grid-cols-2 gap-2">
+          <Link
+            href="/dashboard/lead-matching"
+            className="flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+              <Zap className="w-4.5 h-4.5 text-[#B45309]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">AI Lead Matching</p>
+              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Match & Connect</p>
+            </div>
+          </Link>
+          <Link
+            href="/dashboard/marketplace"
+            className="flex items-center gap-2.5 bg-white border border-[#E7E5E4] rounded-2xl px-3 py-2.5 shadow-sm active:scale-95 transition-transform"
+          >
+            <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+              <ShoppingBag className="w-4.5 h-4.5 text-[#B45309]" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Marketplace</p>
+              <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Sell & Earn</p>
+            </div>
+          </Link>
+        </div>
+
         {/* Property Reels - shows 3 at a time, scrollable */}
         <div className="flex-1 overflow-y-scroll snap-y snap-mandatory mt-3 px-3 pb-20 scrollbar-hide">
           {properties.length === 0 && !statsLoading && (
@@ -366,7 +424,7 @@ export default function BuilderDashboardPage() {
               {/* Content Area */}
               <div className="flex-1 p-3 flex flex-col min-w-0 justify-between">
 
-                {/* Name + Price + Actions */}
+                {/* Name + Price */}
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0 flex-1">
@@ -377,39 +435,6 @@ export default function BuilderDashboardPage() {
                         {formatPrice(property.price)}
                       </span>
                     </div>
-
-                    {property.slug && (
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          onClick={() => handleShare(property.slug, property.name)}
-                          className="w-6 h-6 bg-[#FAF7F2] border border-[#E7E5E4] rounded-md flex items-center justify-center active:scale-90"
-                        >
-                          <Share2 className="w-3 h-3 text-[#57534E]" />
-                        </button>
-
-                        <button
-                          onClick={() => handleDownloadPDF(property)}
-                          className="w-6 h-6 bg-[#FAF7F2] border border-[#E7E5E4] rounded-md flex items-center justify-center active:scale-90"
-                        >
-                          <Download className="w-3 h-3 text-[#57534E]" />
-                        </button>
-
-                        <button
-                          onClick={() => handleGenerateQR(property.slug, property.name)}
-                          className="w-6 h-6 bg-[#FAF7F2] border border-[#E7E5E4] rounded-md flex items-center justify-center active:scale-90"
-                        >
-                          <QrCode className="w-3 h-3 text-[#57534E]" />
-                        </button>
-
-                        <button
-                          onClick={() => handleDownloadGallery(property.id, property.name)}
-                          className="w-6 h-6 bg-[#FAF7F2] border border-[#E7E5E4] rounded-md flex items-center justify-center active:scale-90"
-                          title="Download Gallery"
-                        >
-                          <Images className="w-3 h-3 text-[#57534E]" />
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -422,12 +447,24 @@ export default function BuilderDashboardPage() {
                       {property.city.split(',')[0]}
                     </span>
                   </div>
-                  {property.pricePerSqFt > 0 && (
+                  {formatDerivedPricePerSqFt(property.price, property.area) && (
                     <span className="text-[9px] text-zinc-400 font-semibold shrink-0">
-                      {'\u20B9'}{property.pricePerSqFt.toLocaleString('en-IN')}/sqft
+                      {formatDerivedPricePerSqFt(property.price, property.area)}
                     </span>
                   )}
                 </div>
+
+                {/* Matching signal — the product differentiator: this isn't just a listing,
+                    it knows who's actually looking. Only shown when there are live matches. */}
+                {matchCounts[property.id] > 0 && (
+                  <div className="flex items-center gap-1 text-[10px] font-bold text-[#3F6212]">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#3F6212] opacity-60"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-[#3F6212]"></span>
+                    </span>
+                    {matchCounts[property.id]} live {matchCounts[property.id] === 1 ? 'buyer matches' : 'buyers match'} this
+                  </div>
+                )}
 
                 {/* Tags */}
                 <div className="flex items-center flex-wrap gap-1">
@@ -453,75 +490,100 @@ export default function BuilderDashboardPage() {
                   )}
                 </div>
 
-                {/* Bottom row: View+Chat+Call on left, Share+PDF+QR on right */}
-                <div className="flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1">
-                    {property.slug && (
-                      <Link href={`/visit/${property.slug}`} className="flex items-center gap-1 px-2 py-1.5 bg-[#1C1917] text-white rounded-lg text-[9px] font-bold active:scale-95 transition-transform">
-                        <Eye className="w-3 h-3" />View
-                      </Link>
-                    )}
-                    <Link href="/dashboard/group-chat" className="flex items-center gap-1 px-2 py-1.5 bg-[#25D366] text-white rounded-lg text-[9px] font-bold active:scale-95 transition-transform">
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
-                      </svg>
-                      Chat
+                {/* View Details + Share (with all sharing options) */}
+                {property.slug && (
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      href={`/visit/${property.slug}`}
+                      className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
+                    >
+                      <Eye className="w-3 h-3 md:w-3.5 md:h-3.5" />View Details
                     </Link>
-                    <Link href="/dashboard/group-chat" className="flex items-center gap-1 px-2 py-1.5 bg-[#2563EB] text-white rounded-lg text-[9px] font-bold active:scale-95 transition-transform">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                      Call
-                    </Link>
+                    <div className="relative flex-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(openMenuId === property.id ? null : property.id);
+                        }}
+                        className={`w-full flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold border transition-all active:scale-95 ${
+                          openMenuId === property.id
+                            ? 'border-[#B45309]/30 text-[#B45309] bg-[#FAF7F2]'
+                            : 'border-[#B45309]/20 text-[#B45309] bg-amber-50/60 hover:bg-[#FAF7F2]'
+                        }`}
+                        aria-label="Share"
+                      >
+                        <Share2 className="w-3 h-3 md:w-3.5 md:h-3.5" />Share
+                      </button>
+
+                      {openMenuId === property.id && (
+                        <div
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute right-0 bottom-full mb-1 z-20 w-36 bg-white border border-[#E7E5E4] rounded-lg shadow-xl py-1 text-left"
+                        >
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleShare(property.slug, property.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <Share2 className="w-3.5 h-3.5" /> Copy link
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleDownloadPDF(property); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <Download className="w-3.5 h-3.5" /> Download PDF
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleGenerateQR(property.slug, property.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <QrCode className="w-3.5 h-3.5" /> Download QR
+                          </button>
+                          <button
+                            onClick={() => { setOpenMenuId(null); handleDownloadGallery(property.id, property.name); }}
+                            className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                          >
+                            <Images className="w-3.5 h-3.5" /> Download gallery
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
               </div>
             </div>
           ))}
         </div>
 
-        {/* Fixed Bottom Navigation */}
-        <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-2 py-2 safe-area-pb">
-          <div className="grid grid-cols-4 gap-1">
-            <Link
-              href="/dashboard/lead-matching"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
-            >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <Zap className="w-4 h-4 text-[#B45309]" />
-              </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Leads</span>
-            </Link>
-            <Link
-              href="/dashboard/marketplace"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
-            >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <ShoppingBag className="w-4 h-4 text-[#B45309]" />
-              </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Sell</span>
-            </Link>
+        {/* Fixed Bottom Navigation — 2 primary actions (card-style, matches quick-action cards) */}
+        <div className="shrink-0 fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t border-[#E7E5E4] px-3 py-2 safe-area-pb">
+          <div className="grid grid-cols-2 gap-2">
             <Link
               href="/dashboard/crm"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors relative"
+              className="relative flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
             >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <BarChart3 className="w-4 h-4 text-[#B45309]" />
+              <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+                <BarChart3 className="w-4.5 h-4.5 text-[#B45309]" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">CRM</p>
+                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">Pipeline</p>
               </div>
               {stats.crmHot > 0 && (
-                <span className="absolute top-1 right-1/4 w-2 h-2 bg-red-500 rounded-full border border-white" />
+                <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border border-white" />
               )}
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">CRM</span>
             </Link>
             <Link
               href="https://www.oneemployee.in/"
-              className="flex flex-col items-center gap-0.5 py-1.5 rounded-xl active:bg-amber-50 transition-colors"
+              className="flex items-center gap-2.5 rounded-2xl px-3 py-2 active:scale-95 transition-transform"
             >
-              <div className="w-8 h-8 bg-[#B45309]/10 rounded-xl flex items-center justify-center">
-                <Users className="w-4 h-4 text-[#B45309]" />
+              <div className="w-9 h-9 bg-[#B45309]/10 rounded-xl flex items-center justify-center shrink-0">
+                <Users className="w-4.5 h-4.5 text-[#B45309]" />
               </div>
-              <span className="text-[8px] font-bold text-[#57534E] uppercase tracking-wide">Team</span>
+              <div className="min-w-0">
+                <p className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight">Team</p>
+                <p className="text-[9px] text-[#A8A29E] font-semibold uppercase tracking-wide">One Employee</p>
+              </div>
             </Link>
           </div>
         </div>
@@ -603,8 +665,12 @@ export default function BuilderDashboardPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 shadow-sm">
                   <Zap className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-[#1C1917] font-serif">Lead Matching</h3>
-                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Generate Leads</p>
+                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">AI Lead Matching</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Match & Connect</p>
+                <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
+                  <span className="text-[10px] font-bold">Open</span>
+                  <ArrowUpRight className="w-3 h-3" />
+                </div>
               </div>
             </button>
 
@@ -615,8 +681,8 @@ export default function BuilderDashboardPage() {
                 <div className="w-12 h-12 bg-gradient-to-br from-amber-100 to-amber-50 rounded-2xl flex items-center justify-center text-[#B45309] mb-4 group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 shadow-sm">
                   <ShoppingBag className="w-6 h-6" />
                 </div>
-                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Sell & Earn</h3>
-                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Marketplace</p>
+                <h3 className="text-base font-bold text-[#1C1917] font-serif group-hover:text-[#B45309] transition-colors">Marketplace</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-1 font-semibold uppercase tracking-wider">Sell & Earn</p>
                 <div className="mt-3 flex items-center gap-1 text-[#B45309] opacity-0 group-hover:opacity-100 translate-y-1 group-hover:translate-y-0 transition-all duration-300">
                   <span className="text-[10px] font-bold">Open</span>
                   <ArrowUpRight className="w-3 h-3" />

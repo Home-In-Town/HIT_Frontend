@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/lib/authContext';
-import { groupChatApi, leadMatchingApi, shareApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
+import { groupChatApi, leadMatchingApi, shareApi, projectsApi, GroupRoom, GroupMessage as GMsg, RequirementCard, InventoryCard, MatchResult } from '@/lib/api';
+import { generateProjectPdf } from '@/utils/generateProjectPdf';
 import { useSocket } from '@/hooks/useSocket';
 import toast from 'react-hot-toast';
 import LeadsTab from './LeadsTab';
@@ -45,6 +46,59 @@ export default function GroupChatPage() {
       toast.success('Gallery downloaded!', { id: 'gallery-dl' });
     } catch (err: any) {
       toast.error(err.message || 'Failed to download gallery', { id: 'gallery-dl' });
+    }
+  };
+
+  // Copy project visit link
+  const handleCopyLink = async () => {
+    setShowBannerMenu(false);
+    const slug = activeRoom?.project?.slug;
+    if (!slug) { toast.error('No visit link available'); return; }
+    const url = `${window.location.origin}/visit/${slug}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copied!');
+    } catch {
+      toast.error('Failed to copy link');
+    }
+  };
+
+  // Download project QR code
+  const handleDownloadQR = () => {
+    setShowBannerMenu(false);
+    const slug = activeRoom?.project?.slug;
+    if (!slug) { toast.error('No QR available'); return; }
+    const url = `${window.location.origin}/visit/${slug}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(url)}`;
+    const a = document.createElement('a');
+    a.href = qrUrl;
+    a.download = `${activeRoom?.project?.projectName || 'project'}-qr.png`;
+    a.target = '_blank';
+    a.click();
+  };
+
+  // Download project PDF brochure
+  const handleDownloadPDF = async () => {
+    if (!activeRoom?.project?._id) return;
+    setShowBannerMenu(false);
+    toast.loading('Generating brochure...', { id: 'pdf-gen' });
+    try {
+      const [fullProject, contactInfo] = await Promise.all([
+        projectsApi.getById(activeRoom.project._id).catch(() => null),
+        shareApi.getMyContact().catch(() => null),
+      ]);
+      const shareResult = await shareApi.generateToken(activeRoom.project._id, 'pdf').catch(() => null);
+      const shareUrl = shareResult?.shareUrl || `${window.location.origin}/visit/${activeRoom.project.slug || ''}`;
+      const pdfData = {
+        ...fullProject,
+        price: fullProject?.startingPrice,
+        startingPrice: fullProject?.startingPrice,
+        area: fullProject?.carpetAreaRange || fullProject?.plotSizeRange || '',
+      } as any;
+      await generateProjectPdf(pdfData, contactInfo as any, shareUrl);
+      toast.success('Brochure downloaded!', { id: 'pdf-gen' });
+    } catch {
+      toast.error('Failed to generate brochure', { id: 'pdf-gen' });
     }
   };
 
@@ -521,6 +575,28 @@ export default function GroupChatPage() {
                     </button>
                     {showBannerMenu && (
                       <div onClick={(e) => e.stopPropagation()} className="absolute right-0 top-9 z-20 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden py-1">
+                        <button
+                          onClick={handleCopyLink}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                          Copy Link
+                        </button>
+                        <button
+                          onClick={handleDownloadPDF}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                          Download PDF
+                        </button>
+                        <button
+                          onClick={handleDownloadQR}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 013.75 9.375v-4.5zM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 01-1.125-1.125v-4.5zM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0113.5 9.375v-4.5z" /><path strokeLinecap="round" strokeLinejoin="round" d="M6.75 6.75h.75v.75h-.75v-.75zM16.5 6.75h.75v.75h-.75v-.75zM13.5 13.5h.75v.75h-.75v-.75z" /></svg>
+                          Download QR
+                        </button>
+                        <div className="border-t border-gray-100 my-1" />
                         <button
                           onClick={handleDownloadGallery}
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]"

@@ -6,7 +6,8 @@ import { Project, ProjectFormData, AMENITIES, ProjectStatus } from '@/types/proj
 import { projectsApi, mediaApi} from '@/lib/api';
 import { PROPERTY_CATEGORIES, CATEGORY_PROPERTY_TYPES, PropertyCategory } from '@/lib/propertyConfig';
 import toast from 'react-hot-toast';
-import { useRef } from 'react';
+import { useRef, useEffect } from 'react';
+import { derivePricePerSqFt, formatDerivedPricePerSqFt, parseAreaLowerBoundSqFt } from '@/utils/pricePerSqFt';
 
 interface ProjectFormProps {
   initialData?: Partial<Project>;
@@ -150,6 +151,19 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // Auto-derive price-per-sqft from starting price and area so the stored value
+  // always agrees with the price and area shown on cards. The field is no longer
+  // hand-entered — see src/utils/pricePerSqFt.ts.
+  const derivedPricePerSqFt = derivePricePerSqFt(
+    formData.startingPrice,
+    formData.carpetAreaRange || formData.plotSizeRange
+  );
+
+  useEffect(() => {
+    const next = derivedPricePerSqFt ?? 0;
+    setFormData((prev) => (prev.pricePerSqFt === next ? prev : { ...prev, pricePerSqFt: next }));
+  }, [derivedPricePerSqFt]);
+
   const validateForm = (isPublishing = false) => {
   const errors: Record<string, string> = {};
 
@@ -181,6 +195,32 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   
   if (formData.propertyType && !isPlotType && !isMixedUse && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
     errors.bhkOptions = 'Select at least one BHK option';
+  }
+
+  // Area is required so the per-sqft rate (now auto-derived from price ÷ area)
+  // can always be computed. Plot types use plotSizeRange, everything else uses
+  // carpetAreaRange. Mixed Use may carry either.
+  if (formData.propertyType) {
+    if (isPlotType) {
+      if (!formData.plotSizeRange?.trim()) {
+        errors.plotSizeRange = 'Plot size is required';
+      } else if (parseAreaLowerBoundSqFt(formData.plotSizeRange) === null) {
+        errors.plotSizeRange = 'Enter a valid area in sqft (e.g., 1000 - 2500 sqft)';
+      }
+    } else if (isMixedUse) {
+      const area = formData.carpetAreaRange || formData.plotSizeRange;
+      if (!area?.trim()) {
+        errors.carpetAreaRange = 'Carpet area or plot size is required';
+      } else if (parseAreaLowerBoundSqFt(area) === null) {
+        errors.carpetAreaRange = 'Enter a valid area in sqft (e.g., 650 - 1200 sqft)';
+      }
+    } else {
+      if (!formData.carpetAreaRange?.trim()) {
+        errors.carpetAreaRange = 'Carpet area is required';
+      } else if (parseAreaLowerBoundSqFt(formData.carpetAreaRange) === null) {
+        errors.carpetAreaRange = 'Enter a valid area in sqft (e.g., 650 - 1200 sqft)';
+      }
+    }
   }
 
   // Section 5
@@ -936,7 +976,10 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
               label="Carpet Area Range"
               name="carpetAreaRange"
               placeholder="e.g., 650 - 1200 sqft"
+              required
               value={formData.carpetAreaRange || ''}
+              error={formErrors.carpetAreaRange}
+              refCallback={(el) => (fieldRefs.current.carpetAreaRange = el)}
               onChange={(v) => updateField('carpetAreaRange', v)}
             />
 
@@ -957,7 +1000,10 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
               label="Plot Size Range (sqft)"
               name="plotSizeRange"
               placeholder="e.g., 1000 - 2500 sqft"
+              required
               value={formData.plotSizeRange || ''}
+              error={formErrors.plotSizeRange}
+              refCallback={(el) => (fieldRefs.current.plotSizeRange = el)}
               onChange={(v) => updateField('plotSizeRange', v)}
             />
 
@@ -1037,17 +1083,25 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             onChange={(v) => updateField('startingPrice', Number(v))}
           />
 
-          <InputField
-            label="Price Per Sq Ft (₹)"
-            name="pricePerSqFt"
-            type="number"
-            placeholder="e.g., 15000"
-            required
-            value={formData.pricePerSqFt || ''}
-            error={formErrors.pricePerSqFt}
-            refCallback={(el) => (fieldRefs.current.pricePerSqFt = el)}
-            onChange={(v) => updateField('pricePerSqFt', Number(v))}
-          />
+          <div>
+            <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
+              Price Per Sq Ft (₹)
+              <span className="ml-2 text-xs font-normal text-[#A8A29E]">auto-calculated</span>
+            </label>
+            <div className="w-full px-4 py-2.5 bg-[#FAF7F2] border border-[#E7E5E4] rounded-lg text-[#2A2A2A]">
+              {formatDerivedPricePerSqFt(
+                formData.startingPrice,
+                formData.carpetAreaRange || formData.plotSizeRange
+              ) ?? (
+                <span className="text-[#A8A29E]">
+                  Enter starting price and area to calculate
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-xs text-[#A8A29E]">
+              Derived from starting price ÷ area so it always matches the card.
+            </p>
+          </div>
 
           <InputField
             label="Price Range"
