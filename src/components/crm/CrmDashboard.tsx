@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { crmBridgeApi, CrmAnalytics, CrmLead, CrmLeadsParams, CrmLeadsResponse, ApiError } from '@/lib/api';
-import CrmMetricsBar from './CrmMetricsBar';
+import { crmBridgeApi, CrmLead, CrmLeadsParams, CrmLeadsResponse, ApiError } from '@/lib/api';
 import CrmLeadTable from './CrmLeadTable';
 import CrmLeadDrawer from './CrmLeadDrawer';
 import HumanLeadManager from './HumanLeadManager';
@@ -15,16 +14,6 @@ const TABS: { key: Tab; label: string; redirectPath: string }[] = [
   { key: 'whatsapp',  label: 'WhatsApp Templates',  redirectPath: '/whatsapp-templates' },
 ];
 
-const DEFAULT_ANALYTICS: CrmAnalytics = {
-  total: 0,
-  hot: 0,
-  warm: 0,
-  cold: 0,
-  engagementRate: 0,
-  avgScore: 0,
-  recentActivity: [],
-};
-
 const DEFAULT_LEADS: CrmLeadsResponse = {
   leads: [],
   total: 0,
@@ -33,10 +22,8 @@ const DEFAULT_LEADS: CrmLeadsResponse = {
 };
 
 export default function CrmDashboard() {
-  const [analytics, setAnalytics] = useState<CrmAnalytics>(DEFAULT_ANALYTICS);
   const [leadsData, setLeadsData] = useState<CrmLeadsResponse>(DEFAULT_LEADS);
   const [leadsLoading, setLeadsLoading] = useState(true);
-  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<Tab>('leads');
@@ -55,24 +42,18 @@ export default function CrmDashboard() {
   // Current lead filter state
   const [currentParams, setCurrentParams] = useState<CrmLeadsParams>({ page: 1 });
 
-  // On mount: fetch analytics + first page of leads
+  // On mount: fetch first page of leads
   useEffect(() => {
     const init = async () => {
-      setAnalyticsLoading(true);
       setLeadsLoading(true);
       setError(null);
       try {
-        const [analyticsResult, leadsResult] = await Promise.all([
-          crmBridgeApi.getAnalytics(),
-          crmBridgeApi.getLeads({ page: 1 }),
-        ]);
-        setAnalytics(analyticsResult);
+        const leadsResult = await crmBridgeApi.getLeads({ page: 1 });
         setLeadsData(leadsResult);
       } catch (err: unknown) {
         const msg = err instanceof ApiError ? err.message : 'Failed to load CRM data';
         setError(msg);
       } finally {
-        setAnalyticsLoading(false);
         setLeadsLoading(false);
       }
     };
@@ -213,17 +194,6 @@ export default function CrmDashboard() {
       {/* AI Leads Manager Content */}
       {managerMode === 'ai' && (
         <>
-          {/* Metrics bar */}
-          {analyticsLoading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl border border-[#E7E5E4] p-4 h-24 animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <CrmMetricsBar analytics={analytics} />
-          )}
-
           {/* Tabs */}
           <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden">
             {/* Tab nav */}
