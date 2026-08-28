@@ -16,6 +16,9 @@ const PIPELINE_STAGES = [
   'Lost',
 ];
 
+// Lead type: inbound = client raised their own enquiry, outbound = manually sourced / cold
+type LeadType = 'inbound' | 'outbound';
+
 interface DemoLead {
   id: string;
   name: string;
@@ -24,21 +27,93 @@ interface DemoLead {
   stage: string;
   date: string;
   source: string;
+  leadType: LeadType; // inbound (client enquiry) vs outbound (cold / manually sourced)
   siteVisitDate?: string; // ISO date string for scheduled visit
   siteVisitTime?: string; // e.g. "10:30 AM"
 }
 
 const DEMO_LEADS: DemoLead[] = [
-  { id: '1', name: 'Rahul Sharma', phone: '+91 98XXX XXXXX', project: 'Skyline Heights', stage: 'New Lead', date: '22 Aug 2026', source: 'Walk-in' },
-  { id: '2', name: 'Priya Patel', phone: '+91 87XXX XXXXX', project: 'Green Valley', stage: 'Contacted', date: '21 Aug 2026', source: 'Reference' },
-  { id: '3', name: 'Amit Desai', phone: '+91 91XXX XXXXX', project: 'Sunset Villas', stage: 'Qualified', date: '20 Aug 2026', source: 'Online' },
-  { id: '4', name: 'Neha Kulkarni', phone: '+91 70XXX XXXXX', project: 'Royal Residency', stage: 'Site Visit Scheduled', date: '19 Aug 2026', source: 'Campaign', siteVisitDate: '2026-08-25', siteVisitTime: '11:00 AM' },
-  { id: '5', name: 'Vikas Joshi', phone: '+91 85XXX XXXXX', project: 'Palm Gardens', stage: 'Site Visit Done', date: '18 Aug 2026', source: 'Walk-in', siteVisitDate: '2026-08-20', siteVisitTime: '3:00 PM' },
-  { id: '6', name: 'Sanjay Mehta', phone: '+91 99XXX XXXXX', project: 'Skyline Heights', stage: 'Site Visit Scheduled', date: '17 Aug 2026', source: 'Online' }, // missing date — should show red
-  { id: '7', name: 'Ritu Singh', phone: '+91 88XXX XXXXX', project: 'Green Valley', stage: 'Booking', date: '16 Aug 2026', source: 'Reference' },
-  { id: '8', name: 'Karan Gupta', phone: '+91 77XXX XXXXX', project: 'Sunset Villas', stage: 'Won', date: '15 Aug 2026', source: 'Walk-in' },
-  { id: '9', name: 'Meera Jain', phone: '+91 66XXX XXXXX', project: 'Royal Residency', stage: 'Lost', date: '14 Aug 2026', source: 'Campaign' },
+  { id: '1', name: 'Rahul Sharma', phone: '+91 98XXX XXXXX', project: 'Skyline Heights', stage: 'New Lead', date: '22 Aug 2026', source: 'Walk-in', leadType: 'outbound' },
+  { id: '2', name: 'Priya Patel', phone: '+91 87XXX XXXXX', project: 'Green Valley', stage: 'Contacted', date: '21 Aug 2026', source: 'Reference', leadType: 'inbound' },
+  { id: '3', name: 'Amit Desai', phone: '+91 91XXX XXXXX', project: 'Sunset Villas', stage: 'Qualified', date: '20 Aug 2026', source: 'Online', leadType: 'inbound' },
+  { id: '4', name: 'Neha Kulkarni', phone: '+91 70XXX XXXXX', project: 'Royal Residency', stage: 'Site Visit Scheduled', date: '19 Aug 2026', source: 'Campaign', leadType: 'inbound', siteVisitDate: '2026-08-25', siteVisitTime: '11:00 AM' },
+  { id: '5', name: 'Vikas Joshi', phone: '+91 85XXX XXXXX', project: 'Palm Gardens', stage: 'Site Visit Done', date: '18 Aug 2026', source: 'Walk-in', leadType: 'outbound', siteVisitDate: '2026-08-20', siteVisitTime: '3:00 PM' },
+  { id: '6', name: 'Sanjay Mehta', phone: '+91 99XXX XXXXX', project: 'Skyline Heights', stage: 'Site Visit Scheduled', date: '17 Aug 2026', source: 'Online', leadType: 'inbound' }, // missing date — should show red
+  { id: '7', name: 'Ritu Singh', phone: '+91 88XXX XXXXX', project: 'Green Valley', stage: 'Booking', date: '16 Aug 2026', source: 'Reference', leadType: 'outbound' },
+  { id: '8', name: 'Karan Gupta', phone: '+91 77XXX XXXXX', project: 'Sunset Villas', stage: 'Won', date: '15 Aug 2026', source: 'Walk-in', leadType: 'outbound' },
+  { id: '9', name: 'Meera Jain', phone: '+91 66XXX XXXXX', project: 'Royal Residency', stage: 'Lost', date: '14 Aug 2026', source: 'Campaign', leadType: 'inbound' },
 ];
+
+// Small badge for lead type — used in the list and detail views
+const leadTypeBadge = (type: LeadType) =>
+  type === 'inbound'
+    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    : 'bg-violet-50 text-violet-700 border-violet-200';
+
+// A shareable/downloadable project asset (photo, video or PDF)
+export interface ProjectAsset {
+  type: 'image' | 'video' | 'pdf';
+  url: string;
+  name: string;
+}
+
+// A media entry may be a plain URL string or a { url, key } object
+type MediaEntry = string | { url?: string } | null | undefined;
+
+// Pull the URL out of a media entry that may be a string or { url, key }
+const mediaUrl = (m: MediaEntry): string | null => {
+  if (!m) return null;
+  if (typeof m === 'string') return m.startsWith('blob:') || m.startsWith('data:') ? null : m;
+  return m.url || null;
+};
+
+// Loosely-typed project shape (fields come from the API transform or raw backend)
+interface ProjectMediaSource {
+  name?: string;
+  projectName?: string;
+  coverImage?: MediaEntry;
+  galleryImages?: MediaEntry[];
+  layoutImage?: MediaEntry;
+  videos?: MediaEntry[];
+  brochureUrl?: MediaEntry;
+  media?: {
+    coverImage?: MediaEntry;
+    galleryImages?: MediaEntry[];
+    layoutImage?: MediaEntry;
+    videos?: MediaEntry[];
+    brochurePdf?: MediaEntry;
+  };
+}
+
+// Collect all uploaded assets for a project into a flat, shareable list
+export function collectProjectAssets(project: ProjectMediaSource | null | undefined): ProjectAsset[] {
+  if (!project) return [];
+  const name = project.name || project.projectName || 'Project';
+  const assets: ProjectAsset[] = [];
+
+  const cover = mediaUrl(project.coverImage ?? project.media?.coverImage);
+  if (cover) assets.push({ type: 'image', url: cover, name: `${name} - Cover` });
+
+  const gallery = project.galleryImages ?? project.media?.galleryImages ?? [];
+  gallery.forEach((g, i) => {
+    const u = mediaUrl(g);
+    if (u) assets.push({ type: 'image', url: u, name: `${name} - Photo ${i + 1}` });
+  });
+
+  const layout = mediaUrl(project.layoutImage ?? project.media?.layoutImage);
+  if (layout) assets.push({ type: 'image', url: layout, name: `${name} - Layout` });
+
+  const videos = project.videos ?? project.media?.videos ?? [];
+  videos.forEach((v, i) => {
+    const u = mediaUrl(v);
+    if (u) assets.push({ type: 'video', url: u, name: `${name} - Video ${i + 1}` });
+  });
+
+  const brochure = mediaUrl(project.brochureUrl ?? project.media?.brochurePdf);
+  if (brochure) assets.push({ type: 'pdf', url: brochure, name: `${name} - Brochure` });
+
+  return assets;
+}
 
 export default function HumanLeadManager() {
   const [selectedLead, setSelectedLead] = useState<DemoLead | null>(null);
@@ -57,16 +132,25 @@ export default function HumanLeadManager() {
     name: '', phone: '', altPhone: '', email: '', budget: '',
     homeType: '', buyingType: '', location: '', project: '',
     source: 'Meta Ad', customSource: '', stage: 'New Lead',
+    leadType: 'inbound' as LeadType,
   });
 
-  // Projects list for dropdown
+  // Projects list for dropdown (id + name for the form)
   const [projectsList, setProjectsList] = useState<{ id: string; name: string }[]>([]);
+  // Full projects (with media) keyed by name — used to resolve a lead's assets
+  const [projectsByName, setProjectsByName] = useState<Record<string, ProjectAsset[]>>({});
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const projects = await projectsApi.getAllPublic();
-        setProjectsList(projects.map((p: any) => ({ id: p.id || p._id, name: p.name || p.projectName || 'Untitled' })));
+        const projects = (await projectsApi.getAllPublic()) as unknown as (ProjectMediaSource & { id?: string; _id?: string })[];
+        setProjectsList(projects.map((p) => ({ id: p.id || p._id || '', name: p.name || p.projectName || 'Untitled' })));
+        const byName: Record<string, ProjectAsset[]> = {};
+        projects.forEach((p) => {
+          const nm = p.name || p.projectName || 'Untitled';
+          byName[nm] = collectProjectAssets(p);
+        });
+        setProjectsByName(byName);
       } catch {
         // Silently fail — user can still type project name
       }
@@ -123,9 +207,10 @@ export default function HumanLeadManager() {
       stage: newLead.stage,
       date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
       source: newLead.source === 'Other' ? newLead.customSource || 'Other' : newLead.source,
+      leadType: newLead.leadType,
     };
     setLeads(prev => [lead, ...prev]);
-    setNewLead({ name: '', phone: '', altPhone: '', email: '', budget: '', homeType: '', buyingType: '', location: '', project: '', source: 'Meta Ad', customSource: '', stage: 'New Lead' });
+    setNewLead({ name: '', phone: '', altPhone: '', email: '', budget: '', homeType: '', buyingType: '', location: '', project: '', source: 'Meta Ad', customSource: '', stage: 'New Lead', leadType: 'inbound' });
     setShowAddLead(false);
   };
 
@@ -152,6 +237,7 @@ export default function HumanLeadManager() {
           stages={PIPELINE_STAGES}
           stageColor={stageColor}
           onStageChange={handleStageChange}
+          projectAssets={projectsByName[selectedLead.project] || []}
         />
       </div>
     );
@@ -244,6 +330,9 @@ export default function HumanLeadManager() {
                   <p className="text-sm font-bold text-[#2A2A2A] truncate group-hover:text-[#B45309] transition-colors">{lead.name}</p>
                   <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0 ${stageColor(lead.stage)}`}>
                     {lead.stage}
+                  </span>
+                  <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border shrink-0 uppercase ${leadTypeBadge(lead.leadType)}`}>
+                    {lead.leadType}
                   </span>
                 </div>
                 <p className="text-xs text-[#57534E] truncate mt-0.5">{lead.project}</p>
@@ -429,6 +518,29 @@ export default function HumanLeadManager() {
                 {newLead.project === '__other__' && (
                   <input type="text" placeholder="Type project name" className="w-full mt-2 px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all" onChange={(e) => setNewLead(prev => ({ ...prev, project: e.target.value }))} />
                 )}
+              </div>
+
+              {/* Lead Type — Inbound (client enquiry) vs Outbound (cold / manually sourced) */}
+              <div>
+                <label className="text-xs font-bold text-[#57534E] mb-1 block">Lead Type</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewLead(prev => ({ ...prev, leadType: 'inbound' }))}
+                    className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${newLead.leadType === 'inbound' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-[#FAF7F2] text-[#57534E] border-[#E7E5E4] hover:border-emerald-400'}`}
+                  >
+                    Inbound
+                    <span className="block text-[9px] font-medium opacity-80 mt-0.5">Client ne khud enquiry ki</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewLead(prev => ({ ...prev, leadType: 'outbound' }))}
+                    className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${newLead.leadType === 'outbound' ? 'bg-violet-600 text-white border-violet-600' : 'bg-[#FAF7F2] text-[#57534E] border-[#E7E5E4] hover:border-violet-400'}`}
+                  >
+                    Outbound
+                    <span className="block text-[9px] font-medium opacity-80 mt-0.5">Cold / manually sourced</span>
+                  </button>
+                </div>
               </div>
 
               {/* Source */}
