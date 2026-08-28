@@ -18,8 +18,13 @@ export default function CrmPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Role guard
-    if (user.role !== 'admin' && user.role !== 'builder' && user.role !== 'agent') {
+    // Role guard — admin, builder, agent and captain can access the CRM
+    if (
+      user.role !== 'admin' &&
+      user.role !== 'builder' &&
+      user.role !== 'agent' &&
+      user.role !== 'captain'
+    ) {
       router.replace('/dashboard');
       return;
     }
