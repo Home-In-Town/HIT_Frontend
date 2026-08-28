@@ -16,7 +16,7 @@ interface OwnerAnalytics {
   totalProjects?: number;
 }
 
-const CRM_ROLES = ['admin', 'builder', 'agent'] as const;
+const CRM_ROLES = ['admin', 'builder', 'agent', 'captain'] as const;
 type CrmRole = typeof CRM_ROLES[number];
 function hasCrmAccess(role?: string): role is CrmRole {
   return CRM_ROLES.includes(role as CrmRole);

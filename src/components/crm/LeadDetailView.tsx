@@ -123,6 +123,10 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
   const currentStageIndex = stages.indexOf(lead.stage);
   const currentStep = currentStageIndex >= 0 ? currentStageIndex + 1 : 1;
 
+  // Only offer the journey tab that matches the lead's type (inbound or outbound), plus AI Guide.
+  const availableJourneyTypes: JourneyType[] =
+    lead.leadType === 'outbound' ? ['outbound', 'ai'] : ['inbound', 'ai'];
+
   const handleFieldEdit = (stageId: string, field: keyof JourneyStage, value: string) => {
     setJourneyStages(prev => ({
       ...prev,
@@ -279,9 +283,9 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
           <span className="text-xs font-bold text-[#B45309]">Step {currentStep} / {currentStages.length}</span>
         </div>
 
-        {/* Journey type toggle */}
+        {/* Journey type toggle — only show the tab matching this lead's type, plus AI Guide */}
         <div className="flex gap-2 mb-4">
-          {(['inbound', 'outbound', 'ai'] as JourneyType[]).map(type => (
+          {availableJourneyTypes.map(type => (
             <button key={type} onClick={() => { setJourneyType(type); setExpandedStage(null); }} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${journeyType === type ? 'bg-[#1C1917] text-white shadow-sm' : 'bg-[#FAF7F2] text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40'}`}>
               {type === 'inbound' ? 'Inbound' : type === 'outbound' ? 'Outbound' : 'AI Guide'}
             </button>

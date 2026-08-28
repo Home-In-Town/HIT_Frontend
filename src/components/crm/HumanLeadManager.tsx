@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LeadDetailView from './LeadDetailView';
-import { projectsApi } from '@/lib/api';
+import { projectsApi, humanLeadsApi, HumanLead } from '@/lib/api';
+import { useAuth } from '@/lib/authContext';
 
 const PIPELINE_STAGES = [
   'New Lead',
@@ -19,30 +20,8 @@ const PIPELINE_STAGES = [
 // Lead type: inbound = client raised their own enquiry, outbound = manually sourced / cold
 type LeadType = 'inbound' | 'outbound';
 
-interface DemoLead {
-  id: string;
-  name: string;
-  phone: string;
-  project: string;
-  stage: string;
-  date: string;
-  source: string;
-  leadType: LeadType; // inbound (client enquiry) vs outbound (cold / manually sourced)
-  siteVisitDate?: string; // ISO date string for scheduled visit
-  siteVisitTime?: string; // e.g. "10:30 AM"
-}
-
-const DEMO_LEADS: DemoLead[] = [
-  { id: '1', name: 'Rahul Sharma', phone: '+91 98XXX XXXXX', project: 'Skyline Heights', stage: 'New Lead', date: '22 Aug 2026', source: 'Walk-in', leadType: 'outbound' },
-  { id: '2', name: 'Priya Patel', phone: '+91 87XXX XXXXX', project: 'Green Valley', stage: 'Contacted', date: '21 Aug 2026', source: 'Reference', leadType: 'inbound' },
-  { id: '3', name: 'Amit Desai', phone: '+91 91XXX XXXXX', project: 'Sunset Villas', stage: 'Qualified', date: '20 Aug 2026', source: 'Online', leadType: 'inbound' },
-  { id: '4', name: 'Neha Kulkarni', phone: '+91 70XXX XXXXX', project: 'Royal Residency', stage: 'Site Visit Scheduled', date: '19 Aug 2026', source: 'Campaign', leadType: 'inbound', siteVisitDate: '2026-08-25', siteVisitTime: '11:00 AM' },
-  { id: '5', name: 'Vikas Joshi', phone: '+91 85XXX XXXXX', project: 'Palm Gardens', stage: 'Site Visit Done', date: '18 Aug 2026', source: 'Walk-in', leadType: 'outbound', siteVisitDate: '2026-08-20', siteVisitTime: '3:00 PM' },
-  { id: '6', name: 'Sanjay Mehta', phone: '+91 99XXX XXXXX', project: 'Skyline Heights', stage: 'Site Visit Scheduled', date: '17 Aug 2026', source: 'Online', leadType: 'inbound' }, // missing date — should show red
-  { id: '7', name: 'Ritu Singh', phone: '+91 88XXX XXXXX', project: 'Green Valley', stage: 'Booking', date: '16 Aug 2026', source: 'Reference', leadType: 'outbound' },
-  { id: '8', name: 'Karan Gupta', phone: '+91 77XXX XXXXX', project: 'Sunset Villas', stage: 'Won', date: '15 Aug 2026', source: 'Walk-in', leadType: 'outbound' },
-  { id: '9', name: 'Meera Jain', phone: '+91 66XXX XXXXX', project: 'Royal Residency', stage: 'Lost', date: '14 Aug 2026', source: 'Campaign', leadType: 'inbound' },
-];
+// Leads are now real, team-scoped records from the backend (with ownership info)
+type DemoLead = HumanLead;
 
 // Small badge for lead type — used in the list and detail views
 const leadTypeBadge = (type: LeadType) =>
@@ -116,10 +95,47 @@ export function collectProjectAssets(project: ProjectMediaSource | null | undefi
 }
 
 export default function HumanLeadManager() {
+  const { user } = useAuth();
+  // Only captains can (re)assign leads to their team agents
+  const canAssign = user?.role === 'captain';
+
   const [selectedLead, setSelectedLead] = useState<DemoLead | null>(null);
-  const [leads, setLeads] = useState<DemoLead[]>(DEMO_LEADS);
+  const [leads, setLeads] = useState<DemoLead[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStage, setFilterStage] = useState<string>('All');
+  const [saving, setSaving] = useState(false);
+
+  // Team agents available for assignment (captain/admin only)
+  const [teamAgents, setTeamAgents] = useState<{ id: string; name: string; role: string }[]>([]);
+
+  // Load leads from the backend (team-scoped by role)
+  const loadLeads = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const data = await humanLeadsApi.list();
+      // Guard against any records missing an id and drop accidental duplicates
+      const seen = new Set<string>();
+      const clean = (data || [])
+        .filter((l) => l && l.id && !seen.has(l.id) && seen.add(l.id))
+        .map((l) => ({ ...l, id: String(l.id) }));
+      setLeads(clean);
+    } catch {
+      setLoadError('Could not load leads. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadLeads(); }, [loadLeads]);
+
+  // Load team agents for the assign dropdown
+  useEffect(() => {
+    if (!canAssign) return;
+    humanLeadsApi.teamAgents().then(setTeamAgents).catch(() => {});
+  }, [canAssign]);
 
   // Site visit scheduling modal
   const [schedulingLead, setSchedulingLead] = useState<DemoLead | null>(null);
@@ -185,33 +201,56 @@ export default function HumanLeadManager() {
     return null;
   };
 
-  const handleScheduleVisit = () => {
+  const handleScheduleVisit = async () => {
     if (!schedulingLead || !visitDate || !visitTime) return;
-    setLeads(prev => prev.map(l =>
-      l.id === schedulingLead.id
-        ? { ...l, siteVisitDate: visitDate, siteVisitTime: visitTime }
-        : l
-    ));
+    try {
+      const updated = await humanLeadsApi.update(schedulingLead.id, { siteVisitDate: visitDate, siteVisitTime: visitTime });
+      setLeads(prev => prev.map(l => (l.id === updated.id ? updated : l)));
+    } catch {
+      // keep the modal state; surface nothing fancy — leads reload will correct
+    }
     setSchedulingLead(null);
     setVisitDate('');
     setVisitTime('');
   };
 
-  const handleAddLead = () => {
-    if (!newLead.name || !newLead.phone) return;
-    const lead: DemoLead = {
-      id: String(Date.now()),
-      name: newLead.name,
-      phone: newLead.phone,
-      project: newLead.project || 'Unassigned',
-      stage: newLead.stage,
-      date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      source: newLead.source === 'Other' ? newLead.customSource || 'Other' : newLead.source,
-      leadType: newLead.leadType,
-    };
-    setLeads(prev => [lead, ...prev]);
-    setNewLead({ name: '', phone: '', altPhone: '', email: '', budget: '', homeType: '', buyingType: '', location: '', project: '', source: 'Meta Ad', customSource: '', stage: 'New Lead', leadType: 'inbound' });
-    setShowAddLead(false);
+  const handleAddLead = async () => {
+    if (!newLead.name || !newLead.phone || saving) return;
+    setSaving(true);
+    try {
+      const created = await humanLeadsApi.create({
+        name: newLead.name,
+        phone: newLead.phone,
+        altPhone: newLead.altPhone,
+        email: newLead.email,
+        budget: newLead.budget,
+        homeType: newLead.homeType,
+        buyingType: newLead.buyingType,
+        location: newLead.location,
+        projectName: newLead.project === '__other__' ? '' : newLead.project,
+        source: newLead.source === 'Other' ? newLead.customSource || 'Other' : newLead.source,
+        leadType: newLead.leadType,
+        stage: newLead.stage,
+      });
+      setLeads(prev => [created, ...prev]);
+      setNewLead({ name: '', phone: '', altPhone: '', email: '', budget: '', homeType: '', buyingType: '', location: '', project: '', source: 'Meta Ad', customSource: '', stage: 'New Lead', leadType: 'inbound' });
+      setShowAddLead(false);
+    } catch {
+      // leave the form open so the user can retry
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Reassign a lead to an agent (captain/admin)
+  const handleAssign = async (leadId: string, agentId: string | null) => {
+    try {
+      const updated = await humanLeadsApi.assign(leadId, agentId);
+      setLeads(prev => prev.map(l => (l.id === updated.id ? updated : l)));
+      if (selectedLead?.id === updated.id) setSelectedLead(updated);
+    } catch {
+      loadLeads();
+    }
   };
 
   // Filter leads
@@ -225,9 +264,17 @@ export default function HumanLeadManager() {
 
   // If a lead is selected, show detail view
   if (selectedLead) {
-    const handleStageChange = (newStage: string) => {
+    const handleStageChange = async (newStage: string) => {
+      // Optimistic update, then persist
       setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, stage: newStage } : l));
       setSelectedLead({ ...selectedLead, stage: newStage });
+      try {
+        const updated = await humanLeadsApi.updateStage(selectedLead.id, newStage);
+        setLeads(prev => prev.map(l => (l.id === updated.id ? updated : l)));
+        setSelectedLead(updated);
+      } catch {
+        loadLeads();
+      }
     };
     return (
       <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden" style={{ minHeight: '520px' }}>
@@ -309,11 +356,22 @@ export default function HumanLeadManager() {
 
       {/* Lead list */}
       <div className="divide-y divide-[#E7E5E4] max-h-[500px] overflow-y-auto">
-        {filteredLeads.map(lead => {
+        {loading && (
+          <div className="py-12 text-center">
+            <span className="inline-block w-6 h-6 border-2 border-[#B45309]/30 border-t-[#B45309] rounded-full animate-spin" />
+          </div>
+        )}
+        {!loading && loadError && (
+          <div className="py-12 text-center">
+            <p className="text-sm text-[#A8A29E]">{loadError}</p>
+            <button onClick={loadLeads} className="mt-2 text-xs font-bold text-[#B45309] hover:underline">Try again</button>
+          </div>
+        )}
+        {!loading && !loadError && filteredLeads.map((lead, idx) => {
           const alert = getSiteVisitAlert(lead);
           return (
             <div
-              key={lead.id}
+              key={lead.id || `lead-${idx}`}
               onClick={() => setSelectedLead(lead)}
               className={`flex items-center gap-3 px-5 py-4 hover:bg-[#FAF7F2] transition-colors cursor-pointer group ${
                 alert ? 'bg-red-50/50' : ''
@@ -336,6 +394,35 @@ export default function HumanLeadManager() {
                   </span>
                 </div>
                 <p className="text-xs text-[#57534E] truncate mt-0.5">{lead.project}</p>
+
+                {/* Ownership — who brought the lead and who it's assigned to */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1">
+                  {lead.createdBy && (
+                    <span className="text-[10px] text-[#A8A29E]">
+                      Added by <span className="font-semibold text-[#57534E]">{lead.createdBy.name}</span>
+                      <span className="text-[#A8A29E]"> ({lead.createdBy.role})</span>
+                    </span>
+                  )}
+                  <span className="text-[10px] text-[#A8A29E]">
+                    Assigned to{' '}
+                    <span className={`font-semibold ${lead.assignedAgent ? 'text-[#B45309]' : 'text-[#A8A29E]'}`}>
+                      {lead.assignedAgent ? lead.assignedAgent.name : 'Unassigned'}
+                    </span>
+                  </span>
+                </div>
+
+                {/* Assign dropdown — captain only */}
+                {canAssign && (
+                  <select
+                    value={lead.assignedAgent?.id || ''}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => { e.stopPropagation(); handleAssign(lead.id, e.target.value || null); }}
+                    className="mt-1.5 text-[10px] font-bold text-[#57534E] bg-[#FAF7F2] border border-[#E7E5E4] rounded-lg px-2 py-1 focus:outline-none focus:border-[#B45309]/40"
+                  >
+                    <option value="">Unassigned</option>
+                    {teamAgents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                )}
 
                 {/* Site Visit Alert */}
                 {alert === 'missing' && (
@@ -381,9 +468,10 @@ export default function HumanLeadManager() {
           );
         })}
 
-        {filteredLeads.length === 0 && (
+        {!loading && !loadError && filteredLeads.length === 0 && (
           <div className="py-12 text-center">
             <p className="text-sm text-[#A8A29E]">No leads found</p>
+            <p className="text-xs text-[#A8A29E] mt-1">Add a lead to get started.</p>
           </div>
         )}
       </div>

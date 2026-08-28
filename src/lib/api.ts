@@ -1738,6 +1738,22 @@ export const crmBridgeApi = {
     return handleResponse(response);
   },
 
+  // Connect by verifying the user's OneEmployee phone + PIN (most reliable path)
+  async manualConnect(phone: string, pin: string): Promise<{
+    linked: boolean;
+    manualLinked?: boolean;
+    oneEmployeeOwnerId?: string;
+    message?: string;
+  }> {
+    const response = await fetch(`${API_URL}/crm-bridge/manual-connect`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, pin }),
+    });
+    return handleResponse(response);
+  },
+
   async getRedirectBase(): Promise<string> {
     try {
       const response = await fetch(`${API_URL}/crm-bridge/redirect-base`, {
@@ -1814,6 +1830,155 @@ export const crmBridgeApi = {
       body: JSON.stringify({ phoneOrEmail }),
     });
     return handleResponse(response);
+  },
+};
+
+/* ----------------------------------
+   Referrals API — "Learn to Get Leads Faster" course unlock
+-----------------------------------*/
+
+export interface ReferralEntry {
+  id: string;
+  name: string;
+  phone: string;   // masked, e.g. "••••••1234"
+  role: string;
+  joined: boolean; // true once the referred user has verified/joined
+  joinedAt: string;
+}
+
+export interface ReferralInfo {
+  referralCode: string;
+  referralLink: string;
+  goal: number;
+  count: number;
+  remaining: number;
+  courseUnlocked: boolean;
+  referrals: ReferralEntry[];
+}
+
+export const referralsApi = {
+  async getMine(): Promise<ReferralInfo> {
+    const response = await fetch(`${API_URL}/referrals/me`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<ReferralInfo>(response);
+  },
+};
+
+/* ----------------------------------
+   Human Lead Manager API — team-scoped leads with ownership/assignment
+-----------------------------------*/
+
+export interface LeadPerson {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface HumanLead {
+  id: string;
+  name: string;
+  phone: string;
+  altPhone?: string;
+  email?: string;
+  budget?: string;
+  homeType?: string;
+  buyingType?: string;
+  location?: string;
+  project: string;
+  source: string;
+  leadType: 'inbound' | 'outbound';
+  stage: string;
+  siteVisitDate?: string;
+  siteVisitTime?: string;
+  date: string;
+  createdBy: LeadPerson | null;    // who brought the lead
+  owningCaptain: LeadPerson | null; // the team owner
+  assignedAgent: LeadPerson | null; // who it's assigned to
+}
+
+export interface CreateHumanLeadInput {
+  name: string;
+  phone: string;
+  altPhone?: string;
+  email?: string;
+  budget?: string;
+  homeType?: string;
+  buyingType?: string;
+  location?: string;
+  projectName?: string;
+  source?: string;
+  leadType?: 'inbound' | 'outbound';
+  stage?: string;
+  assignedAgent?: string | null;
+}
+
+export const humanLeadsApi = {
+  async list(params?: { stage?: string; search?: string }): Promise<HumanLead[]> {
+    const query = new URLSearchParams();
+    if (params?.stage) query.set('stage', params.stage);
+    if (params?.search) query.set('search', params.search);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_URL}/human-leads${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ leads: HumanLead[] }>(response);
+    return data.leads;
+  },
+
+  async create(input: CreateHumanLeadInput): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async updateStage(id: string, stage: string): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads/${id}/stage`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage }),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async update(id: string, patch: Partial<CreateHumanLeadInput & { siteVisitDate: string; siteVisitTime: string }>): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async assign(id: string, agentId: string | null): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads/${id}/assign`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId }),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async teamAgents(): Promise<{ id: string; name: string; role: string }[]> {
+    const response = await fetch(`${API_URL}/human-leads/team-agents`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ agents: { id: string; name: string; role: string }[] }>(response);
+    return data.agents;
   },
 };
 
