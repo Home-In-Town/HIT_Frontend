@@ -1221,6 +1221,109 @@ export const chatApi = {
 };
 
 /* ----------------------------------
+   AI Lead Matching (conversational slot-filling chat)
+-----------------------------------*/
+
+export type LeadChatInputType =
+  | 'choice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results';
+
+export interface LeadChatOption {
+  value: string;
+  label: { en: string; hi: string };
+}
+
+export interface LeadChatTemplate {
+  slotId?: string;
+  inputType?: LeadChatInputType;
+  // choice options, unit list, summary values, or results match cards
+  options?: any;
+  unit?: string[];
+  prefill?: string;
+  progress?: { current: number; total: number };
+}
+
+export interface LeadChatMessage {
+  _id: string;
+  session: string;
+  sender: string | { _id: string; name?: string; role?: string };
+  content: string;
+  messageType: 'text' | 'system' | 'image' | 'file';
+  template?: LeadChatTemplate;
+  createdAt: string;
+}
+
+export interface LeadFlowState {
+  intent: 'sell' | 'buy' | 'rent' | null;
+  slots: Record<string, any>;
+  currentSlotId: string | null;
+  editingSlotId?: string | null;
+  status: 'in_progress' | 'awaiting_confirmation' | 'completed';
+}
+
+export interface LeadChatOpenResponse {
+  sessionId: string;
+  isNew: boolean;
+  flowState: LeadFlowState;
+  messages: LeadChatMessage[];
+}
+
+export interface LeadChatAnswerResponse {
+  valid: boolean;
+  hint?: string;
+  message: LeadChatMessage;
+  flowState: LeadFlowState;
+}
+
+export interface LeadChatConfirmResponse {
+  leadId: string;
+  matchCount: number;
+  resultsMessage: LeadChatMessage;
+  loopBackMessage: LeadChatMessage;
+  flowState: LeadFlowState;
+}
+
+export const leadChatApi = {
+  async open(): Promise<LeadChatOpenResponse> {
+    const response = await fetch(`${API_URL}/lead-chat/open`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<LeadChatOpenResponse>(response);
+  },
+
+  async answer(data: { sessionId: string; slotId: string; value: any }): Promise<LeadChatAnswerResponse> {
+    const response = await fetch(`${API_URL}/lead-chat/answer`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<LeadChatAnswerResponse>(response);
+  },
+
+  async edit(data: { sessionId: string; slotId: string }): Promise<{ message: LeadChatMessage; flowState: LeadFlowState }> {
+    const response = await fetch(`${API_URL}/lead-chat/edit`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify(data),
+    });
+    return handleResponse<{ message: LeadChatMessage; flowState: LeadFlowState }>(response);
+  },
+
+  async confirm(sessionId: string): Promise<LeadChatConfirmResponse> {
+    const response = await fetch(`${API_URL}/lead-chat/confirm`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ sessionId }),
+    });
+    return handleResponse<LeadChatConfirmResponse>(response);
+  },
+};
+
+/* ----------------------------------
    Builders Network API (FOMO Chat)
 -----------------------------------*/
 

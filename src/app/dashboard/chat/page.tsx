@@ -6,6 +6,9 @@ import { chatApi, ChatSession, ChatMessage as ChatMsg, buildersNetworkApi, Build
 import { useSocket } from '@/hooks/useSocket';
 import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import dynamic from 'next/dynamic';
+
+const AiAssistantChat = dynamic(() => import('../lead-matching/AiAssistantChat'), { ssr: false });
 
 export default function ChatPage() {
   return (
@@ -33,12 +36,27 @@ function ChatContent() {
 
 function BuilderNetworkView() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [builders, setBuilders] = useState<BuilderNetworkItem[]>([]);
   const [pulse, setPulse] = useState<PlatformPulse | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBuilder, setSelectedBuilder] = useState<BuilderNetworkItem | null>(null);
+  const [showAssistant, setShowAssistant] = useState(false);
   const searchTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+
+  // Auto-open the AI Assistant when arriving from the "AI Lead Matching" entry.
+  useEffect(() => {
+    if (searchParams.get('assistant') === '1') {
+      setShowAssistant(true);
+    }
+  }, [searchParams]);
+
+  const openAssistant = () => {
+    setSelectedBuilder(null);
+    setShowAssistant(true);
+  };
+  const closeAssistant = () => setShowAssistant(false);
 
   const fetchBuilders = useCallback(async (search?: string) => {
     try {
@@ -118,7 +136,7 @@ function BuilderNetworkView() {
   return (
     <div className="h-[100dvh] lg:h-screen flex bg-[#FAF7F2] -mt-16 lg:mt-0">
       {/* Left Panel — Builder List */}
-      <div className={`w-full sm:w-[420px] flex flex-col bg-white border-r border-[#E7E5E4] ${selectedBuilder ? 'hidden sm:flex' : 'flex'}`}>
+      <div className={`w-full sm:w-[420px] flex flex-col bg-white border-r border-[#E7E5E4] ${selectedBuilder || showAssistant ? 'hidden sm:flex' : 'flex'}`}>
         {/* Header */}
         <div className="px-3 py-2.5 sm:px-4 sm:py-3 bg-[#075E54]">
           <div className="flex items-center justify-between">
@@ -187,6 +205,26 @@ function BuilderNetworkView() {
 
         {/* Builder List */}
         <div className="flex-1 overflow-y-auto">
+          {/* Pinned: AI Assistant (AI Lead Matching) */}
+          <div
+            onClick={openAssistant}
+            className={`relative flex items-center gap-3 px-3 sm:px-4 py-3 cursor-pointer transition-colors border-b border-[#E7E5E4] overflow-hidden ${showAssistant ? 'bg-[#075E54]/5' : 'bg-gradient-to-r from-[#075E54]/[0.06] to-transparent hover:from-[#075E54]/10'}`}
+          >
+            <span className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#25D366] to-[#075E54]" />
+            <div className="relative flex-shrink-0">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-white text-2xl shadow-sm ring-2 ring-white">🤖</div>
+              <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-[15px] font-bold text-[#0B2B1E] truncate">HIT Assistant</h3>
+                <svg className="w-4 h-4 text-[#075E54] flex-shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+                <span className="ml-auto px-2 py-0.5 rounded-full bg-[#B45309] text-white text-[9px] font-bold uppercase tracking-wide shadow-sm flex-shrink-0">AI</span>
+              </div>
+              <p className="text-[12.5px] text-[#57534E] mt-0.5 truncate">Bechna / Kharidna / Rent — tap to start</p>
+            </div>
+          </div>
+
           {loading ? (
             <div className="flex items-center justify-center h-32">
               <div className="w-6 h-6 border-2 border-[#B45309] border-t-transparent rounded-full animate-spin" />
@@ -268,9 +306,11 @@ function BuilderNetworkView() {
         </div>
       </div>
 
-      {/* Right Panel — Builder Profile Card / Empty State */}
-      <div className={`flex-1 flex flex-col ${selectedBuilder ? 'flex' : 'hidden sm:flex'}`}>
-        {selectedBuilder ? (
+      {/* Right Panel — AI Assistant / Builder Profile Card / Empty State */}
+      <div className={`flex-1 flex flex-col ${selectedBuilder || showAssistant ? 'flex' : 'hidden sm:flex'}`}>
+        {showAssistant ? (
+          <AiAssistantChat onBack={closeAssistant} />
+        ) : selectedBuilder ? (
           <BuilderProfilePanel
             builder={selectedBuilder}
             onBack={() => setSelectedBuilder(null)}

@@ -17,8 +17,9 @@ const ChatPage = dynamic(() => import('../chat/page'), { ssr: false });
 const GroupChatPage = dynamic(() => import('../group-chat/page'), { ssr: false });
 const LeadsTab = dynamic(() => import('../group-chat/LeadsTab'), { ssr: false });
 const StatsTab = dynamic(() => import('../group-chat/StatsTab'), { ssr: false });
+const AiAssistantChat = dynamic(() => import('./AiAssistantChat'), { ssr: false });
 
-type HubTab = 'chats' | 'groups' | 'leads';
+type HubTab = 'chats' | 'groups' | 'leads' | 'assistant';
 
 export default function LeadMatchingHubPage() {
   return (
@@ -42,7 +43,7 @@ function LeadMatchingHubContent() {
   // Read tab from URL params on mount
   useEffect(() => {
     const tab = searchParams.get('tab');
-    if (tab === 'chats' || tab === 'groups' || tab === 'leads') {
+    if (tab === 'chats' || tab === 'groups' || tab === 'leads' || tab === 'assistant') {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -100,6 +101,11 @@ function LeadMatchingHubContent() {
         {activeTab === 'groups' && (
           <div className="absolute inset-0 overflow-hidden flex flex-col [&>*]:!h-full [&>*]:!mt-0 [&>*]:!max-h-full [&>*]:!min-h-0 [&>*>*]:!h-full [&>*>*]:!mt-0 [&>*>*]:!max-h-full">
             <GroupChatPage />
+          </div>
+        )}
+        {activeTab === 'assistant' && (
+          <div className="absolute inset-0 overflow-hidden">
+            <AiAssistantChat />
           </div>
         )}
         {activeTab === 'leads' && isAdmin && (
