@@ -361,7 +361,7 @@ const orgPath = user
               </Link>
 
               <Link
-                href="/dashboard/lead-matching"
+                href="/dashboard/lead-matching?tab=chats&assistant=1"
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
                   isActive('/dashboard/lead-matching')

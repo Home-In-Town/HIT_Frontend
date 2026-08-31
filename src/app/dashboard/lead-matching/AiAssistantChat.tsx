@@ -1,0 +1,576 @@
+'use client';
+
+/**
+ * AiAssistantChat
+ *
+ * The AI Lead Matching conversational UI (Approach A — deterministic slot
+ * filling). Renders the persistent AI Assistant thread as a polished chat:
+ *   - assistant questions (left bubbles) with tappable answer templates
+ *   - user answers (right bubbles)
+ *   - a Summary Card with per-value edit + confirm
+ *   - inline match results and a loop-back "start new" prompt
+ *
+ * All conversation logic lives on the backend; this component only renders the
+ * latest question's template and posts answers.
+ */
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  leadChatApi,
+  LeadChatMessage,
+  LeadFlowState,
+  LeadChatOption,
+} from '@/lib/api';
+import toast from 'react-hot-toast';
+
+const ASSISTANT_TYPING_MS = 650;
+
+// Icons for property-type / intent options so choices feel tangible.
+const OPTION_ICONS: Record<string, string> = {
+  sell: '🏷️', buy: '🔍', rent: '🔑',
+  flat: '🏢', plot: '🌱', villa: '🏡', shop: '🏪', office: '🏬',
+  '1BHK': '🛏️', '2BHK': '🛏️', '3BHK': '🛏️', '4BHK+': '🛏️',
+  ready: '✅', under_construction: '🚧',
+  normal: '🙂', urgent: '⚡', very_urgent: '🔥',
+};
+
+export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}) {
+  const [messages, setMessages] = useState<LeadChatMessage[]>([]);
+  const [, setFlowState] = useState<LeadFlowState | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [typing, setTyping] = useState(false);
+  const sessionIdRef = useRef<string | null>(null);
+  const endRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ─── Load / resume the assistant thread ────────────────────────────────
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await leadChatApi.open();
+        sessionIdRef.current = data.sessionId;
+        setMessages(data.messages || []);
+        setFlowState(data.flowState);
+      } catch (err: unknown) {
+        toast.error(errMsg(err, 'Failed to open assistant'));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  // Smooth auto-scroll to newest.
+  useEffect(() => {
+    const t = setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 60);
+    return () => clearTimeout(t);
+  }, [messages, typing]);
+
+  const lastAssistant = [...messages].reverse().find(m => m.messageType === 'system' && m.template);
+  const activeTemplate = lastAssistant?.template;
+  const progress = activeTemplate?.progress;
+  const progressPct = progress && progress.total ? Math.round((progress.current / progress.total) * 100) : 0;
+
+  const revealWithTyping = useCallback((appendMsgs: LeadChatMessage[]) => {
+    setTyping(true);
+    setTimeout(() => {
+      setMessages(prev => [...prev, ...appendMsgs]);
+      setTyping(false);
+    }, ASSISTANT_TYPING_MS);
+  }, []);
+
+  const submit = useCallback(async (slotId: string, value: unknown, displayText: string) => {
+    if (!sessionIdRef.current || sending) return;
+    setSending(true);
+    const optimistic: LeadChatMessage = {
+      _id: `tmp-${Date.now()}`,
+      session: sessionIdRef.current,
+      sender: 'me',
+      content: displayText,
+      messageType: 'text',
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, optimistic]);
+    try {
+      const res = await leadChatApi.answer({ sessionId: sessionIdRef.current, slotId, value });
+      setFlowState(res.flowState);
+      revealWithTyping([res.message]);
+    } catch (err: unknown) {
+      setMessages(prev => prev.filter(m => m._id !== optimistic._id));
+      toast.error(errMsg(err, 'Could not submit answer'));
+    } finally {
+      setSending(false);
+    }
+  }, [sending, revealWithTyping]);
+
+  const edit = useCallback(async (slotId: string) => {
+    if (!sessionIdRef.current) return;
+    try {
+      const res = await leadChatApi.edit({ sessionId: sessionIdRef.current, slotId });
+      setFlowState(res.flowState);
+      revealWithTyping([res.message]);
+    } catch (err: unknown) {
+      toast.error(errMsg(err, 'Could not edit'));
+    }
+  }, [revealWithTyping]);
+
+  const confirm = useCallback(async () => {
+    if (!sessionIdRef.current || sending) return;
+    setSending(true);
+    try {
+      const res = await leadChatApi.confirm(sessionIdRef.current);
+      setFlowState(res.flowState);
+      revealWithTyping([res.resultsMessage, res.loopBackMessage]);
+    } catch (err: unknown) {
+      toast.error(errMsg(err, 'Could not confirm'));
+    } finally {
+      setSending(false);
+    }
+  }, [sending, revealWithTyping]);
+
+  if (loading) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-[#0B141A]">
+        <div className="relative">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0E7C66] to-[#075E54] flex items-center justify-center text-2xl shadow-lg animate-pulse">🤖</div>
+        </div>
+        <p className="mt-4 text-sm text-white/50">Assistant load ho raha hai…</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col relative overflow-hidden bg-[#ECE5DD]">
+      {/* Scoped styles / animations */}
+      <style>{styles}</style>
+
+      {/* ─── Header ─── */}
+      <div className="relative z-10 bg-gradient-to-r from-[#075E54] to-[#0A7360] shadow-md">
+        <div className="px-3 py-2.5 sm:px-4 sm:py-3 flex items-center gap-3">
+          {onBack ? (
+            <button onClick={onBack} className="p-1.5 -ml-1 hover:bg-white/10 rounded-full transition-colors active:scale-90" title="Back">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+          ) : (
+            <a href="/dashboard" className="p-1.5 -ml-1 hover:bg-white/10 rounded-full transition-colors sm:hidden">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+            </a>
+          )}
+          <div className="relative flex-shrink-0">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-xl shadow-inner ring-2 ring-white/20">🤖</div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#25D366] rounded-full border-2 border-[#075E54]" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <h1 className="text-[15px] font-bold text-white leading-tight">HIT Assistant</h1>
+              <svg className="w-4 h-4 text-[#7DD3FC]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" /></svg>
+            </div>
+            <p className="text-[11px] text-white/70">{typing ? 'typing…' : 'online • Lead Matching'}</p>
+          </div>
+          <div className="hidden sm:flex flex-shrink-0 w-9 h-9 rounded-full bg-white/10 items-center justify-center">
+            <svg className="text-white/80" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {progress && progress.total > 1 && (
+          <div className="px-4 pb-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-white/60 uppercase tracking-wider">Step {progress.current} of {progress.total}</span>
+              <span className="text-[10px] font-bold text-[#7DD3FC]">{progressPct}%</span>
+            </div>
+            <div className="h-1.5 bg-white/15 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-[#25D366] to-[#7DD3FC] rounded-full transition-all duration-500 ease-out" style={{ width: `${progressPct}%` }} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ─── Messages ─── */}
+      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3.5 sm:px-6 sm:py-4 space-y-2.5">
+        {messages.map((msg, idx) => {
+          const isSystem = msg.messageType === 'system';
+          const isMe = !isSystem;
+
+          if (isSystem && msg.template?.inputType === 'summary') {
+            return <SummaryBubble key={msg._id} msg={msg} onEdit={edit} onConfirm={confirm} sending={sending} />;
+          }
+          if (isSystem && msg.template?.inputType === 'results') {
+            return <ResultsBubble key={msg._id} msg={msg} />;
+          }
+
+          // Group consecutive assistant messages (hide avatar on follow-ups).
+          const prev = messages[idx - 1];
+          const showAvatar = isSystem && (!prev || prev.messageType !== 'system' || (prev.template && ['summary', 'results'].includes(prev.template.inputType || '')));
+
+          return (
+            <div key={msg._id} className={`flex items-end gap-2 ai-msg-in ${isMe ? 'justify-end' : 'justify-start'}`}>
+              {isSystem && (
+                <div className={`flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm shadow-sm ${showAvatar ? '' : 'opacity-0'}`}>🤖</div>
+              )}
+              <div className={`group max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 shadow-sm relative ${isMe
+                ? 'bg-gradient-to-br from-[#DCF8C6] to-[#D1F4C0] text-[#0B2B1E] rounded-2xl rounded-br-md'
+                : 'bg-white text-[#111B21] rounded-2xl rounded-bl-md'}`}>
+                <p className="text-[14px] sm:text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                <span className="block text-[10px] text-[#667781] text-right mt-0.5 select-none">
+                  {formatTime(msg.createdAt)}
+                  {isMe && <span className="ml-1 text-[#53BDEB]">✓✓</span>}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+
+        {typing && (
+          <div className="flex items-end gap-2 justify-start ai-msg-in">
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm">🤖</div>
+            <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
+              <div className="flex gap-1.5 items-center">
+                <span className="w-2 h-2 bg-gray-400 rounded-full ai-dot" style={{ animationDelay: '0ms' }} />
+                <span className="w-2 h-2 bg-gray-400 rounded-full ai-dot" style={{ animationDelay: '160ms' }} />
+                <span className="w-2 h-2 bg-gray-400 rounded-full ai-dot" style={{ animationDelay: '320ms' }} />
+              </div>
+            </div>
+          </div>
+        )}
+        <div ref={endRef} className="h-2" />
+      </div>
+
+      {/* ─── Active answer template ─── */}
+      {!typing && activeTemplate && activeTemplate.inputType &&
+        !['summary', 'results'].includes(activeTemplate.inputType) && (
+          <div className="relative z-10 ai-input-in">
+            <AnswerTemplate template={activeTemplate} disabled={sending} onSubmit={submit} />
+          </div>
+        )}
+    </div>
+  );
+}
+
+function formatTime(ts: string) {
+  try {
+    return new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
+function errMsg(err: unknown, fallback: string) {
+  return err instanceof Error ? err.message : fallback;
+}
+
+// ═══════════════════════════════════════════════════════════
+// ANSWER TEMPLATE
+// ═══════════════════════════════════════════════════════════
+
+function AnswerTemplate({
+  template,
+  disabled,
+  onSubmit,
+}: {
+  template: NonNullable<LeadChatMessage['template']>;
+  disabled: boolean;
+  onSubmit: (slotId: string, value: unknown, displayText: string) => void;
+}) {
+  const slotId = template.slotId || '';
+
+  if (template.inputType === 'choice') {
+    const options: LeadChatOption[] = Array.isArray(template.options) ? template.options : [];
+    // Big option cards for the intent step, compact chips for the rest.
+    const isIntent = slotId === 'intent';
+    return (
+      <div className="px-2.5 sm:px-6 py-3 sm:py-3.5 bg-white/85 backdrop-blur-md border-t border-black/5">
+        <div className={isIntent ? 'grid grid-cols-1 gap-2' : 'flex flex-wrap gap-2'}>
+          {options.map((opt, i) => {
+            const label = opt.label.hi || opt.label.en;
+            const icon = OPTION_ICONS[opt.value];
+            if (isIntent) {
+              return (
+                <button
+                  key={opt.value}
+                  disabled={disabled}
+                  onClick={() => onSubmit(slotId, opt.value, label)}
+                  style={{ animationDelay: `${i * 60}ms` }}
+                  className="ai-opt-in flex items-center gap-3 w-full px-3.5 py-3 sm:py-3.5 rounded-2xl border border-[#075E54]/20 bg-white text-left shadow-sm hover:border-[#075E54] hover:shadow-md hover:-translate-y-0.5 active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  <span className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#075E54]/8 flex items-center justify-center text-xl sm:text-2xl flex-shrink-0">{icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[15px] font-semibold text-[#0B2B1E] truncate">{label}</p>
+                    <p className="text-[11px] text-[#57534E] truncate">{opt.label.en}</p>
+                  </div>
+                  <svg className="w-5 h-5 text-[#075E54]/40 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </button>
+              );
+            }
+            return (
+              <button
+                key={opt.value}
+                disabled={disabled}
+                onClick={() => onSubmit(slotId, opt.value, label)}
+                style={{ animationDelay: `${i * 45}ms` }}
+                className="ai-opt-in inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full border border-[#075E54]/25 text-[#075E54] text-[13.5px] font-semibold bg-white shadow-sm hover:bg-[#075E54] hover:text-white hover:shadow-md active:scale-95 transition-all disabled:opacity-50"
+              >
+                {icon && <span className="text-base">{icon}</span>}
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (template.inputType === 'number') {
+    return <NumberInput slotId={slotId} units={template.unit || []} disabled={disabled} onSubmit={onSubmit} />;
+  }
+  if (template.inputType === 'phone') {
+    return <PhoneInput slotId={slotId} prefill={template.prefill} disabled={disabled} onSubmit={onSubmit} />;
+  }
+  return <TextInput slotId={slotId} inputType={template.inputType} disabled={disabled} onSubmit={onSubmit} />;
+}
+
+function InputShell({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-2.5 sm:px-6 py-3 sm:py-3.5 bg-white/85 backdrop-blur-md border-t border-black/5">
+      {children}
+    </div>
+  );
+}
+
+function SendButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled} className="w-11 h-11 flex-shrink-0 bg-gradient-to-br from-[#0A7360] to-[#075E54] text-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg active:scale-90 transition-all disabled:opacity-40 disabled:shadow-none">
+      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+    </button>
+  );
+}
+
+function NumberInput({ slotId, units, disabled, onSubmit }: {
+  slotId: string; units: string[]; disabled: boolean;
+  onSubmit: (slotId: string, value: unknown, displayText: string) => void;
+}) {
+  const [val, setVal] = useState('');
+  const [unit, setUnit] = useState(units[0] || '');
+  const send = () => {
+    if (!val.trim()) return;
+    const value = units.length ? { value: val.trim(), unit } : val.trim();
+    const display = units.length ? `${val.trim()} ${unit}` : val.trim();
+    onSubmit(slotId, value, display);
+    setVal('');
+  };
+  return (
+    <InputShell>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center bg-white rounded-full border border-black/10 shadow-sm px-4 focus-within:ring-2 focus-within:ring-[#075E54]/30 transition-all">
+          <input
+            type="number" inputMode="decimal" autoFocus
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder="Enter amount"
+            className="flex-1 py-2.5 text-[15px] bg-transparent focus:outline-none placeholder:text-gray-400"
+          />
+          {units.length > 0 && (
+            <div className="flex gap-1 ml-2">
+              {units.map((u) => (
+                <button key={u} onClick={() => setUnit(u)} className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${unit === u ? 'bg-[#075E54] text-white shadow-sm' : 'bg-gray-100 text-[#57534E]'}`}>
+                  {u}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <SendButton onClick={send} disabled={disabled || !val.trim()} />
+      </div>
+    </InputShell>
+  );
+}
+
+function PhoneInput({ slotId, prefill, disabled, onSubmit }: {
+  slotId: string; prefill?: string; disabled: boolean;
+  onSubmit: (slotId: string, value: unknown, displayText: string) => void;
+}) {
+  const [val, setVal] = useState(prefill || '');
+  const send = () => { if (val.trim()) onSubmit(slotId, val.trim(), val.trim()); };
+  return (
+    <InputShell>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center bg-white rounded-full border border-black/10 shadow-sm px-4 focus-within:ring-2 focus-within:ring-[#075E54]/30 transition-all">
+          <span className="text-[15px] text-[#57534E] font-medium mr-1">+91</span>
+          <input
+            type="tel" inputMode="numeric" maxLength={10} autoFocus
+            value={val}
+            onChange={(e) => setVal(e.target.value.replace(/\D/g, ''))}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder="10-digit mobile"
+            className="flex-1 py-2.5 text-[15px] bg-transparent focus:outline-none placeholder:text-gray-400 tracking-wide"
+          />
+        </div>
+        <SendButton onClick={send} disabled={disabled || val.trim().length < 10} />
+      </div>
+      {prefill && <p className="mt-1.5 ml-4 text-[11px] text-[#57534E]">Aapke profile ka number bhara hai — badal sakte hain.</p>}
+    </InputShell>
+  );
+}
+
+function TextInput({ slotId, inputType, disabled, onSubmit }: {
+  slotId: string; inputType?: string; disabled: boolean;
+  onSubmit: (slotId: string, value: unknown, displayText: string) => void;
+}) {
+  const [val, setVal] = useState('');
+  const isLocation = inputType === 'location';
+  const send = () => { if (val.trim()) { onSubmit(slotId, val.trim(), val.trim()); setVal(''); } };
+  return (
+    <InputShell>
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex items-center bg-white rounded-full border border-black/10 shadow-sm px-4 focus-within:ring-2 focus-within:ring-[#075E54]/30 transition-all">
+          {isLocation && (
+            <svg className="w-4.5 h-4.5 text-[#075E54] mr-2 flex-shrink-0" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          )}
+          <input
+            type="text" autoFocus
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && send()}
+            placeholder={isLocation ? 'e.g. Manish Nagar' : 'Type your answer'}
+            className="flex-1 py-2.5 text-[15px] bg-transparent focus:outline-none placeholder:text-gray-400"
+          />
+        </div>
+        <SendButton onClick={send} disabled={disabled || !val.trim()} />
+      </div>
+    </InputShell>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// SUMMARY BUBBLE
+// ═══════════════════════════════════════════════════════════
+
+function SummaryBubble({ msg, onEdit, onConfirm, sending }: {
+  msg: LeadChatMessage;
+  onEdit: (slotId: string) => void;
+  onConfirm: () => void;
+  sending: boolean;
+}) {
+  const values: { slotId: string; label: string; display: string }[] = msg.template?.options?.values || [];
+  return (
+    <div className="flex items-end gap-2 justify-start ai-msg-in">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm">🤖</div>
+      <div className="max-w-[88%] w-full sm:max-w-[400px] bg-white rounded-2xl rounded-bl-md shadow-lg overflow-hidden">
+        <div className="px-4 py-3 bg-gradient-to-r from-[#075E54] to-[#0A7360] flex items-center gap-2">
+          <svg className="w-5 h-5 text-[#7DD3FC]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div>
+            <p className="text-white text-[14px] font-bold leading-tight">Confirm your details</p>
+            <p className="text-white/60 text-[10px]">Review karke matches paayein</p>
+          </div>
+        </div>
+        <div className="divide-y divide-black/5">
+          {values.map((v) => (
+            <div key={v.slotId} className="flex items-center justify-between px-4 py-2.5 hover:bg-[#FAF7F2] transition-colors">
+              <div className="min-w-0">
+                <p className="text-[10px] text-[#57534E] uppercase tracking-wide">{v.label}</p>
+                <p className="text-[14px] font-semibold text-[#0B2B1E] truncate">{v.display}</p>
+              </div>
+              <button onClick={() => onEdit(v.slotId)} className="ml-3 flex-shrink-0 flex items-center gap-1 text-[#B45309] text-[12px] font-semibold px-2.5 py-1 rounded-full hover:bg-[#B45309]/10 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Edit
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="p-3">
+          <button
+            onClick={onConfirm}
+            disabled={sending}
+            className="w-full py-3 bg-gradient-to-r from-[#B45309] to-[#92400E] text-white font-bold rounded-xl shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2"
+          >
+            {sending ? (
+              <><span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Finding matches…</>
+            ) : (
+              <>Confirm &amp; Find Matches
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" /></svg>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// RESULTS BUBBLE
+// ═══════════════════════════════════════════════════════════
+
+function ResultsBubble({ msg }: { msg: LeadChatMessage }) {
+  const matches: { projectId: string; projectName: string; city?: string; location?: string; score: number; slug?: string }[] =
+    msg.template?.options?.matches || [];
+  const hasMatches = matches.length > 0;
+  return (
+    <div className="flex items-end gap-2 justify-start ai-msg-in">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm">🤖</div>
+      <div className="max-w-[88%] w-full sm:max-w-[400px] space-y-2">
+        <div className={`rounded-2xl rounded-bl-md px-4 py-3 shadow-sm ${hasMatches ? 'bg-gradient-to-br from-emerald-50 to-white border border-emerald-100' : 'bg-white'}`}>
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{hasMatches ? '🎯' : '⏳'}</span>
+            <p className="text-[14px] font-semibold text-[#0B2B1E]">{msg.content}</p>
+          </div>
+        </div>
+        {matches.map((m, i) => (
+          <div key={m.projectId} style={{ animationDelay: `${i * 80}ms` }} className="ai-opt-in bg-white rounded-2xl p-3 shadow-sm border border-black/5 flex items-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#B45309]/10 to-[#B45309]/5 flex items-center justify-center flex-shrink-0">
+              <svg className="w-6 h-6 text-[#B45309]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m-5 0v-4a1 1 0 011-1h2a1 1 0 011 1v4m-4 0h4" /></svg>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[14px] font-bold text-[#0B2B1E] truncate">{m.projectName || 'Project'}</p>
+              <p className="text-[11px] text-[#57534E] truncate">📍 {[m.location, m.city].filter(Boolean).join(', ') || '—'}</p>
+            </div>
+            <ScoreRing score={m.score} />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ScoreRing({ score }: { score: number }) {
+  const clamped = Math.max(0, Math.min(100, score));
+  const color = clamped >= 75 ? '#059669' : clamped >= 50 ? '#B45309' : '#78716C';
+  return (
+    <div className="relative w-11 h-11 flex-shrink-0">
+      <svg className="w-11 h-11 -rotate-90" viewBox="0 0 44 44">
+        <circle cx="22" cy="22" r="18" fill="none" stroke="#F1F1F0" strokeWidth="4" />
+        <circle cx="22" cy="22" r="18" fill="none" stroke={color} strokeWidth="4" strokeLinecap="round"
+          strokeDasharray={`${(clamped / 100) * 113} 113`} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold" style={{ color }}>{clamped}%</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// Scoped CSS
+// ═══════════════════════════════════════════════════════════
+
+const styles = `
+@keyframes aiMsgIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.ai-msg-in { animation: aiMsgIn 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes aiOptIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ai-opt-in { animation: aiOptIn 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+@keyframes aiInputIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ai-input-in { animation: aiInputIn 0.3s ease-out both; }
+@keyframes aiDot {
+  0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-5px); opacity: 1; }
+}
+.ai-dot { animation: aiDot 1.2s infinite ease-in-out; }
+`;
