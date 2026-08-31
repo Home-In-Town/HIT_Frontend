@@ -1225,7 +1225,7 @@ export const chatApi = {
 -----------------------------------*/
 
 export type LeadChatInputType =
-  | 'choice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results';
+  | 'choice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results' | 'actions';
 
 export interface LeadChatOption {
   value: string;
@@ -1278,7 +1278,8 @@ export interface LeadChatConfirmResponse {
   leadId: string;
   matchCount: number;
   resultsMessage: LeadChatMessage;
-  loopBackMessage: LeadChatMessage;
+  closingMessage: LeadChatMessage;
+  actionsMessage: LeadChatMessage;
   flowState: LeadFlowState;
 }
 
@@ -1320,6 +1321,16 @@ export const leadChatApi = {
       body: JSON.stringify({ sessionId }),
     });
     return handleResponse<LeadChatConfirmResponse>(response);
+  },
+
+  async newLead(sessionId: string): Promise<{ message: LeadChatMessage; flowState: LeadFlowState }> {
+    const response = await fetch(`${API_URL}/lead-chat/new`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ sessionId }),
+    });
+    return handleResponse<{ message: LeadChatMessage; flowState: LeadFlowState }>(response);
   },
 };
 
