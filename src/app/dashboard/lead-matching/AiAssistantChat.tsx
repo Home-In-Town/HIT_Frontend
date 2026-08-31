@@ -120,9 +120,24 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
     try {
       const res = await leadChatApi.confirm(sessionIdRef.current);
       setFlowState(res.flowState);
-      revealWithTyping([res.resultsMessage, res.loopBackMessage]);
+      revealWithTyping([res.resultsMessage, res.closingMessage, res.actionsMessage]);
     } catch (err: unknown) {
       toast.error(errMsg(err, 'Could not confirm'));
+    } finally {
+      setSending(false);
+    }
+  }, [sending, revealWithTyping]);
+
+  // Start a fresh lead on demand (from the closing "New requirement" action).
+  const startNewLead = useCallback(async () => {
+    if (!sessionIdRef.current || sending) return;
+    setSending(true);
+    try {
+      const res = await leadChatApi.newLead(sessionIdRef.current);
+      setFlowState(res.flowState);
+      revealWithTyping([res.message]);
+    } catch (err: unknown) {
+      toast.error(errMsg(err, 'Could not start a new requirement'));
     } finally {
       setSending(false);
     }
@@ -198,10 +213,13 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
           if (isSystem && msg.template?.inputType === 'results') {
             return <ResultsBubble key={msg._id} msg={msg} />;
           }
+          if (isSystem && msg.template?.inputType === 'actions') {
+            return <ActionsBubble key={msg._id} msg={msg} onNewLead={startNewLead} disabled={sending} />;
+          }
 
           // Group consecutive assistant messages (hide avatar on follow-ups).
           const prev = messages[idx - 1];
-          const showAvatar = isSystem && (!prev || prev.messageType !== 'system' || (prev.template && ['summary', 'results'].includes(prev.template.inputType || '')));
+          const showAvatar = isSystem && (!prev || prev.messageType !== 'system' || (prev.template && ['summary', 'results', 'actions'].includes(prev.template.inputType || '')));
 
           return (
             <div key={msg._id} className={`flex items-end gap-2 ai-msg-in ${isMe ? 'justify-end' : 'justify-start'}`}>
@@ -238,7 +256,7 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
 
       {/* ─── Active answer template ─── */}
       {!typing && activeTemplate && activeTemplate.inputType &&
-        !['summary', 'results'].includes(activeTemplate.inputType) && (
+        !['summary', 'results', 'actions'].includes(activeTemplate.inputType) && (
           <div className="relative z-10 ai-input-in">
             <AnswerTemplate template={activeTemplate} disabled={sending} onSubmit={submit} />
           </div>
@@ -544,6 +562,58 @@ function ScoreRing({ score }: { score: number }) {
           strokeDasharray={`${(clamped / 100) * 113} 113`} />
       </svg>
       <span className="absolute inset-0 flex items-center justify-center text-[11px] font-bold" style={{ color }}>{clamped}%</span>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════
+// ACTIONS BUBBLE — closing quick-action tray (not a forced question)
+// ═══════════════════════════════════════════════════════════
+
+function ActionsBubble({ msg, onNewLead, disabled }: {
+  msg: LeadChatMessage;
+  onNewLead: () => void;
+  disabled: boolean;
+}) {
+  const actions: { action: string; label: { en: string; hi: string }; icon?: string }[] =
+    msg.template?.options?.actions || [];
+
+  const handle = (action: string) => {
+    if (action === 'new_lead') onNewLead();
+    else if (action === 'view_leads') window.location.assign('/dashboard/lead-matching?tab=leads');
+  };
+
+  const iconFor = (icon?: string) => {
+    if (icon === 'plus') return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>;
+    if (icon === 'list') return <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>;
+    return null;
+  };
+
+  return (
+    <div className="flex items-end gap-2 justify-start ai-msg-in">
+      <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm">🤖</div>
+      <div className="max-w-[88%] w-full sm:max-w-[400px] bg-white rounded-2xl rounded-bl-md shadow-sm p-3">
+        {msg.content && <p className="text-[13.5px] text-[#57534E] mb-2.5 px-1">{msg.content}</p>}
+        <div className="flex flex-wrap gap-2">
+          {actions.map((a, i) => {
+            const primary = a.action === 'new_lead';
+            return (
+              <button
+                key={a.action}
+                disabled={disabled}
+                onClick={() => handle(a.action)}
+                style={{ animationDelay: `${i * 60}ms` }}
+                className={`ai-opt-in inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13.5px] font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-50 ${primary
+                  ? 'bg-gradient-to-br from-[#0A7360] to-[#075E54] text-white hover:shadow-md'
+                  : 'bg-white border border-[#075E54]/25 text-[#075E54] hover:bg-[#075E54]/5'}`}
+              >
+                {iconFor(a.icon)}
+                {a.label.hi || a.label.en}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
