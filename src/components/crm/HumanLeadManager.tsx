@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import LeadDetailView from './LeadDetailView';
+import CaptainTeamPanel from './CaptainTeamPanel';
 import { projectsApi, humanLeadsApi, HumanLead } from '@/lib/api';
 import { useAuth } from '@/lib/authContext';
 
@@ -107,8 +108,14 @@ export default function HumanLeadManager() {
   const [filterStage, setFilterStage] = useState<string>('All');
   const [saving, setSaving] = useState(false);
 
-  // Team agents available for assignment (captain/admin only)
+  // Team agents available for assignment (captain only) — includes partner captains
   const [teamAgents, setTeamAgents] = useState<{ id: string; name: string; role: string }[]>([]);
+  // Captain team-up panel
+  const [showTeamPanel, setShowTeamPanel] = useState(false);
+
+  const loadTeamAgents = useCallback(() => {
+    humanLeadsApi.teamAgents().then(setTeamAgents).catch(() => {});
+  }, []);
 
   // Load leads from the backend (team-scoped by role)
   const loadLeads = useCallback(async () => {
@@ -134,8 +141,8 @@ export default function HumanLeadManager() {
   // Load team agents for the assign dropdown
   useEffect(() => {
     if (!canAssign) return;
-    humanLeadsApi.teamAgents().then(setTeamAgents).catch(() => {});
-  }, [canAssign]);
+    loadTeamAgents();
+  }, [canAssign, loadTeamAgents]);
 
   // Site visit scheduling modal
   const [schedulingLead, setSchedulingLead] = useState<DemoLead | null>(null);
@@ -300,6 +307,14 @@ export default function HumanLeadManager() {
             <p className="text-xs text-[#A8A29E] mt-0.5">{filteredLeads.length} total leads</p>
           </div>
           <div className="flex items-center gap-2">
+            {user?.role === 'captain' && (
+              <button onClick={() => setShowTeamPanel(true)} className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#E7E5E4] text-[10px] font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] transition-all">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4-4 4 4 0 004 4zm6 0a4 4 0 00-3-3.87" />
+                </svg>
+                Captain Team
+              </button>
+            )}
             <a href="https://sales.homeintown.in" target="_blank" rel="noopener noreferrer" className="px-2.5 py-1.5 rounded-lg border border-[#E7E5E4] text-[10px] font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] transition-all">
               Advanced
             </a>
@@ -666,6 +681,14 @@ export default function HumanLeadManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Captain team-up panel */}
+      {showTeamPanel && (
+        <CaptainTeamPanel
+          onClose={() => setShowTeamPanel(false)}
+          onChanged={() => { loadTeamAgents(); loadLeads(); }}
+        />
       )}
     </div>
   );

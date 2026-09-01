@@ -1,12 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { authApi, employeeApi, mediaApi } from '@/lib/api';
 import { useAuth } from '@/lib/authContext';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
-import { Phone, Lock, User, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Phone, Lock, User, Mail, ArrowRight, ShieldCheck, Gift } from 'lucide-react';
+
+const REFERRAL_STORAGE_KEY = 'hit_referral_code';
 
 type Screen = 'login' | 'register' | 'forgot-phone' | 'otp' | 'reset-mpin';
 
@@ -22,6 +24,7 @@ export default function AuthScreens() {
     const [confirmMpin, setConfirmMpin] = useState('');
     const [otpCode, setOtpCode] = useState('');
     const [role, setRole] = useState<'user' | 'employee' | 'captain'>('user');
+    const [referralCode, setReferralCode] = useState('');
     
     // Flow tracking
     const [isResetFlow, setIsResetFlow] = useState(false);
@@ -38,6 +41,23 @@ export default function AuthScreens() {
 
     const { checkAuth } = useAuth();
     const router = useRouter();
+
+    // ─── Pick up a referral code from the /join link (?ref=) or sessionStorage ───
+    useEffect(() => {
+        let code = '';
+        try {
+            const params = new URLSearchParams(window.location.search);
+            code = (params.get('ref') || '').trim();
+            if (!code) code = (sessionStorage.getItem(REFERRAL_STORAGE_KEY) || '').trim();
+            else sessionStorage.setItem(REFERRAL_STORAGE_KEY, code);
+        } catch {
+            // ignore — no referral context available
+        }
+        if (code) {
+            setReferralCode(code.toUpperCase());
+            setScreen('register'); // land the referred user straight on sign up
+        }
+    }, []);
 
     // ─── Helper: Format phone with +91 ───
     const formatPhone = (p: string) => p.startsWith('+') ? p : `+91${p}`;
@@ -158,6 +178,7 @@ export default function AuthScreens() {
               mpin,
               email,
               role,
+              ...(referralCode.trim() && { referralCode: referralCode.trim().toUpperCase() }),
               ...(role === 'captain' && {
                 companyName: companyName.trim(),
                 businessAddress: businessAddress.trim() || undefined,
@@ -167,6 +188,9 @@ export default function AuthScreens() {
                 businessLogoUrl: businessLogoUrl || undefined,
               }),
             });
+
+            // Referral has been submitted with the account — clear the stashed code
+            try { sessionStorage.removeItem(REFERRAL_STORAGE_KEY); } catch { /* noop */ }
 
             // DEV BYPASS: if server auto-verified, skip OTP screen
             if ((regResult as any).bypassed) {
@@ -435,6 +459,18 @@ export default function AuthScreens() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-12 pr-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                            />
+                        </div>
+
+                        {/* Referral Code (Optional) — pre-filled from a referral link */}
+                        <div className="relative">
+                            <Gift className="absolute left-4 top-1/2 -translate-y-1/2 text-[#A8A29E] w-5 h-5" />
+                            <input
+                                type="text"
+                                placeholder="Referral Code (Optional)"
+                                value={referralCode}
+                                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                                className="w-full bg-[#FAF7F2] border border-[#E7E5E4] rounded-2xl py-3.5 pl-12 pr-4 text-[#2A2A2A] focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all uppercase tracking-wide"
                             />
                         </div>
 
