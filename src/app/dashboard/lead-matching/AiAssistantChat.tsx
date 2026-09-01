@@ -277,6 +277,27 @@ function errMsg(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
 }
 
+// Sentinel matching the backend's SKIP_VALUE — tells the engine an optional
+// slot was intentionally skipped (so it isn't re-asked).
+const SKIP_VALUE = '__skipped__';
+
+// A small "Skip" button shown for optional (skippable) slots.
+function SkipButton({ slotId, disabled, onSubmit }: {
+  slotId: string; disabled: boolean;
+  onSubmit: (slotId: string, value: unknown, displayText: string) => void;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => onSubmit(slotId, SKIP_VALUE, 'Skipped')}
+      className="mt-2.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#78716C] hover:text-[#57534E] disabled:opacity-50"
+    >
+      Skip this
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+    </button>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════
 // ANSWER TEMPLATE
 // ═══════════════════════════════════════════════════════════
@@ -291,6 +312,12 @@ function AnswerTemplate({
   onSubmit: (slotId: string, value: unknown, displayText: string) => void;
 }) {
   const slotId = template.slotId || '';
+  const skippable = !!template.skippable;
+
+  // Multi-select (e.g. amenities) — accumulate then submit.
+  if (template.inputType === 'multichoice') {
+    return <MultiChoiceInput template={template} disabled={disabled} onSubmit={onSubmit} />;
+  }
 
   if (template.inputType === 'choice') {
     const options: LeadChatOption[] = Array.isArray(template.options) ? template.options : [];
@@ -334,17 +361,70 @@ function AnswerTemplate({
             );
           })}
         </div>
+        {skippable && <SkipButton slotId={slotId} disabled={disabled} onSubmit={onSubmit} />}
       </div>
     );
   }
 
   if (template.inputType === 'number') {
-    return <NumberInput slotId={slotId} units={template.unit || []} disabled={disabled} onSubmit={onSubmit} />;
+    return <NumberInput slotId={slotId} units={template.unit || []} skippable={skippable} disabled={disabled} onSubmit={onSubmit} />;
   }
   if (template.inputType === 'phone') {
     return <PhoneInput slotId={slotId} prefill={template.prefill} disabled={disabled} onSubmit={onSubmit} />;
   }
-  return <TextInput slotId={slotId} inputType={template.inputType} disabled={disabled} onSubmit={onSubmit} />;
+  return <TextInput slotId={slotId} inputType={template.inputType} skippable={skippable} disabled={disabled} onSubmit={onSubmit} />;
+}
+
+// ── Multi-select (amenities): tap several, then Add / Skip ──
+function MultiChoiceInput({ template, disabled, onSubmit }: {
+  template: NonNullable<LeadChatMessage['template']>;
+  disabled: boolean;
+  onSubmit: (slotId: string, value: unknown, displayText: string) => void;
+}) {
+  const slotId = template.slotId || '';
+  const options: LeadChatOption[] = Array.isArray(template.options) ? template.options : [];
+  const [selected, setSelected] = useState<string[]>([]);
+
+  const toggle = (v: string) =>
+    setSelected((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
+
+  const submit = () => {
+    if (selected.length === 0) return;
+    onSubmit(slotId, selected, selected.join(', '));
+  };
+
+  return (
+    <div className="px-2.5 sm:px-6 py-3 sm:py-3.5 bg-white/85 backdrop-blur-md border-t border-black/5">
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const on = selected.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              disabled={disabled}
+              onClick={() => toggle(opt.value)}
+              className={`inline-flex items-center gap-1 px-3.5 py-2 rounded-full text-[13px] font-semibold border transition-all active:scale-95 disabled:opacity-50 ${on
+                ? 'bg-[#075E54] text-white border-[#075E54]'
+                : 'bg-white text-[#075E54] border-[#075E54]/25 hover:bg-[#075E54]/5'}`}
+            >
+              {on && <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>}
+              {opt.label.en}
+            </button>
+          );
+        })}
+      </div>
+      <div className="flex items-center gap-3 mt-3">
+        <button
+          disabled={disabled || selected.length === 0}
+          onClick={submit}
+          className="px-5 py-2 rounded-full bg-gradient-to-br from-[#0A7360] to-[#075E54] text-white text-[13.5px] font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-40"
+        >
+          Add {selected.length > 0 ? `(${selected.length})` : ''}
+        </button>
+        {template.skippable && <SkipButton slotId={slotId} disabled={disabled} onSubmit={onSubmit} />}
+      </div>
+    </div>
+  );
 }
 
 function InputShell({ children }: { children: React.ReactNode }) {
@@ -363,8 +443,8 @@ function SendButton({ onClick, disabled }: { onClick: () => void; disabled: bool
   );
 }
 
-function NumberInput({ slotId, units, disabled, onSubmit }: {
-  slotId: string; units: string[]; disabled: boolean;
+function NumberInput({ slotId, units, skippable, disabled, onSubmit }: {
+  slotId: string; units: string[]; skippable?: boolean; disabled: boolean;
   onSubmit: (slotId: string, value: unknown, displayText: string) => void;
 }) {
   const [val, setVal] = useState('');
@@ -400,6 +480,7 @@ function NumberInput({ slotId, units, disabled, onSubmit }: {
         </div>
         <SendButton onClick={send} disabled={disabled || !val.trim()} />
       </div>
+      {skippable && <SkipButton slotId={slotId} disabled={disabled} onSubmit={onSubmit} />}
     </InputShell>
   );
 }
@@ -431,8 +512,8 @@ function PhoneInput({ slotId, prefill, disabled, onSubmit }: {
   );
 }
 
-function TextInput({ slotId, inputType, disabled, onSubmit }: {
-  slotId: string; inputType?: string; disabled: boolean;
+function TextInput({ slotId, inputType, skippable, disabled, onSubmit }: {
+  slotId: string; inputType?: string; skippable?: boolean; disabled: boolean;
   onSubmit: (slotId: string, value: unknown, displayText: string) => void;
 }) {
   const [val, setVal] = useState('');
@@ -456,6 +537,7 @@ function TextInput({ slotId, inputType, disabled, onSubmit }: {
         </div>
         <SendButton onClick={send} disabled={disabled || !val.trim()} />
       </div>
+      {skippable && <SkipButton slotId={slotId} disabled={disabled} onSubmit={onSubmit} />}
     </InputShell>
   );
 }
@@ -470,7 +552,7 @@ function SummaryBubble({ msg, onEdit, onConfirm, sending }: {
   onConfirm: () => void;
   sending: boolean;
 }) {
-  const values: { slotId: string; label: string; display: string }[] = msg.template?.options?.values || [];
+  const values: { slotId: string; label: string; display: string; skipped?: boolean }[] = msg.template?.options?.values || [];
   return (
     <div className="flex items-end gap-2 justify-start ai-msg-in">
       <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm">🤖</div>
@@ -487,11 +569,11 @@ function SummaryBubble({ msg, onEdit, onConfirm, sending }: {
             <div key={v.slotId} className="flex items-center justify-between px-4 py-2.5 hover:bg-[#FAF7F2] transition-colors">
               <div className="min-w-0">
                 <p className="text-[10px] text-[#57534E] uppercase tracking-wide">{v.label}</p>
-                <p className="text-[14px] font-semibold text-[#0B2B1E] truncate">{v.display}</p>
+                <p className={`text-[14px] font-semibold truncate ${v.skipped ? 'text-[#A8A29E] italic font-normal' : 'text-[#0B2B1E]'}`}>{v.skipped ? 'Not provided' : v.display}</p>
               </div>
               <button onClick={() => onEdit(v.slotId)} className="ml-3 flex-shrink-0 flex items-center gap-1 text-[#B45309] text-[12px] font-semibold px-2.5 py-1 rounded-full hover:bg-[#B45309]/10 transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                Edit
+                {v.skipped ? 'Add' : 'Edit'}
               </button>
             </div>
           ))}

@@ -1225,7 +1225,7 @@ export const chatApi = {
 -----------------------------------*/
 
 export type LeadChatInputType =
-  | 'choice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results' | 'actions';
+  | 'choice' | 'multichoice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results' | 'actions';
 
 export interface LeadChatOption {
   value: string;
@@ -1239,6 +1239,7 @@ export interface LeadChatTemplate {
   options?: any;
   unit?: string[];
   prefill?: string;
+  skippable?: boolean;
   progress?: { current: number; total: number };
 }
 
