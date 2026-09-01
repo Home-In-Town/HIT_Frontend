@@ -855,6 +855,7 @@ export const authApi = {
     mpin: string;
     email?: string;
     role?: string;
+    referralCode?: string;
     companyName?: string;
     businessAddress?: string;
     businessCity?: string;
@@ -2093,6 +2094,70 @@ export const humanLeadsApi = {
     });
     const data = await handleResponse<{ agents: { id: string; name: string; role: string }[] }>(response);
     return data.agents;
+  },
+};
+
+/* ----------------------------------
+   Captain Team-up API — captains partnering with other captains
+-----------------------------------*/
+
+export type CaptainTeamStatus = 'none' | 'partner' | 'incoming' | 'outgoing';
+
+export interface CaptainPartner {
+  id: string;
+  name: string;
+  companyName?: string;
+  phone?: string;
+  businessCity?: string;
+  status?: CaptainTeamStatus; // present on the "find captains" list
+}
+
+export interface CaptainTeamState {
+  partners: CaptainPartner[];
+  incoming: CaptainPartner[];
+  outgoing: CaptainPartner[];
+}
+
+export const captainTeamApi = {
+  async getMyTeam(): Promise<CaptainTeamState> {
+    const response = await fetch(`${API_URL}/captain-team/me`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<CaptainTeamState>(response);
+  },
+
+  async listCaptains(search?: string): Promise<CaptainPartner[]> {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+    const response = await fetch(`${API_URL}/captain-team/captains${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ captains: CaptainPartner[] }>(response);
+    return data.captains;
+  },
+
+  async request(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('request', captainId);
+  },
+  async accept(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('accept', captainId);
+  },
+  async decline(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('decline', captainId);
+  },
+  async remove(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('remove', captainId);
+  },
+
+  async _post(action: string, captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    const response = await fetch(`${API_URL}/captain-team/${action}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ captainId }),
+    });
+    return handleResponse<{ status: CaptainTeamStatus; message: string }>(response);
   },
 };
 

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { referralsApi, ReferralInfo } from '@/lib/api';
+import { useAuth } from '@/lib/authContext';
 
 // A single lesson/chapter in the course
 interface Chapter {
@@ -13,8 +14,8 @@ interface Chapter {
   keyTakeaways: string[];
 }
 
-// The step-wise "book" — the playbook to get leads faster
-const CHAPTERS: Chapter[] = [
+// The step-wise "book" — the playbook to get leads faster (initial/default content)
+const DEFAULT_CHAPTERS: Chapter[] = [
   {
     id: 1,
     title: 'Foundation — Kaun sa lead chahiye',
@@ -127,6 +128,9 @@ type UnlockMethod = 'pay' | 'refer';
 const PRICE = 25000;
 
 export default function LeadCourse() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [info, setInfo] = useState<ReferralInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -134,7 +138,16 @@ export default function LeadCourse() {
   const [copied, setCopied] = useState(false);
   const [openChapter, setOpenChapter] = useState<number | null>(1);
 
+  // Editable course content (admin can edit; changes held in state)
+  const [chapters, setChapters] = useState<Chapter[]>(DEFAULT_CHAPTERS);
+  const [isEditing, setIsEditing] = useState(false);
+
   const load = useCallback(async () => {
+    // Admins get free access — no need to fetch referral state.
+    if (isAdmin) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setLoadError(null);
     try {
@@ -147,13 +160,60 @@ export default function LeadCourse() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => { load(); }, [load]);
 
-  const unlocked = !!info?.courseUnlocked;
+  // Admins get the course for free (always unlocked); others need referral/payment.
+  const unlocked = isAdmin || !!info?.courseUnlocked;
   const REFERRAL_GOAL = info?.goal ?? 10;
   const referralCount = info?.count ?? 0;
+
+  // ── Editing helpers (admin) ──
+  const updateChapterField = (id: number, field: 'title' | 'subtitle' | 'readTime', value: string) => {
+    setChapters(prev => prev.map(c => (c.id === id ? { ...c, [field]: value } : c)));
+  };
+  const updateSection = (chId: number, idx: number, field: 'heading' | 'body', value: string) => {
+    setChapters(prev => prev.map(c => c.id === chId
+      ? { ...c, sections: c.sections.map((s, i) => (i === idx ? { ...s, [field]: value } : s)) }
+      : c));
+  };
+  const addSection = (chId: number) => {
+    setChapters(prev => prev.map(c => c.id === chId
+      ? { ...c, sections: [...c.sections, { heading: 'New section', body: '' }] }
+      : c));
+  };
+  const removeSection = (chId: number, idx: number) => {
+    setChapters(prev => prev.map(c => c.id === chId
+      ? { ...c, sections: c.sections.filter((_, i) => i !== idx) }
+      : c));
+  };
+  const updateTakeaway = (chId: number, idx: number, value: string) => {
+    setChapters(prev => prev.map(c => c.id === chId
+      ? { ...c, keyTakeaways: c.keyTakeaways.map((t, i) => (i === idx ? value : t)) }
+      : c));
+  };
+  const addTakeaway = (chId: number) => {
+    setChapters(prev => prev.map(c => c.id === chId
+      ? { ...c, keyTakeaways: [...c.keyTakeaways, 'New takeaway'] }
+      : c));
+  };
+  const removeTakeaway = (chId: number, idx: number) => {
+    setChapters(prev => prev.map(c => c.id === chId
+      ? { ...c, keyTakeaways: c.keyTakeaways.filter((_, i) => i !== idx) }
+      : c));
+  };
+  const addChapter = () => {
+    setChapters(prev => {
+      const nextId = prev.length ? Math.max(...prev.map(c => c.id)) + 1 : 1;
+      const next: Chapter = { id: nextId, title: 'New Chapter', subtitle: 'Add a subtitle', readTime: '5 min', sections: [{ heading: 'Section', body: '' }], keyTakeaways: ['Key takeaway'] };
+      return [...prev, next];
+    });
+  };
+  const removeChapter = (id: number) => {
+    setChapters(prev => prev.filter(c => c.id !== id));
+    if (openChapter === id) setOpenChapter(null);
+  };
 
   const handleCopyLink = async () => {
     if (!info?.referralLink) return;
@@ -214,7 +274,7 @@ export default function LeadCourse() {
               Unlock the full book-style course below.
             </p>
             <div className="flex flex-wrap gap-3 sm:gap-4 mt-4 sm:mt-5 text-[11px] sm:text-xs text-white/60">
-              <span className="flex items-center gap-1.5"><Dot /> {CHAPTERS.length} chapters</span>
+              <span className="flex items-center gap-1.5"><Dot /> {chapters.length} chapters</span>
               <span className="flex items-center gap-1.5"><Dot /> Step-by-step</span>
               <span className="flex items-center gap-1.5"><Dot /> Scripts & templates</span>
             </div>
@@ -338,44 +398,92 @@ export default function LeadCourse() {
     <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden">
       {/* Book header */}
       <div className="flex items-center gap-3 p-5 border-b border-[#E7E5E4] bg-gradient-to-r from-[#B45309]/5 to-transparent">
-        <div className="w-11 h-11 rounded-xl bg-[#B45309] flex items-center justify-center shadow-sm">
+        <div className="w-11 h-11 rounded-xl bg-[#B45309] flex items-center justify-center shadow-sm shrink-0">
           <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="text-lg font-bold text-[#2A2A2A] font-serif">Get Leads Faster — The Playbook</h3>
-          <p className="text-xs text-[#A8A29E]">Read step by step. {CHAPTERS.length} chapters · unlocked</p>
+          <p className="text-xs text-[#A8A29E]">
+            Read step by step. {chapters.length} chapters
+            {isAdmin ? ' · admin access' : ' · unlocked'}
+          </p>
         </div>
+        {isAdmin && (
+          <button
+            onClick={() => setIsEditing(v => !v)}
+            className={`shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditing ? 'bg-[#B45309] text-white shadow-sm' : 'border border-[#E7E5E4] text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309]'}`}
+          >
+            {isEditing ? 'Done' : 'Edit'}
+          </button>
+        )}
       </div>
 
       {/* Table of contents + chapters */}
       <div className="p-5 space-y-3">
-        {CHAPTERS.map((ch) => {
+        {chapters.map((ch, chIndex) => {
           const isOpen = openChapter === ch.id;
           return (
             <div key={ch.id} className={`rounded-xl border transition-all ${isOpen ? 'border-[#B45309]/30 bg-[#FAF7F2]' : 'border-[#E7E5E4] bg-white'}`}>
               {/* Chapter header */}
-              <button
-                onClick={() => setOpenChapter(isOpen ? null : ch.id)}
-                className="w-full flex items-center gap-3 p-4 text-left"
-              >
-                <div className="w-8 h-8 rounded-full bg-[#B45309] text-white flex items-center justify-center text-sm font-bold shrink-0">{ch.id}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-[#2A2A2A]">{ch.title}</p>
-                  <p className="text-xs text-[#A8A29E] truncate">{ch.subtitle}</p>
-                </div>
-                <span className="text-[10px] font-bold text-[#A8A29E] shrink-0">{ch.readTime}</span>
-                <svg className={`w-4 h-4 text-[#A8A29E] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-              </button>
+              <div className="w-full flex items-center gap-3 p-4">
+                <div className="w-8 h-8 rounded-full bg-[#B45309] text-white flex items-center justify-center text-sm font-bold shrink-0">{chIndex + 1}</div>
+                <button onClick={() => setOpenChapter(isOpen ? null : ch.id)} className="flex-1 min-w-0 text-left">
+                  {isEditing ? (
+                    <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                      <input value={ch.title} onChange={(e) => updateChapterField(ch.id, 'title', e.target.value)} className="w-full text-sm font-bold text-[#2A2A2A] bg-white border border-[#E7E5E4] rounded-md px-2 py-1 focus:outline-none focus:border-[#B45309]/40" />
+                      <input value={ch.subtitle} onChange={(e) => updateChapterField(ch.id, 'subtitle', e.target.value)} className="w-full text-xs text-[#57534E] bg-white border border-[#E7E5E4] rounded-md px-2 py-1 focus:outline-none focus:border-[#B45309]/40" />
+                    </div>
+                  ) : (
+                    <>
+                      <p className="text-sm font-bold text-[#2A2A2A]">{ch.title}</p>
+                      <p className="text-xs text-[#A8A29E] truncate">{ch.subtitle}</p>
+                    </>
+                  )}
+                </button>
+                {isEditing ? (
+                  <input value={ch.readTime} onChange={(e) => updateChapterField(ch.id, 'readTime', e.target.value)} className="w-16 text-[10px] font-bold text-[#57534E] bg-white border border-[#E7E5E4] rounded-md px-1.5 py-1 shrink-0 focus:outline-none focus:border-[#B45309]/40" />
+                ) : (
+                  <span className="text-[10px] font-bold text-[#A8A29E] shrink-0">{ch.readTime}</span>
+                )}
+                {isEditing && (
+                  <button onClick={() => removeChapter(ch.id)} className="p-1 text-red-500 hover:text-red-600 shrink-0" title="Delete chapter">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  </button>
+                )}
+                <button onClick={() => setOpenChapter(isOpen ? null : ch.id)} className="shrink-0">
+                  <svg className={`w-4 h-4 text-[#A8A29E] transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+              </div>
 
               {/* Chapter body */}
               {isOpen && (
                 <div className="px-4 pb-4 space-y-4 border-t border-[#E7E5E4] pt-4">
                   {ch.sections.map((sec, i) => (
                     <div key={i}>
-                      <p className="text-sm font-bold text-[#2A2A2A] mb-1">{sec.heading}</p>
-                      <p className="text-sm text-[#57534E] leading-relaxed">{sec.body}</p>
+                      {isEditing ? (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <input value={sec.heading} onChange={(e) => updateSection(ch.id, i, 'heading', e.target.value)} className="flex-1 text-sm font-bold text-[#2A2A2A] bg-white border border-[#E7E5E4] rounded-md px-2 py-1 focus:outline-none focus:border-[#B45309]/40" />
+                            <button onClick={() => removeSection(ch.id, i)} className="p-1 text-red-500 hover:text-red-600" title="Remove section">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                          </div>
+                          <textarea value={sec.body} onChange={(e) => updateSection(ch.id, i, 'body', e.target.value)} rows={3} className="w-full text-sm text-[#57534E] bg-white border border-[#E7E5E4] rounded-md px-2 py-1.5 resize-none focus:outline-none focus:border-[#B45309]/40" />
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-sm font-bold text-[#2A2A2A] mb-1">{sec.heading}</p>
+                          <p className="text-sm text-[#57534E] leading-relaxed whitespace-pre-line">{sec.body}</p>
+                        </>
+                      )}
                     </div>
                   ))}
+
+                  {isEditing && (
+                    <button onClick={() => addSection(ch.id)} className="w-full py-2 rounded-lg border-2 border-dashed border-[#B45309]/30 text-[#B45309] text-xs font-bold hover:border-[#B45309] hover:bg-[#B45309]/5 transition-all">
+                      + Add section
+                    </button>
+                  )}
 
                   {/* Key takeaways */}
                   <div className="rounded-lg bg-white border border-[#E7E5E4] p-3">
@@ -384,34 +492,56 @@ export default function LeadCourse() {
                       {ch.keyTakeaways.map((t, i) => (
                         <li key={i} className="flex items-start gap-2 text-xs text-[#2A2A2A]">
                           <svg className="w-3.5 h-3.5 text-[#B45309] mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                          {t}
+                          {isEditing ? (
+                            <span className="flex-1 flex items-center gap-2">
+                              <input value={t} onChange={(e) => updateTakeaway(ch.id, i, e.target.value)} className="flex-1 bg-white border border-[#E7E5E4] rounded-md px-2 py-1 focus:outline-none focus:border-[#B45309]/40" />
+                              <button onClick={() => removeTakeaway(ch.id, i)} className="text-red-500 hover:text-red-600" title="Remove">
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </span>
+                          ) : (
+                            <span>{t}</span>
+                          )}
                         </li>
                       ))}
                     </ul>
+                    {isEditing && (
+                      <button onClick={() => addTakeaway(ch.id)} className="mt-2 text-[10px] font-bold text-[#B45309] hover:underline">+ Add takeaway</button>
+                    )}
                   </div>
 
-                  {/* Chapter nav */}
-                  <div className="flex justify-between pt-1">
-                    <button
-                      onClick={() => setOpenChapter(ch.id > 1 ? ch.id - 1 : ch.id)}
-                      disabled={ch.id === 1}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-[#57534E] border border-[#E7E5E4] disabled:opacity-40 hover:border-[#B45309]/40 hover:text-[#B45309] transition-all"
-                    >
-                      ← Previous
-                    </button>
-                    <button
-                      onClick={() => setOpenChapter(ch.id < CHAPTERS.length ? ch.id + 1 : ch.id)}
-                      disabled={ch.id === CHAPTERS.length}
-                      className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#B45309] disabled:opacity-40 hover:bg-[#92400E] transition-all"
-                    >
-                      Next chapter →
-                    </button>
-                  </div>
+                  {/* Chapter nav (hidden while editing) */}
+                  {!isEditing && (
+                    <div className="flex justify-between pt-1">
+                      <button
+                        onClick={() => setOpenChapter(chIndex > 0 ? chapters[chIndex - 1].id : ch.id)}
+                        disabled={chIndex === 0}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-[#57534E] border border-[#E7E5E4] disabled:opacity-40 hover:border-[#B45309]/40 hover:text-[#B45309] transition-all"
+                      >
+                        ← Previous
+                      </button>
+                      <button
+                        onClick={() => setOpenChapter(chIndex < chapters.length - 1 ? chapters[chIndex + 1].id : ch.id)}
+                        disabled={chIndex === chapters.length - 1}
+                        className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-[#B45309] disabled:opacity-40 hover:bg-[#92400E] transition-all"
+                      >
+                        Next chapter →
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           );
         })}
+
+        {/* Add chapter (admin, editing) */}
+        {isEditing && (
+          <button onClick={addChapter} className="w-full flex items-center justify-center gap-2 p-3 rounded-xl border-2 border-dashed border-[#B45309]/30 text-[#B45309] text-xs font-bold hover:border-[#B45309] hover:bg-[#B45309]/5 transition-all">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            Add chapter
+          </button>
+        )}
       </div>
     </div>
   );
