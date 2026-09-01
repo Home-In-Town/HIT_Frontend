@@ -163,3 +163,88 @@ button[disabled] {
 }
 
 
+
+
+/* ============================================================
+   MOBILE TOUCH & SMOOTHNESS
+   Fixes janky taps and scroll on touch devices:
+   - remove the grey/blue tap flash on Android/iOS
+   - momentum (inertial) scrolling
+   - stop rubber-band scroll chaining to parents
+   - snappier tap response (no 300ms delay)
+   - respect users who prefer reduced motion
+   ============================================================ */
+
+/* Kill the native tap highlight everywhere; we render our own
+   active states via :active / active:scale utilities. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* Prevent the browser from scaling text on orientation change. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  /* Momentum scrolling + no accidental horizontal drift on mobile. */
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+}
+
+/* Interactive elements: remove the tap flash, keep selection off for
+   controls, and hint the browser to optimise touch handling. */
+a,
+button,
+[role="button"],
+label,
+summary,
+input[type="button"],
+input[type="submit"],
+input[type="reset"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  touch-action: manipulation; /* removes the 300ms click delay */
+  user-select: none;
+}
+
+/* Any scrollable pane should scroll smoothly and not chain its
+   overscroll to the page behind it (common cause of janky chat/list). */
+.touch-scroll,
+.overflow-y-auto,
+.overflow-auto {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Give tappable controls a GPU layer so :active transforms stay smooth
+   and don't repaint the whole element on press. */
+button,
+[role="button"],
+.ai-opt-in {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Text inputs must remain selectable even though controls above aren't. */
+input,
+textarea,
+[contenteditable="true"] {
+  user-select: text;
+  -webkit-user-select: text;
+  touch-action: manipulation;
+}
+
+/* Honour reduced-motion: disable the decorative keyframe animations so
+   the UI feels instant for users who ask for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
