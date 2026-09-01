@@ -143,7 +143,6 @@ export default function LeadCourse() {
   const [method, setMethod] = useState<UnlockMethod | null>(null);
   const [copied, setCopied] = useState(false);
   const [openChapter, setOpenChapter] = useState<number | null>(1);
-  const [prebooked, setPrebooked] = useState(false);
 
   // Editable course content (admin can edit; changes held in state)
   const [chapters, setChapters] = useState<Chapter[]>(DEFAULT_CHAPTERS);
@@ -559,25 +558,14 @@ export default function LeadCourse() {
                 ))}
               </ul>
 
-              {prebooked ? (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ type: 'spring', bounce: 0.4, duration: 0.5 }}
-                  className="w-full py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-bold text-center"
-                >
-                  ✓ Seat prebooked! The course is launching soon — our team will reach out.
-                </motion.div>
-              ) : (
-                <motion.button
-                  onClick={() => { setMethod('pay'); setPrebooked(true); }}
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="w-full py-3 rounded-xl bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-bold shadow-sm transition-colors"
-                >
-                  Prebook for {inr(PREBOOK_PRICE)}
-                </motion.button>
-              )}
+              <motion.button
+                type="button"
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="w-full py-3 rounded-xl bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-bold shadow-sm transition-colors"
+              >
+                Prebook for {inr(PREBOOK_PRICE)}
+              </motion.button>
               <p className="text-[10px] text-[#A8A29E] mt-2 text-center">Course &amp; online payment launching soon — prebooking reserves your seat at the early-bird price.</p>
             </motion.div>
 
