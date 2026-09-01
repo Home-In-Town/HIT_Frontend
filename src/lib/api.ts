@@ -117,6 +117,11 @@ export function transformBackendToFrontend(backendProject: any): Project {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
     } : undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    coCaptains: Array.isArray(backendProject.coCaptains)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? backendProject.coCaptains.map((c: any) => ({ ...c, id: String(c.id || c._id || '') }))
+      : [],
     assignedAgent: backendProject.assignedAgent ? {
       ...backendProject.assignedAgent,
       id: String(backendProject.assignedAgent.id || backendProject.assignedAgent._id || ''),
@@ -325,6 +330,19 @@ export const projectsApi = {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ captainId }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
+
+  // Add or remove a co-captain (second captain) on a project
+  async assignCoCaptain(projectId: string, captainId: string, action: 'add' | 'remove' = 'add'): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/assign-co-captain`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ captainId, action }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any>(response);

@@ -108,6 +108,14 @@ export interface Project {
     companyName?: string;
     role: string;
   };
+  // Additional captains co-managing this project alongside the primary owner
+  coCaptains?: {
+    id: string;
+    _id: string;
+    name: string;
+    companyName?: string;
+    role: string;
+  }[];
   assignedAgent?: {
     id: string;
     _id: string;

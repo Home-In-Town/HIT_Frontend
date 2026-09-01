@@ -268,6 +268,16 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleAssignCoCaptain = async (projectId: string, captainId: string, captainName: string, action: 'add' | 'remove') => {
+    try {
+      const updatedProject = await projectsApi.assignCoCaptain(projectId, captainId, action);
+      setProjects((prev) => prev.map((p) => (p.id === projectId ? updatedProject : p)));
+      toast.success(action === 'add' ? `${captainName} added as co-captain` : `${captainName} removed as co-captain`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update co-captain');
+    }
+  };
+
   const handleAssignAgent = async (projectId: string, agentId: string | null, agentName: string | null) => {
     const project = projects.find(p => p.id === projectId);
     if (!project) return;
@@ -346,6 +356,7 @@ export default function ProjectsPage() {
                         onDelete={handleDeleteClick}
                         onCopyLink={copyLink}
                         onAssignCaptain={handleAssignCaptain}
+                        onAssignCoCaptain={handleAssignCoCaptain}
                         onAssignAgent={handleAssignAgent}
                     />
                 ) : (
