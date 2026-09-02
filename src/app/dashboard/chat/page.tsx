@@ -58,6 +58,15 @@ function BuilderNetworkView() {
   };
   const closeAssistant = () => setShowAssistant(false);
 
+  // Selecting a builder should take over the right panel even if the assistant
+  // is open. On desktop the builder list stays visible, so a click can switch
+  // panels directly (no need to hit "Back" first). On mobile the list is hidden
+  // while the assistant is full-screen, so this simply has no builder to click.
+  const selectBuilder = (builder: BuilderNetworkItem) => {
+    setShowAssistant(false);
+    setSelectedBuilder(builder);
+  };
+
   const fetchBuilders = useCallback(async (search?: string) => {
     try {
       setLoading(true);
@@ -243,7 +252,7 @@ function BuilderNetworkView() {
               return (
                 <div
                   key={builder._id}
-                  onClick={() => setSelectedBuilder(builder)}
+                  onClick={() => selectBuilder(builder)}
                   className={`flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer hover:bg-[#FAF7F2] active:bg-[#F0EDE8] transition-colors border-b border-[#E7E5E4]/50 ${selectedBuilder?._id === builder._id ? 'bg-[#FAF7F2]' : ''}`}
                 >
                   {/* Avatar */}
@@ -307,7 +316,7 @@ function BuilderNetworkView() {
       </div>
 
       {/* Right Panel — AI Assistant / Builder Profile Card / Empty State */}
-      <div className={`flex-1 flex flex-col ${selectedBuilder || showAssistant ? 'flex' : 'hidden sm:flex'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 overflow-x-hidden ${selectedBuilder || showAssistant ? 'flex' : 'hidden sm:flex'}`}>
         {showAssistant ? (
           <AiAssistantChat onBack={closeAssistant} />
         ) : selectedBuilder ? (
