@@ -563,6 +563,13 @@ function AdminChatView() {
     fetchSessions();
   }, [fetchSessions]);
 
+  // Auto-open the AI Assistant when arriving from the "AI Lead Matching" entry.
+  useEffect(() => {
+    if (searchParams.get('assistant') === '1') {
+      setShowAssistant(true);
+    }
+  }, [searchParams]);
+
   // Hide the layout's mobile header on this page (full-screen chat experience)
   useEffect(() => {
     const layoutHeader = document.querySelector('header.lg\\:hidden') as HTMLElement | null;
