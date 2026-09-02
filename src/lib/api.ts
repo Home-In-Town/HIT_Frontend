@@ -117,6 +117,11 @@ export function transformBackendToFrontend(backendProject: any): Project {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
     } : undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    coCaptains: Array.isArray(backendProject.coCaptains)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? backendProject.coCaptains.map((c: any) => ({ ...c, id: String(c.id || c._id || '') }))
+      : [],
     assignedAgent: backendProject.assignedAgent ? {
       ...backendProject.assignedAgent,
       id: String(backendProject.assignedAgent.id || backendProject.assignedAgent._id || ''),
@@ -325,6 +330,19 @@ export const projectsApi = {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ captainId }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
+
+  // Add or remove a co-captain (second captain) on a project
+  async assignCoCaptain(projectId: string, captainId: string, action: 'add' | 'remove' = 'add'): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/assign-co-captain`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ captainId, action }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any>(response);
@@ -855,6 +873,7 @@ export const authApi = {
     mpin: string;
     email?: string;
     role?: string;
+    referralCode?: string;
     companyName?: string;
     businessAddress?: string;
     businessCity?: string;
@@ -1854,6 +1873,22 @@ export const crmBridgeApi = {
     return handleResponse(response);
   },
 
+  // Connect by verifying the user's OneEmployee phone + PIN (most reliable path)
+  async manualConnect(phone: string, pin: string): Promise<{
+    linked: boolean;
+    manualLinked?: boolean;
+    oneEmployeeOwnerId?: string;
+    message?: string;
+  }> {
+    const response = await fetch(`${API_URL}/crm-bridge/manual-connect`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, pin }),
+    });
+    return handleResponse(response);
+  },
+
   async getRedirectBase(): Promise<string> {
     try {
       const response = await fetch(`${API_URL}/crm-bridge/redirect-base`, {
@@ -1930,6 +1965,219 @@ export const crmBridgeApi = {
       body: JSON.stringify({ phoneOrEmail }),
     });
     return handleResponse(response);
+  },
+};
+
+/* ----------------------------------
+   Referrals API — "Learn to Get Leads Faster" course unlock
+-----------------------------------*/
+
+export interface ReferralEntry {
+  id: string;
+  name: string;
+  phone: string;   // masked, e.g. "••••••1234"
+  role: string;
+  joined: boolean; // true once the referred user has verified/joined
+  joinedAt: string;
+}
+
+export interface ReferralInfo {
+  referralCode: string;
+  referralLink: string;
+  goal: number;
+  count: number;
+  remaining: number;
+  courseUnlocked: boolean;
+  referrals: ReferralEntry[];
+}
+
+export const referralsApi = {
+  async getMine(): Promise<ReferralInfo> {
+    const response = await fetch(`${API_URL}/referrals/me`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<ReferralInfo>(response);
+  },
+};
+
+/* ----------------------------------
+   Human Lead Manager API — team-scoped leads with ownership/assignment
+-----------------------------------*/
+
+export interface LeadPerson {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface HumanLead {
+  id: string;
+  name: string;
+  phone: string;
+  altPhone?: string;
+  email?: string;
+  budget?: string;
+  homeType?: string;
+  buyingType?: string;
+  location?: string;
+  project: string;
+  source: string;
+  leadType: 'inbound' | 'outbound';
+  stage: string;
+  siteVisitDate?: string;
+  siteVisitTime?: string;
+  date: string;
+  createdBy: LeadPerson | null;    // who brought the lead
+  owningCaptain: LeadPerson | null; // the team owner
+  assignedAgent: LeadPerson | null; // who it's assigned to
+}
+
+export interface CreateHumanLeadInput {
+  name: string;
+  phone: string;
+  altPhone?: string;
+  email?: string;
+  budget?: string;
+  homeType?: string;
+  buyingType?: string;
+  location?: string;
+  projectName?: string;
+  source?: string;
+  leadType?: 'inbound' | 'outbound';
+  stage?: string;
+  assignedAgent?: string | null;
+}
+
+export const humanLeadsApi = {
+  async list(params?: { stage?: string; search?: string }): Promise<HumanLead[]> {
+    const query = new URLSearchParams();
+    if (params?.stage) query.set('stage', params.stage);
+    if (params?.search) query.set('search', params.search);
+    const qs = query.toString() ? `?${query.toString()}` : '';
+    const response = await fetch(`${API_URL}/human-leads${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ leads: HumanLead[] }>(response);
+    return data.leads;
+  },
+
+  async create(input: CreateHumanLeadInput): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async updateStage(id: string, stage: string): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads/${id}/stage`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ stage }),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async update(id: string, patch: Partial<CreateHumanLeadInput & { siteVisitDate: string; siteVisitTime: string }>): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads/${id}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async assign(id: string, agentId: string | null): Promise<HumanLead> {
+    const response = await fetch(`${API_URL}/human-leads/${id}/assign`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId }),
+    });
+    const data = await handleResponse<{ lead: HumanLead }>(response);
+    return data.lead;
+  },
+
+  async teamAgents(): Promise<{ id: string; name: string; role: string }[]> {
+    const response = await fetch(`${API_URL}/human-leads/team-agents`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ agents: { id: string; name: string; role: string }[] }>(response);
+    return data.agents;
+  },
+};
+
+/* ----------------------------------
+   Captain Team-up API — captains partnering with other captains
+-----------------------------------*/
+
+export type CaptainTeamStatus = 'none' | 'partner' | 'incoming' | 'outgoing';
+
+export interface CaptainPartner {
+  id: string;
+  name: string;
+  companyName?: string;
+  phone?: string;
+  businessCity?: string;
+  status?: CaptainTeamStatus; // present on the "find captains" list
+}
+
+export interface CaptainTeamState {
+  partners: CaptainPartner[];
+  incoming: CaptainPartner[];
+  outgoing: CaptainPartner[];
+}
+
+export const captainTeamApi = {
+  async getMyTeam(): Promise<CaptainTeamState> {
+    const response = await fetch(`${API_URL}/captain-team/me`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<CaptainTeamState>(response);
+  },
+
+  async listCaptains(search?: string): Promise<CaptainPartner[]> {
+    const qs = search ? `?search=${encodeURIComponent(search)}` : '';
+    const response = await fetch(`${API_URL}/captain-team/captains${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ captains: CaptainPartner[] }>(response);
+    return data.captains;
+  },
+
+  async request(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('request', captainId);
+  },
+  async accept(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('accept', captainId);
+  },
+  async decline(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('decline', captainId);
+  },
+  async remove(captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    return this._post('remove', captainId);
+  },
+
+  async _post(action: string, captainId: string): Promise<{ status: CaptainTeamStatus; message: string }> {
+    const response = await fetch(`${API_URL}/captain-team/${action}`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ captainId }),
+    });
+    return handleResponse<{ status: CaptainTeamStatus; message: string }>(response);
   },
 };
 

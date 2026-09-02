@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { useAuth } from '@/lib/authContext';
+import AiGuideChat from './AiGuideChat';
 
 interface DemoLead {
   id: string;
@@ -11,6 +12,14 @@ interface DemoLead {
   stage: string;
   date: string;
   source: string;
+  leadType: 'inbound' | 'outbound';
+}
+
+// An attachment added to a journey step (photo, video or PDF)
+interface StepAsset {
+  type: 'image' | 'video' | 'pdf';
+  url: string;
+  name: string;
 }
 
 interface JourneyStage {
@@ -22,6 +31,14 @@ interface JourneyStage {
   nextStep: string;
   scriptMessage: string;
   photos: string[];
+  assets?: StepAsset[];
+}
+
+// A shareable project asset passed from the parent (project's uploaded media)
+interface ProjectAsset {
+  type: 'image' | 'video' | 'pdf';
+  url: string;
+  name: string;
 }
 
 interface Props {
@@ -30,6 +47,7 @@ interface Props {
   stages: string[];
   stageColor: (stage: string) => string;
   onStageChange?: (newStage: string) => void;
+  projectAssets?: ProjectAsset[];
 }
 
 type JourneyType = 'inbound' | 'outbound' | 'ai';
@@ -67,12 +85,18 @@ const AI_GUIDE_JOURNEY: JourneyStage[] = [
   { id: 'ai-8', name: 'Won', duration: '—', description: 'AI auto-triggers referral campaigns, review requests, cross-sell.', touchPlan: 'Day 1: AI congratulations + referral\nWeek 1: AI Google review\nMonth 1: AI cross-sell\nPossession: AI community invite', nextStep: 'AI tracks referrals. Auto-enroll loyalty.', scriptMessage: '[AI Post-Sale]\nCongratulations sent\nReferral link: [GENERATED]\nReview link: [GOOGLE]\nCommunity invite: [LINK]\n\nLifetime tracking: Active', photos: [] },
 ];
 
-export default function LeadDetailView({ lead, onBack, stages, stageColor, onStageChange }: Props) {
+export default function LeadDetailView({ lead, onBack, stages, stageColor, onStageChange, projectAssets = [] }: Props) {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  // Admin and captain can edit the sales journey playbook
+  const canEditJourney = user?.role === 'admin' || user?.role === 'captain';
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Which asset kind the current upload targets (image | video | pdf) + target stage
+  const uploadKindRef = useRef<'image' | 'video' | 'pdf'>('image');
+  // Stage whose "View Assets" modal is open (null = closed)
+  const [assetsModalStageId, setAssetsModalStageId] = useState<string | null>(null);
 
-  const [journeyType, setJourneyType] = useState<JourneyType>('inbound');
+  // Default the journey tab to match the lead's type (inbound/outbound). Falls back to inbound.
+  const [journeyType, setJourneyType] = useState<JourneyType>(lead.leadType === 'outbound' ? 'outbound' : 'inbound');
   const [journeyStages, setJourneyStages] = useState<Record<JourneyType, JourneyStage[]>>({
     inbound: INBOUND_JOURNEY,
     outbound: OUTBOUND_JOURNEY,
@@ -99,6 +123,10 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
   const currentStageIndex = stages.indexOf(lead.stage);
   const currentStep = currentStageIndex >= 0 ? currentStageIndex + 1 : 1;
 
+  // Only offer the journey tab that matches the lead's type (inbound or outbound), plus AI Guide.
+  const availableJourneyTypes: JourneyType[] =
+    lead.leadType === 'outbound' ? ['outbound', 'ai'] : ['inbound', 'ai'];
+
   const handleFieldEdit = (stageId: string, field: keyof JourneyStage, value: string) => {
     setJourneyStages(prev => ({
       ...prev,
@@ -118,16 +146,30 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
     if (expandedStage === stageId) setExpandedStage(null);
   };
 
-  const handlePhotoUpload = (stageId: string, files: FileList | null) => {
-    if (!files || !isAdmin) return;
+  // Kick off a file picker for a specific asset kind on a stage
+  const triggerUpload = (stageId: string, kind: 'image' | 'video' | 'pdf') => {
+    uploadKindRef.current = kind;
+    setUploadingStageId(stageId);
+    if (fileInputRef.current) {
+      fileInputRef.current.accept = kind === 'image' ? 'image/*' : kind === 'video' ? 'video/*' : 'application/pdf';
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  // Read picked files and append them as typed assets on the stage
+  const handleAssetUpload = (stageId: string, files: FileList | null) => {
+    if (!files || !canEditJourney) return;
+    const kind = uploadKindRef.current;
     Array.from(files).forEach(file => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
+        const asset: StepAsset = { type: kind, url: dataUrl, name: file.name };
         setJourneyStages(prev => ({
           ...prev,
           [journeyType]: prev[journeyType].map(s =>
-            s.id === stageId ? { ...s, photos: [...s.photos, dataUrl] } : s
+            s.id === stageId ? { ...s, assets: [...(s.assets || []), asset] } : s
           ),
         }));
       };
@@ -136,14 +178,39 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
     setUploadingStageId(null);
   };
 
-  const handleDeletePhoto = (stageId: string, photoIndex: number) => {
-    if (!isAdmin) return;
+  const handleDeleteAsset = (stageId: string, index: number) => {
+    if (!canEditJourney) return;
     setJourneyStages(prev => ({
       ...prev,
       [journeyType]: prev[journeyType].map(s =>
-        s.id === stageId ? { ...s, photos: s.photos.filter((_, i) => i !== photoIndex) } : s
+        s.id === stageId ? { ...s, assets: (s.assets || []).filter((_, i) => i !== index) } : s
       ),
     }));
+  };
+
+  // Download an asset (works for data URLs and remote URLs)
+  const downloadAsset = (asset: { url: string; name: string }) => {
+    const a = document.createElement('a');
+    a.href = asset.url;
+    a.download = asset.name || 'asset';
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Share an asset link to WhatsApp with a short caption
+  const shareAssetToWhatsApp = (asset: { url: string; name: string }) => {
+    // Only http(s) links can be shared via WhatsApp; local data URLs can't be sent as links
+    if (!/^https?:\/\//i.test(asset.url)) {
+      downloadAsset(asset);
+      return;
+    }
+    const phone = lead.phone.replace(/[^0-9]/g, '');
+    const text = encodeURIComponent(`${asset.name}\n${asset.url}`);
+    const base = phone ? `https://wa.me/${phone}?text=${text}` : `https://wa.me/?text=${text}`;
+    window.open(base, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -154,7 +221,7 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Client Dashboard
         </button>
-        {isAdmin && (
+        {canEditJourney && (
           <button onClick={() => setIsEditing(!isEditing)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${isEditing ? 'bg-[#B45309] text-white shadow-sm' : 'border border-[#E7E5E4] text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309]'}`}>
             {isEditing ? 'Done' : 'Edit'}
           </button>
@@ -173,6 +240,7 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
         <div className="flex flex-wrap gap-1.5 mt-3">
           <span className="px-2 py-0.5 rounded bg-[#292524] text-[10px] font-bold text-white border border-[#57534E]">{lead.project}</span>
           <span className="px-2 py-0.5 rounded bg-[#292524] text-[10px] font-bold text-white border border-[#57534E]">{lead.source}</span>
+          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase ${lead.leadType === 'inbound' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-violet-50 text-violet-700 border-violet-200'}`}>{lead.leadType}</span>
           <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${stageColor(lead.stage)}`}>{lead.stage}</span>
         </div>
       </div>
@@ -215,9 +283,9 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
           <span className="text-xs font-bold text-[#B45309]">Step {currentStep} / {currentStages.length}</span>
         </div>
 
-        {/* Journey type toggle */}
+        {/* Journey type toggle — only show the tab matching this lead's type, plus AI Guide */}
         <div className="flex gap-2 mb-4">
-          {(['inbound', 'outbound', 'ai'] as JourneyType[]).map(type => (
+          {availableJourneyTypes.map(type => (
             <button key={type} onClick={() => { setJourneyType(type); setExpandedStage(null); }} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${journeyType === type ? 'bg-[#1C1917] text-white shadow-sm' : 'bg-[#FAF7F2] text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40'}`}>
               {type === 'inbound' ? 'Inbound' : type === 'outbound' ? 'Outbound' : 'AI Guide'}
             </button>
@@ -227,10 +295,16 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
         <p className="text-xs text-[#A8A29E] mb-3 italic">
           {journeyType === 'inbound' && 'Inbound ka poora rasta lagbhag 23 din. Client ne khud enquiry ki hai.'}
           {journeyType === 'outbound' && 'Outbound rasta 30+ din. Cold leads — trust build karo pehle.'}
-          {journeyType === 'ai' && 'AI-assisted — fastest close ~15 din. AI handles repetitive, human handles relationship.'}
+          {journeyType === 'ai' && 'AI Sales Assistant — Ask any question about the current stage. Get instant guidance.'}
         </p>
 
-        {/* Stages */}
+        {/* AI Guide — Chat interface */}
+        {journeyType === 'ai' && (
+          <AiGuideChat currentStage={lead.stage} leadName={lead.name} projectName={lead.project} />
+        )}
+
+        {/* Stages — only for Inbound and Outbound */}
+        {journeyType !== 'ai' && (
         <div className="space-y-2">
           {currentStages.map((stage, idx) => {
             const isExpanded = expandedStage === stage.id;
@@ -260,40 +334,85 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
                     {/* Description */}
                     <div>{isEditing ? <textarea className="w-full text-sm text-[#57534E] bg-[#FAF7F2] border border-[#E7E5E4] rounded-lg p-2.5 focus:outline-none focus:border-[#B45309]/40 resize-none" rows={3} value={stage.description} onChange={(e) => handleFieldEdit(stage.id, 'description', e.target.value)} /> : <p className="text-sm text-[#57534E] leading-relaxed whitespace-pre-line">{stage.description}</p>}</div>
 
-                    {/* Photos section — visible to all, upload only for admin */}
-                    {(stage.photos.length > 0 || isAdmin) && (
+                    {/* View project assets — available to everyone */}
+                    <div className="flex items-center justify-between gap-2">
+                      <button
+                        onClick={() => setAssetsModalStageId(stage.id)}
+                        className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1C1917] text-white text-xs font-bold hover:bg-[#292524] transition-colors"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        View Assets
+                        {projectAssets.length > 0 && <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-white/20 text-[9px]">{projectAssets.length}</span>}
+                      </button>
+                    </div>
+
+                    {/* Step attachments — photos, videos & PDFs (upload for admin/captain) */}
+                    {((stage.assets && stage.assets.length > 0) || stage.photos.length > 0 || canEditJourney) && (
                       <div className="rounded-lg bg-[#FAF7F2] border border-[#E7E5E4] p-3">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-wider">Photos / References</p>
-                          {isAdmin && (
-                            <button
-                              onClick={() => { setUploadingStageId(stage.id); fileInputRef.current?.click(); }}
-                              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-[#E7E5E4] text-[10px] font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] transition-all"
-                            >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                              Upload
-                            </button>
+                          <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-wider">Attachments</p>
+                          {canEditJourney && (
+                            <div className="flex items-center gap-1.5">
+                              <button onClick={() => triggerUpload(stage.id, 'image')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-[#E7E5E4] text-[10px] font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] transition-all">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M6 4h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2z" /></svg>
+                                Photo
+                              </button>
+                              <button onClick={() => triggerUpload(stage.id, 'video')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-[#E7E5E4] text-[10px] font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] transition-all">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                Video
+                              </button>
+                              <button onClick={() => triggerUpload(stage.id, 'pdf')} className="flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-[#E7E5E4] text-[10px] font-bold text-[#57534E] hover:border-[#B45309]/40 hover:text-[#B45309] transition-all">
+                                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                PDF
+                              </button>
+                            </div>
                           )}
                         </div>
-                        {stage.photos.length > 0 ? (
-                          <div className="grid grid-cols-3 gap-2">
-                            {stage.photos.map((photo, pIdx) => (
-                              <div key={pIdx} className="relative group rounded-lg overflow-hidden border border-[#E7E5E4]">
-                                <img src={photo} alt={`Stage photo ${pIdx + 1}`} className="w-full h-20 object-cover" />
-                                {isAdmin && (
-                                  <button
-                                    onClick={() => handleDeletePhoto(stage.id, pIdx)}
-                                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                  >
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-[10px] text-[#A8A29E] italic">No photos added yet</p>
-                        )}
+
+                        {(() => {
+                          // Merge legacy photos (string[]) into the typed asset list for display
+                          const legacyPhotos: StepAsset[] = stage.photos.map((p, i) => ({ type: 'image', url: p, name: `Photo ${i + 1}` }));
+                          const allAssets: StepAsset[] = [...legacyPhotos, ...(stage.assets || [])];
+                          if (allAssets.length === 0) {
+                            return <p className="text-[10px] text-[#A8A29E] italic">No attachments added yet</p>;
+                          }
+                          return (
+                            <div className="grid grid-cols-3 gap-2">
+                              {allAssets.map((asset, aIdx) => {
+                                // Legacy photos occupy the first slots; typed assets are deletable by their own index
+                                const typedIndex = aIdx - legacyPhotos.length;
+                                return (
+                                  <div key={aIdx} className="relative group rounded-lg overflow-hidden border border-[#E7E5E4] bg-white">
+                                    {asset.type === 'image' ? (
+                                      <img src={asset.url} alt={asset.name} className="w-full h-20 object-cover" />
+                                    ) : asset.type === 'video' ? (
+                                      <video src={asset.url} className="w-full h-20 object-cover" />
+                                    ) : (
+                                      <div className="w-full h-20 flex flex-col items-center justify-center gap-1 text-[#B45309]">
+                                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                                        <span className="text-[8px] font-bold">PDF</span>
+                                      </div>
+                                    )}
+                                    <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1 py-0.5">
+                                      <p className="text-[8px] text-white truncate">{asset.name}</p>
+                                    </div>
+                                    {asset.type !== 'image' && (
+                                      <span className="absolute top-1 left-1 px-1 py-0.5 rounded bg-black/60 text-[7px] font-bold text-white uppercase">{asset.type}</span>
+                                    )}
+                                    {canEditJourney && typedIndex >= 0 && (
+                                      <button
+                                        onClick={() => handleDeleteAsset(stage.id, typedIndex)}
+                                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                      >
+                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -390,6 +509,7 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
             </button>
           )}
         </div>
+        )}
       </div>
 
       {/* Activity */}
@@ -407,18 +527,76 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
         </div>
       </div>
 
-      {/* Hidden file input for photo upload */}
+      {/* Hidden file input for step attachments (photo / video / pdf) */}
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
         multiple
         className="hidden"
         onChange={(e) => {
-          if (uploadingStageId) handlePhotoUpload(uploadingStageId, e.target.files);
+          if (uploadingStageId) handleAssetUpload(uploadingStageId, e.target.files);
           e.target.value = '';
         }}
       />
+
+      {/* View Assets modal — shows the project's uploaded photos, videos & brochure */}
+      {assetsModalStageId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setAssetsModalStageId(null)}>
+          <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-5 border-b border-[#E7E5E4] sticky top-0 bg-white">
+              <div>
+                <h3 className="text-base font-bold text-[#2A2A2A] font-serif">Property Assets</h3>
+                <p className="text-[10px] text-[#A8A29E] mt-0.5">{lead.project} — download or share on WhatsApp</p>
+              </div>
+              <button onClick={() => setAssetsModalStageId(null)} className="p-1 rounded-lg hover:bg-[#FAF7F2] text-[#A8A29E] hover:text-[#2A2A2A] transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5">
+              {projectAssets.length === 0 ? (
+                <div className="py-12 text-center">
+                  <p className="text-sm text-[#A8A29E]">No assets uploaded for this project yet.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {projectAssets.map((asset, i) => (
+                    <div key={i} className="rounded-xl border border-[#E7E5E4] overflow-hidden bg-[#FAF7F2]">
+                      <div className="h-40 bg-[#1C1917] flex items-center justify-center overflow-hidden">
+                        {asset.type === 'image' ? (
+                          <img src={asset.url} alt={asset.name} className="w-full h-full object-cover" />
+                        ) : asset.type === 'video' ? (
+                          <video src={asset.url} className="w-full h-full object-cover" controls />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-white">
+                            <svg className="w-10 h-10 text-[#B45309]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                            <span className="text-[10px] font-bold">Brochure PDF</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-2.5">
+                        <div className="flex items-center gap-1.5 mb-2">
+                          <span className="px-1.5 py-0.5 rounded bg-white border border-[#E7E5E4] text-[9px] font-bold text-[#57534E] uppercase">{asset.type}</span>
+                          <p className="text-xs font-semibold text-[#2A2A2A] truncate">{asset.name}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => downloadAsset(asset)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[#1C1917] text-white text-[11px] font-bold hover:bg-[#292524] transition-colors">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            Download
+                          </button>
+                          <button onClick={() => shareAssetToWhatsApp(asset)} className="flex-1 flex items-center justify-center gap-1 py-2 rounded-lg bg-[#25D366] text-white text-[11px] font-bold hover:opacity-90 transition-opacity">
+                            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413" /></svg>
+                            WhatsApp
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

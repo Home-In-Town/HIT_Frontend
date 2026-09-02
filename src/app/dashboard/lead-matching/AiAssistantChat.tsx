@@ -294,7 +294,7 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
       </div>
 
       {/* ─── Messages ─── */}
-      <div ref={scrollRef} role="log" aria-live="polite" aria-label="Conversation with HIT Assistant" className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3.5 sm:px-6 sm:py-4 space-y-2.5">
+      <div ref={scrollRef} role="log" aria-live="polite" aria-label="Conversation with HIT Assistant" className="ai-scroll relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3.5 sm:px-6 sm:py-4 space-y-2.5">
         {messages.map((msg, idx) => {
           const isSystem = msg.messageType === 'system';
           const isMe = !isSystem;
@@ -919,24 +919,49 @@ function ActionsBubble({ msg, onNewLead, disabled }: {
 // ═══════════════════════════════════════════════════════════
 
 const styles = `
+/* Smooth, contained momentum scrolling for the message pane so the chat
+   doesn't rubber-band the page behind it and feels native on touch. */
+.ai-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+/* GPU-accelerated entrance animations (translate3d + will-change) keep
+   bubbles and option chips buttery on low-end phones. */
 @keyframes aiMsgIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.98); }
-  to   { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translate3d(0, 8px, 0) scale(0.98); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
-.ai-msg-in { animation: aiMsgIn 0.28s cubic-bezier(0.22,1,0.36,1) both; }
+.ai-msg-in { animation: aiMsgIn 0.28s cubic-bezier(0.22,1,0.36,1) both; will-change: transform, opacity; }
 @keyframes aiOptIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-.ai-opt-in { animation: aiOptIn 0.32s cubic-bezier(0.22,1,0.36,1) both; }
+.ai-opt-in { animation: aiOptIn 0.32s cubic-bezier(0.22,1,0.36,1) both; will-change: transform, opacity; }
 @keyframes aiInputIn {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate3d(0, 16px, 0); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0); }
 }
-.ai-input-in { animation: aiInputIn 0.3s ease-out both; }
+.ai-input-in { animation: aiInputIn 0.3s ease-out both; will-change: transform, opacity; }
 @keyframes aiDot {
-  0%,60%,100% { transform: translateY(0); opacity: 0.4; }
-  30% { transform: translateY(-5px); opacity: 1; }
+  0%,60%,100% { transform: translate3d(0, 0, 0); opacity: 0.4; }
+  30% { transform: translate3d(0, -5px, 0); opacity: 1; }
 }
 .ai-dot { animation: aiDot 1.2s infinite ease-in-out; }
+
+/* Crisp, instant tap feedback on option chips / buttons.
+   A short transition on press makes taps feel responsive without lag. */
+.ai-opt-in,
+button {
+  -webkit-tap-highlight-color: transparent;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ai-opt-in:active { transform: scale(0.96); transition-duration: 0.06s; }
+
+/* Respect reduced-motion inside the chat too. */
+@media (prefers-reduced-motion: reduce) {
+  .ai-msg-in, .ai-opt-in, .ai-input-in, .ai-dot { animation: none !important; }
+  .ai-scroll { scroll-behavior: auto; }
+}
 `;

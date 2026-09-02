@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { crmBridgeApi, CrmAnalytics, CrmLead, CrmLeadsParams, CrmLeadsResponse, ApiError } from '@/lib/api';
-import CrmMetricsBar from './CrmMetricsBar';
+import { crmBridgeApi, CrmLead, CrmLeadsParams, CrmLeadsResponse, ApiError } from '@/lib/api';
 import CrmLeadTable from './CrmLeadTable';
 import CrmLeadDrawer from './CrmLeadDrawer';
 import HumanLeadManager from './HumanLeadManager';
+import LeadCourse from './LeadCourse';
 
 type Tab = 'leads' | 'campaigns' | 'whatsapp';
 
@@ -15,16 +15,6 @@ const TABS: { key: Tab; label: string; redirectPath: string }[] = [
   { key: 'whatsapp',  label: 'WhatsApp Templates',  redirectPath: '/whatsapp-templates' },
 ];
 
-const DEFAULT_ANALYTICS: CrmAnalytics = {
-  total: 0,
-  hot: 0,
-  warm: 0,
-  cold: 0,
-  engagementRate: 0,
-  avgScore: 0,
-  recentActivity: [],
-};
-
 const DEFAULT_LEADS: CrmLeadsResponse = {
   leads: [],
   total: 0,
@@ -33,18 +23,16 @@ const DEFAULT_LEADS: CrmLeadsResponse = {
 };
 
 export default function CrmDashboard() {
-  const [analytics, setAnalytics] = useState<CrmAnalytics>(DEFAULT_ANALYTICS);
   const [leadsData, setLeadsData] = useState<CrmLeadsResponse>(DEFAULT_LEADS);
   const [leadsLoading, setLeadsLoading] = useState(true);
-  const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<Tab>('leads');
   const [ssoLoadingTab, setSsoLoadingTab] = useState<Tab | null>(null);
   const [ssoError, setSsoError] = useState<string | null>(null);
 
-  // Manager mode: 'ai' or 'human'
-  const [managerMode, setManagerMode] = useState<'ai' | 'human'>('ai');
+  // Manager mode: 'ai', 'human', or the 'course'
+  const [managerMode, setManagerMode] = useState<'ai' | 'human' | 'course'>('ai');
 
   // Drawer state
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
@@ -55,24 +43,18 @@ export default function CrmDashboard() {
   // Current lead filter state
   const [currentParams, setCurrentParams] = useState<CrmLeadsParams>({ page: 1 });
 
-  // On mount: fetch analytics + first page of leads
+  // On mount: fetch first page of leads
   useEffect(() => {
     const init = async () => {
-      setAnalyticsLoading(true);
       setLeadsLoading(true);
       setError(null);
       try {
-        const [analyticsResult, leadsResult] = await Promise.all([
-          crmBridgeApi.getAnalytics(),
-          crmBridgeApi.getLeads({ page: 1 }),
-        ]);
-        setAnalytics(analyticsResult);
+        const leadsResult = await crmBridgeApi.getLeads({ page: 1 });
         setLeadsData(leadsResult);
       } catch (err: unknown) {
         const msg = err instanceof ApiError ? err.message : 'Failed to load CRM data';
         setError(msg);
       } finally {
-        setAnalyticsLoading(false);
         setLeadsLoading(false);
       }
     };
@@ -169,7 +151,7 @@ export default function CrmDashboard() {
   }
 
   return (
-    <div className="space-y-6 p-6 bg-[#FAF7F2] min-h-screen">
+    <div className="space-y-5 sm:space-y-6 p-4 sm:p-6 bg-[#FAF7F2] min-h-screen">
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div>
@@ -178,17 +160,17 @@ export default function CrmDashboard() {
         </div>
       </div>
 
-      {/* Manager Mode Toggle */}
-      <div className="flex items-center gap-3">
+      {/* Manager Mode Toggle — wraps on mobile, sits inline on larger screens */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
         <button
           onClick={() => setManagerMode('ai')}
-          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+          className={`flex items-center justify-center gap-2 sm:gap-2.5 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex-1 sm:flex-none min-w-[calc(50%-0.25rem)] sm:min-w-0 ${
             managerMode === 'ai'
               ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/25'
               : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40 hover:text-[#B45309]'
           }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
@@ -196,34 +178,37 @@ export default function CrmDashboard() {
         </button>
         <button
           onClick={() => setManagerMode('human')}
-          className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-200 ${
+          className={`flex items-center justify-center gap-2 sm:gap-2.5 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex-1 sm:flex-none min-w-[calc(50%-0.25rem)] sm:min-w-0 ${
             managerMode === 'human'
               ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/25'
               : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40 hover:text-[#B45309]'
           }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           Human Lead Manager
+        </button>
+        <button
+          onClick={() => setManagerMode('course')}
+          className={`flex items-center justify-center gap-2 sm:gap-2.5 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 flex-1 sm:flex-none ${
+            managerMode === 'course'
+              ? 'bg-[#B45309] text-white shadow-lg shadow-[#B45309]/25'
+              : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40 hover:text-[#B45309]'
+          }`}
+        >
+          <svg className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+          </svg>
+          Earn 1 Cr Per Year
         </button>
       </div>
 
       {/* AI Leads Manager Content */}
       {managerMode === 'ai' && (
         <>
-          {/* Metrics bar */}
-          {analyticsLoading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl border border-[#E7E5E4] p-4 h-24 animate-pulse" />
-              ))}
-            </div>
-          ) : (
-            <CrmMetricsBar analytics={analytics} />
-          )}
-
           {/* Tabs */}
           <div className="bg-white rounded-2xl border border-[#E7E5E4] shadow-sm overflow-hidden">
             {/* Tab nav */}
@@ -303,6 +288,11 @@ export default function CrmDashboard() {
       {/* Human Lead Manager Content */}
       {managerMode === 'human' && (
         <HumanLeadManager />
+      )}
+
+      {/* Earn 1 Cr Per Year — landing page + locked course */}
+      {managerMode === 'course' && (
+        <LeadCourse />
       )}
     </div>
   );

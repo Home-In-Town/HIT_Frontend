@@ -11,7 +11,12 @@ export default function CrmConnectCard({ onSuccess }: CrmConnectCardProps) {
   const [showForm, setShowForm] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<'OWNER_ALREADY_LINKED' | 'NO_MATCHING_OWNER' | 'GENERIC' | null>(null);
+  const [error, setError] = useState<'OWNER_ALREADY_LINKED' | 'NO_MATCHING_OWNER' | 'INVALID_PIN' | 'GENERIC' | null>(null);
+
+  // PIN-based connect (used when a plain phone/email lookup can't find the account)
+  const [usePin, setUsePin] = useState(false);
+  const [pinPhone, setPinPhone] = useState('');
+  const [pin, setPin] = useState('');
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +43,43 @@ export default function CrmConnectCard({ onSuccess }: CrmConnectCardProps) {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Verify OneEmployee phone + PIN, then link
+  const handlePinConnect = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pinPhone.trim() || !pin.trim()) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      await crmBridgeApi.manualConnect(pinPhone.trim(), pin.trim());
+      onSuccess();
+    } catch (err: unknown) {
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          setError('INVALID_PIN');
+        } else if (err.status === 409) {
+          setError('OWNER_ALREADY_LINKED');
+        } else {
+          setError('GENERIC');
+        }
+      } else {
+        setError('GENERIC');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openForm = () => {
+    setShowForm(true);
+    setError(null);
+    // Scroll the form into view so the button never feels like a no-op
+    setTimeout(() => {
+      document.getElementById('crm-connect-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 50);
   };
 
   const handleCreateAccount = () => {
@@ -126,10 +168,58 @@ export default function CrmConnectCard({ onSuccess }: CrmConnectCardProps) {
 
             {/* Inline Connect Form */}
             {showForm ? (
-              <div className="bg-[#FAF7F2] rounded-2xl border border-[#E7E5E4] p-6 mb-4">
-                <p className="text-xs font-bold text-[#57534E] uppercase tracking-widest mb-3">
-                  Enter your OneEmployee phone or email
-                </p>
+              <div id="crm-connect-form" className="bg-[#FAF7F2] rounded-2xl border border-[#E7E5E4] p-6 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs font-bold text-[#57534E] uppercase tracking-widest">
+                    {usePin ? 'Verify with OneEmployee PIN' : 'Enter your OneEmployee phone or email'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => { setUsePin(!usePin); setError(null); }}
+                    className="text-[11px] font-bold text-[#B45309] hover:underline"
+                  >
+                    {usePin ? 'Use phone / email instead' : 'Connect with PIN instead'}
+                  </button>
+                </div>
+
+                {usePin ? (
+                  <form onSubmit={handlePinConnect} className="space-y-3">
+                    <input
+                      type="tel"
+                      value={pinPhone}
+                      onChange={(e) => { setPinPhone(e.target.value); setError(null); }}
+                      placeholder="OneEmployee phone number"
+                      className="w-full px-4 py-2.5 bg-white border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                      disabled={loading}
+                      autoFocus
+                    />
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        value={pin}
+                        onChange={(e) => { setPin(e.target.value); setError(null); }}
+                        placeholder="OneEmployee PIN"
+                        className="flex-1 px-4 py-2.5 bg-white border border-[#E7E5E4] rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#B45309]/20 focus:border-[#B45309] transition-all"
+                        disabled={loading}
+                      />
+                      <button
+                        type="submit"
+                        disabled={loading || !pinPhone.trim() || !pin.trim()}
+                        className="px-5 py-2.5 bg-[#B45309] hover:bg-[#92400E] disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-bold rounded-xl transition-all shadow-sm shadow-[#B45309]/20 flex items-center justify-center gap-2"
+                      >
+                        {loading ? (
+                          <>
+                            <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            Connecting…
+                          </>
+                        ) : (
+                          'Verify & Connect'
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                ) : (
                 <form onSubmit={handleConnect} className="flex flex-col sm:flex-row gap-3">
                   <input
                     type="text"
@@ -167,6 +257,7 @@ export default function CrmConnectCard({ onSuccess }: CrmConnectCardProps) {
                     </button>
                   </div>
                 </form>
+                )}
 
                 {/* Error states */}
                 {error === 'OWNER_ALREADY_LINKED' && (
@@ -188,15 +279,35 @@ export default function CrmConnectCard({ onSuccess }: CrmConnectCardProps) {
                         d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <p className="text-xs text-amber-800 font-medium">
-                      No OneEmployee account found matching those details.{' '}
+                      No OneEmployee account found matching those details. If you already have an account, try{' '}
+                      <button
+                        type="button"
+                        onClick={() => { setUsePin(true); setError(null); }}
+                        className="underline font-bold hover:text-[#B45309] transition-colors"
+                      >
+                        connecting with your PIN
+                      </button>
+                      , or{' '}
                       <button
                         type="button"
                         onClick={handleCreateAccount}
                         className="underline font-bold hover:text-[#B45309] transition-colors"
                       >
-                        Create a new account
-                      </button>{' '}
-                      to get started.
+                        create a new account
+                      </button>
+                      .
+                    </p>
+                  </div>
+                )}
+
+                {error === 'INVALID_PIN' && (
+                  <div className="mt-3 flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl">
+                    <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                    <p className="text-xs text-red-700 font-medium">
+                      Invalid phone or PIN. Please double-check your OneEmployee credentials and try again.
                     </p>
                   </div>
                 )}
@@ -218,7 +329,7 @@ export default function CrmConnectCard({ onSuccess }: CrmConnectCardProps) {
             {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3">
               <button
-                onClick={() => { setShowForm(true); setError(null); }}
+                onClick={openForm}
                 className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-[#B45309] hover:bg-[#92400E] text-white text-sm font-bold rounded-xl transition-all shadow-lg shadow-[#B45309]/20 active:scale-95"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

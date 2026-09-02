@@ -18,8 +18,13 @@ export default function CrmPage() {
   useEffect(() => {
     if (!user) return;
 
-    // Role guard
-    if (user.role !== 'admin' && user.role !== 'builder' && user.role !== 'agent') {
+    // Role guard — admin, builder, agent and captain can access the CRM
+    if (
+      user.role !== 'admin' &&
+      user.role !== 'builder' &&
+      user.role !== 'agent' &&
+      user.role !== 'captain'
+    ) {
       router.replace('/dashboard');
       return;
     }
@@ -59,7 +64,7 @@ export default function CrmPage() {
   // Loading skeleton
   if (pageState === 'loading') {
     return (
-      <div className="p-6 lg:p-8 animate-pulse">
+      <div className="crm-scope p-6 lg:p-8 animate-pulse">
         <div className="h-8 bg-gray-200 rounded w-48 mb-4" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
@@ -74,7 +79,7 @@ export default function CrmPage() {
   // Unlinked state
   if (pageState === 'unlinked') {
     return (
-      <div className="p-6 lg:p-8">
+      <div className="crm-scope p-6 lg:p-8">
         <CrmConnectCard onSuccess={() => setPageState('linked')} />
       </div>
     );
@@ -82,7 +87,7 @@ export default function CrmPage() {
 
   // Linked state
   return (
-    <div className="p-6 lg:p-8">
+    <div className="crm-scope p-6 lg:p-8">
       <CrmDashboard />
     </div>
   );
