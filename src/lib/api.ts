@@ -1240,6 +1240,7 @@ export interface LeadChatTemplate {
   unit?: string[];
   prefill?: string;
   skippable?: boolean;
+  allowCustom?: boolean;
   progress?: { current: number; total: number };
 }
 

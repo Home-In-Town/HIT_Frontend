@@ -298,6 +298,37 @@ function SkipButton({ slotId, disabled, onSubmit }: {
   );
 }
 
+// Compact "type your own + add" row, used when a slot allows custom values.
+function CustomInline({ placeholder, disabled, onAdd }: {
+  placeholder: string; disabled: boolean; onAdd: (value: string) => void;
+}) {
+  const [val, setVal] = useState('');
+  const add = () => { const t = val.trim(); if (t) { onAdd(t); setVal(''); } };
+  return (
+    <div className="mt-2.5 flex items-center gap-2">
+      <div className="flex-1 flex items-center bg-white rounded-full border border-dashed border-[#075E54]/40 px-3.5">
+        <svg className="w-4 h-4 text-[#075E54]/60 mr-1.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7m-1.5-9.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+        <input
+          type="text"
+          value={val}
+          onChange={(e) => setVal(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && add()}
+          placeholder={placeholder}
+          maxLength={60}
+          className="flex-1 py-2 text-[14px] bg-transparent focus:outline-none placeholder:text-gray-400"
+        />
+      </div>
+      <button
+        onClick={add}
+        disabled={disabled || !val.trim()}
+        className="px-4 py-2 rounded-full bg-[#075E54] text-white text-[13px] font-semibold shadow-sm active:scale-95 transition-all disabled:opacity-40"
+      >
+        Add
+      </button>
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════
 // ANSWER TEMPLATE
 // ═══════════════════════════════════════════════════════════
@@ -361,6 +392,13 @@ function AnswerTemplate({
             );
           })}
         </div>
+        {template.allowCustom && (
+          <CustomInline
+            placeholder="Or type your own…"
+            disabled={disabled}
+            onAdd={(v) => onSubmit(slotId, v, v)}
+          />
+        )}
         {skippable && <SkipButton slotId={slotId} disabled={disabled} onSubmit={onSubmit} />}
       </div>
     );
@@ -375,7 +413,7 @@ function AnswerTemplate({
   return <TextInput slotId={slotId} inputType={template.inputType} skippable={skippable} disabled={disabled} onSubmit={onSubmit} />;
 }
 
-// ── Multi-select (amenities): tap several, then Add / Skip ──
+// ── Multi-select (amenities): tap presets + add custom, then submit / skip ──
 function MultiChoiceInput({ template, disabled, onSubmit }: {
   template: NonNullable<LeadChatMessage['template']>;
   disabled: boolean;
@@ -383,15 +421,26 @@ function MultiChoiceInput({ template, disabled, onSubmit }: {
 }) {
   const slotId = template.slotId || '';
   const options: LeadChatOption[] = Array.isArray(template.options) ? template.options : [];
+  const presetValues = options.map((o) => o.value);
   const [selected, setSelected] = useState<string[]>([]);
 
   const toggle = (v: string) =>
     setSelected((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
 
+  // Add a typed custom amenity (deduped, case-insensitive).
+  const addCustom = (raw: string) => {
+    const v = raw.trim();
+    if (!v) return;
+    setSelected((prev) => (prev.some((x) => x.toLowerCase() === v.toLowerCase()) ? prev : [...prev, v]));
+  };
+
   const submit = () => {
     if (selected.length === 0) return;
     onSubmit(slotId, selected, selected.join(', '));
   };
+
+  // Custom (non-preset) selections, shown as removable chips.
+  const customs = selected.filter((v) => !presetValues.includes(v));
 
   return (
     <div className="px-2.5 sm:px-6 py-3 sm:py-3.5 bg-white/85 backdrop-blur-md border-t border-black/5">
@@ -412,7 +461,24 @@ function MultiChoiceInput({ template, disabled, onSubmit }: {
             </button>
           );
         })}
+        {/* Custom selections as removable chips */}
+        {customs.map((c) => (
+          <button
+            key={c}
+            disabled={disabled}
+            onClick={() => toggle(c)}
+            className="inline-flex items-center gap-1 px-3.5 py-2 rounded-full text-[13px] font-semibold border border-[#B45309] bg-[#B45309] text-white active:scale-95 transition-all disabled:opacity-50"
+          >
+            {c}
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        ))}
       </div>
+
+      {template.allowCustom && (
+        <CustomInline placeholder="Add another amenity…" disabled={disabled} onAdd={addCustom} />
+      )}
+
       <div className="flex items-center gap-3 mt-3">
         <button
           disabled={disabled || selected.length === 0}
@@ -468,18 +534,26 @@ function NumberInput({ slotId, units, skippable, disabled, onSubmit }: {
             placeholder="Enter amount"
             className="flex-1 py-2.5 text-[15px] bg-transparent focus:outline-none placeholder:text-gray-400"
           />
-          {units.length > 0 && (
-            <div className="flex gap-1 ml-2">
-              {units.map((u) => (
-                <button key={u} onClick={() => setUnit(u)} className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${unit === u ? 'bg-[#075E54] text-white shadow-sm' : 'bg-gray-100 text-[#57534E]'}`}>
-                  {u}
-                </button>
-              ))}
-            </div>
-          )}
         </div>
         <SendButton onClick={send} disabled={disabled || !val.trim()} />
       </div>
+      {/* Prominent unit options — tap to choose the unit, type the amount above */}
+      {units.length > 0 && (
+        <div className="flex items-center gap-2 mt-2.5">
+          <span className="text-[12px] text-[#57534E]">Unit:</span>
+          {units.map((u) => (
+            <button
+              key={u}
+              onClick={() => setUnit(u)}
+              className={`px-4 py-1.5 rounded-full text-[13px] font-semibold border transition-all active:scale-95 ${unit === u
+                ? 'bg-[#075E54] text-white border-[#075E54] shadow-sm'
+                : 'bg-white text-[#075E54] border-[#075E54]/30 hover:bg-[#075E54]/5'}`}
+            >
+              {u}
+            </button>
+          ))}
+        </div>
+      )}
       {skippable && <SkipButton slotId={slotId} disabled={disabled} onSubmit={onSubmit} />}
     </InputShell>
   );
