@@ -25,6 +25,31 @@ import toast from 'react-hot-toast';
 
 const ASSISTANT_TYPING_MS = 650;
 
+// Friendly labels for answered slots, used by the "Edit an answer" control so
+// a user can correct a previous answer without waiting for the Summary Card.
+// Mirrors the backend leadSlotSchema ids (stable, small set).
+const SLOT_LABELS: Record<string, string> = {
+  intent: 'Intent',
+  category: 'Category',
+  propertyTypeDetailed: 'Property type',
+  propertyType: 'Property type',
+  bhk: 'BHK',
+  area: 'Area',
+  location: 'Location',
+  city: 'City',
+  projectStatus: 'Construction status',
+  possession: 'Possession',
+  expectedPrice: 'Price / budget',
+  reraApproved: 'RERA approved',
+  reraNumber: 'RERA number',
+  bankLoanAvailable: 'Bank loan',
+  amenities: 'Amenities',
+  urgency: 'Urgency',
+  contact: 'Contact number',
+};
+
+
+
 // Icons for property-type / intent options so choices feel tangible.
 const OPTION_ICONS: Record<string, string> = {
   sell: '🏷️', buy: '🔍', rent: '🔑',
@@ -34,31 +59,44 @@ const OPTION_ICONS: Record<string, string> = {
   normal: '🙂', urgent: '⚡', very_urgent: '🔥',
 };
 
+// A user message can be in-flight, delivered, or failed to send. `failed`
+// messages keep the payload needed to retry the exact same submission.
+interface FailedPayload { slotId: string; value: unknown; displayText: string }
+
 export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}) {
   const [messages, setMessages] = useState<LeadChatMessage[]>([]);
-  const [, setFlowState] = useState<LeadFlowState | null>(null);
+  const [flowState, setFlowState] = useState<LeadFlowState | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [sending, setSending] = useState(false);
   const [typing, setTyping] = useState(false);
+  // Map of optimistic-message _id → the payload that failed, so a "Retry"
+  // affordance on the bubble can re-send exactly what the user chose.
+  const [failed, setFailed] = useState<Record<string, FailedPayload>>({});
   const sessionIdRef = useRef<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // ─── Load / resume the assistant thread ────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await leadChatApi.open();
-        sessionIdRef.current = data.sessionId;
-        setMessages(data.messages || []);
-        setFlowState(data.flowState);
-      } catch (err: unknown) {
-        toast.error(errMsg(err, 'Failed to open assistant'));
-      } finally {
-        setLoading(false);
-      }
-    })();
+  const openThread = useCallback(async () => {
+    setLoading(true);
+    setLoadError(false);
+    try {
+      const data = await leadChatApi.open();
+      sessionIdRef.current = data.sessionId;
+      setMessages(data.messages || []);
+      setFlowState(data.flowState);
+    } catch (err: unknown) {
+      setLoadError(true);
+      toast.error(errMsg(err, 'Failed to open assistant'));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    openThread();
+  }, [openThread]);
 
   // Smooth auto-scroll to newest.
   useEffect(() => {
@@ -71,6 +109,15 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
   const progress = activeTemplate?.progress;
   const progressPct = progress && progress.total ? Math.round((progress.current / progress.total) * 100) : 0;
 
+  // Most recently answered slot (for the "Previous" button on the question
+  // template). flowState.slots is insertion-ordered, so the last answered slot
+  // that isn't the current/editing one is the natural "go back" target.
+  const answeredIds = flowState?.slots
+    ? Object.keys(flowState.slots).filter(id => id !== flowState.currentSlotId && id !== flowState.editingSlotId)
+    : [];
+  const previousSlotId = answeredIds.length ? answeredIds[answeredIds.length - 1] : null;
+  const previousSlotLabel = previousSlotId ? (SLOT_LABELS[previousSlotId] || previousSlotId) : null;
+
   const revealWithTyping = useCallback((appendMsgs: LeadChatMessage[]) => {
     setTyping(true);
     setTimeout(() => {
@@ -79,29 +126,52 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
     }, ASSISTANT_TYPING_MS);
   }, []);
 
-  const submit = useCallback(async (slotId: string, value: unknown, displayText: string) => {
+  // Core send. `existingId` reuses an already-rendered optimistic bubble
+  // (used by Retry) instead of appending a new one.
+  const sendAnswer = useCallback(async (
+    slotId: string, value: unknown, displayText: string, existingId?: string,
+  ) => {
     if (!sessionIdRef.current || sending) return;
     setSending(true);
-    const optimistic: LeadChatMessage = {
-      _id: `tmp-${Date.now()}`,
-      session: sessionIdRef.current,
-      sender: 'me',
-      content: displayText,
-      messageType: 'text',
-      createdAt: new Date().toISOString(),
-    };
-    setMessages(prev => [...prev, optimistic]);
+
+    const msgId = existingId ?? `tmp-${Date.now()}`;
+    if (existingId) {
+      // Retrying: clear the failed flag on the existing bubble.
+      setFailed(prev => { const next = { ...prev }; delete next[msgId]; return next; });
+    } else {
+      const optimistic: LeadChatMessage = {
+        _id: msgId,
+        session: sessionIdRef.current,
+        sender: 'me',
+        content: displayText,
+        messageType: 'text',
+        createdAt: new Date().toISOString(),
+      };
+      setMessages(prev => [...prev, optimistic]);
+    }
+
     try {
       const res = await leadChatApi.answer({ sessionId: sessionIdRef.current, slotId, value });
       setFlowState(res.flowState);
       revealWithTyping([res.message]);
     } catch (err: unknown) {
-      setMessages(prev => prev.filter(m => m._id !== optimistic._id));
+      // Keep the bubble, mark it failed, and stash the payload for retry.
+      setFailed(prev => ({ ...prev, [msgId]: { slotId, value, displayText } }));
       toast.error(errMsg(err, 'Could not submit answer'));
     } finally {
       setSending(false);
     }
   }, [sending, revealWithTyping]);
+
+  const submit = useCallback(
+    (slotId: string, value: unknown, displayText: string) => sendAnswer(slotId, value, displayText),
+    [sendAnswer],
+  );
+
+  const retry = useCallback((msgId: string) => {
+    const payload = failed[msgId];
+    if (payload) sendAnswer(payload.slotId, payload.value, payload.displayText, msgId);
+  }, [failed, sendAnswer]);
 
   const edit = useCallback(async (slotId: string) => {
     if (!sessionIdRef.current) return;
@@ -145,11 +215,33 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
 
   if (loading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center bg-[#0B141A]">
+      <div className="h-full flex flex-col items-center justify-center bg-[#0B141A]" role="status" aria-live="polite">
         <div className="relative">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0E7C66] to-[#075E54] flex items-center justify-center text-2xl shadow-lg animate-pulse">🤖</div>
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0E7C66] to-[#075E54] flex items-center justify-center text-2xl shadow-lg animate-pulse" aria-hidden="true">🤖</div>
         </div>
         <p className="mt-4 text-sm text-white/50">Assistant load ho raha hai…</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center bg-[#ECE5DD] px-6 text-center" role="alert">
+        <div className="w-14 h-14 rounded-2xl bg-white flex items-center justify-center text-2xl shadow-sm" aria-hidden="true">⚠️</div>
+        <p className="mt-4 text-[15px] font-semibold text-[#0B2B1E]">Assistant khul nahi paaya</p>
+        <p className="mt-1 text-[13px] text-[#57534E]">Connection issue lag raha hai. Dobara try karein.</p>
+        <button
+          onClick={openThread}
+          className="mt-5 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-gradient-to-br from-[#0A7360] to-[#075E54] text-white text-[14px] font-semibold shadow-md active:scale-95 transition-all"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+          Retry
+        </button>
+        {onBack && (
+          <button onClick={onBack} className="mt-2 text-[13px] font-medium text-[#57534E] hover:text-[#0B2B1E]">
+            Go back
+          </button>
+        )}
       </div>
     );
   }
@@ -163,17 +255,17 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
       <div className="relative z-10 bg-gradient-to-r from-[#075E54] to-[#0A7360] shadow-md">
         <div className="px-3 py-2.5 sm:px-4 sm:py-3 flex items-center gap-3">
           {onBack ? (
-            <button onClick={onBack} className="p-1.5 -ml-1 hover:bg-white/10 rounded-full transition-colors active:scale-90" title="Back">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+            <button onClick={onBack} className="p-1.5 -ml-1 hover:bg-white/10 rounded-full transition-colors active:scale-90" title="Back" aria-label="Back">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
             </button>
           ) : (
-            <a href="/dashboard" className="p-1.5 -ml-1 hover:bg-white/10 rounded-full transition-colors sm:hidden">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
+            <a href="/dashboard" className="p-1.5 -ml-1 hover:bg-white/10 rounded-full transition-colors sm:hidden" aria-label="Back to dashboard">
+              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
             </a>
           )}
           <div className="relative flex-shrink-0">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-xl shadow-inner ring-2 ring-white/20">🤖</div>
-            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#25D366] rounded-full border-2 border-[#075E54]" />
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-xl shadow-inner ring-2 ring-white/20" aria-hidden="true">🤖</div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#25D366] rounded-full border-2 border-[#075E54]" aria-hidden="true" />
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5">
@@ -182,7 +274,7 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
             </div>
             <p className="text-[11px] text-white/70">{typing ? 'typing…' : 'online • Lead Matching'}</p>
           </div>
-          <div className="hidden sm:flex flex-shrink-0 w-9 h-9 rounded-full bg-white/10 items-center justify-center">
+          <div className="hidden sm:flex flex-shrink-0 w-9 h-9 rounded-full bg-white/10 items-center justify-center" aria-hidden="true">
             <svg className="text-white/80" width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
           </div>
         </div>
@@ -202,7 +294,7 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
       </div>
 
       {/* ─── Messages ─── */}
-      <div ref={scrollRef} className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3.5 sm:px-6 sm:py-4 space-y-2.5">
+      <div ref={scrollRef} role="log" aria-live="polite" aria-label="Conversation with HIT Assistant" className="relative z-10 flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3.5 sm:px-6 sm:py-4 space-y-2.5">
         {messages.map((msg, idx) => {
           const isSystem = msg.messageType === 'system';
           const isMe = !isSystem;
@@ -221,19 +313,37 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
           const prev = messages[idx - 1];
           const showAvatar = isSystem && (!prev || prev.messageType !== 'system' || (prev.template && ['summary', 'results', 'actions'].includes(prev.template.inputType || '')));
 
+          const isFailed = isMe && !!failed[msg._id];
+
           return (
             <div key={msg._id} className={`flex items-end gap-2 ai-msg-in ${isMe ? 'justify-end' : 'justify-start'}`}>
               {isSystem && (
-                <div className={`flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm shadow-sm ${showAvatar ? '' : 'opacity-0'}`}>🤖</div>
+                <div className={`flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm shadow-sm ${showAvatar ? '' : 'opacity-0'}`} aria-hidden="true">🤖</div>
               )}
-              <div className={`group max-w-[85%] sm:max-w-[70%] px-3.5 py-2.5 shadow-sm relative ${isMe
-                ? 'bg-gradient-to-br from-[#DCF8C6] to-[#D1F4C0] text-[#0B2B1E] rounded-2xl rounded-br-md'
-                : 'bg-white text-[#111B21] rounded-2xl rounded-bl-md'}`}>
-                <p className="text-[14px] sm:text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
-                <span className="block text-[10px] text-[#667781] text-right mt-0.5 select-none">
-                  {formatTime(msg.createdAt)}
-                  {isMe && <span className="ml-1 text-[#53BDEB]">✓✓</span>}
-                </span>
+              <div className="flex flex-col items-end gap-0.5 max-w-[85%] sm:max-w-[70%]">
+                <div className={`group px-3.5 py-2.5 shadow-sm relative ${isMe
+                  ? isFailed
+                    ? 'bg-[#FEE2E2] text-[#7F1D1D] rounded-2xl rounded-br-md ring-1 ring-[#FCA5A5]'
+                    : 'bg-gradient-to-br from-[#DCF8C6] to-[#D1F4C0] text-[#0B2B1E] rounded-2xl rounded-br-md'
+                  : 'bg-white text-[#111B21] rounded-2xl rounded-bl-md'}`}>
+                  <p className="text-[14px] sm:text-[14.5px] leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                  <span className="block text-[10px] text-right mt-0.5 select-none text-[#5A6B73]">
+                    {formatTime(msg.createdAt)}
+                    {isMe && !isFailed && <span className="ml-1 text-[#3A9FD4]" aria-label="Sent">✓✓</span>}
+                    {isFailed && <span className="ml-1 text-[#B91C1C]" aria-label="Failed to send">⚠︎ Not sent</span>}
+                  </span>
+                </div>
+                {isFailed && (
+                  <button
+                    onClick={() => retry(msg._id)}
+                    disabled={sending}
+                    className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#B91C1C] hover:text-[#7F1D1D] disabled:opacity-50"
+                    aria-label="Retry sending this answer"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                    Tap to retry
+                  </button>
+                )}
               </div>
             </div>
           );
@@ -241,9 +351,10 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
 
         {typing && (
           <div className="flex items-end gap-2 justify-start ai-msg-in">
-            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm">🤖</div>
+            <span className="sr-only">Assistant is typing</span>
+            <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#25D366] to-[#0E9F6E] flex items-center justify-center text-sm" aria-hidden="true">🤖</div>
             <div className="bg-white rounded-2xl rounded-bl-md px-4 py-3 shadow-sm">
-              <div className="flex gap-1.5 items-center">
+              <div className="flex gap-1.5 items-center" aria-hidden="true">
                 <span className="w-2 h-2 bg-gray-400 rounded-full ai-dot" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 bg-gray-400 rounded-full ai-dot" style={{ animationDelay: '160ms' }} />
                 <span className="w-2 h-2 bg-gray-400 rounded-full ai-dot" style={{ animationDelay: '320ms' }} />
@@ -258,6 +369,16 @@ export default function AiAssistantChat({ onBack }: { onBack?: () => void } = {}
       {!typing && activeTemplate && activeTemplate.inputType &&
         !['summary', 'results', 'actions'].includes(activeTemplate.inputType) && (
           <div className="relative z-10 ai-input-in">
+            {previousSlotId && (
+              <div className="px-2.5 sm:px-6 pt-2 pb-0 bg-white/85 backdrop-blur-md flex">
+                <PreviousButton
+                  slotId={previousSlotId}
+                  label={previousSlotLabel}
+                  disabled={sending}
+                  onPrevious={edit}
+                />
+              </div>
+            )}
             <AnswerTemplate template={activeTemplate} disabled={sending} onSubmit={submit} />
           </div>
         )}
@@ -277,6 +398,24 @@ function errMsg(err: unknown, fallback: string) {
   return err instanceof Error ? err.message : fallback;
 }
 
+// "← Previous" control shown on the question template. Re-opens the most
+// recently answered slot for editing via the existing /lead-chat/edit endpoint.
+function PreviousButton({ slotId, label, disabled, onPrevious }: {
+  slotId: string; label: string | null; disabled: boolean; onPrevious: (slotId: string) => void;
+}) {
+  return (
+    <button
+      disabled={disabled}
+      onClick={() => onPrevious(slotId)}
+      aria-label={label ? `Go back and edit: ${label}` : 'Go back to previous question'}
+      className="inline-flex items-center gap-1 text-[12.5px] font-medium text-[#57534E] hover:text-[#0B2B1E] disabled:opacity-50"
+    >
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+      Previous{label ? `: ${label}` : ''}
+    </button>
+  );
+}
+
 // Sentinel matching the backend's SKIP_VALUE — tells the engine an optional
 // slot was intentionally skipped (so it isn't re-asked).
 const SKIP_VALUE = '__skipped__';
@@ -290,10 +429,11 @@ function SkipButton({ slotId, disabled, onSubmit }: {
     <button
       disabled={disabled}
       onClick={() => onSubmit(slotId, SKIP_VALUE, 'Skipped')}
-      className="mt-2.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#78716C] hover:text-[#57534E] disabled:opacity-50"
+      aria-label="Skip this question"
+      className="mt-2.5 inline-flex items-center gap-1 text-[12.5px] font-medium text-[#6B6560] hover:text-[#44403C] disabled:opacity-50"
     >
       Skip this
-      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
+      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" /></svg>
     </button>
   );
 }
@@ -355,7 +495,7 @@ function AnswerTemplate({
     // Big option cards for the intent step, compact chips for the rest.
     const isIntent = slotId === 'intent';
     return (
-      <div className="px-2.5 sm:px-6 py-3 sm:py-3.5 bg-white/85 backdrop-blur-md border-t border-black/5">
+      <div className="px-2.5 sm:px-6 py-3 sm:py-3.5 bg-white/85 backdrop-blur-md border-t border-black/5" role="group" aria-label="Answer options">
         <div className={isIntent ? 'grid grid-cols-1 gap-2' : 'flex flex-wrap gap-2'}>
           {options.map((opt, i) => {
             const label = opt.label.hi || opt.label.en;
@@ -503,8 +643,8 @@ function InputShell({ children }: { children: React.ReactNode }) {
 
 function SendButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
   return (
-    <button onClick={onClick} disabled={disabled} className="w-11 h-11 flex-shrink-0 bg-gradient-to-br from-[#0A7360] to-[#075E54] text-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg active:scale-90 transition-all disabled:opacity-40 disabled:shadow-none">
-      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+    <button onClick={onClick} disabled={disabled} aria-label="Send answer" className="w-11 h-11 flex-shrink-0 bg-gradient-to-br from-[#0A7360] to-[#075E54] text-white rounded-full flex items-center justify-center shadow-md hover:shadow-lg active:scale-90 transition-all disabled:opacity-40 disabled:shadow-none">
+      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
     </button>
   );
 }
