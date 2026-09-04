@@ -1114,7 +1114,7 @@ export default function MarketplacePage() {
                               )}
                             </div>
 
-                            {/* Action Row — View Details + Share (with all sharing options) */}
+                            {/* Action Row — View Project + Share (with all sharing options) */}
                             <div className="mt-auto border-t border-[#E7E5E4]/50 pt-1.5 flex items-center gap-1.5">
                               <button
                                 onClick={(e) => {
@@ -1128,7 +1128,7 @@ export default function MarketplacePage() {
                                 className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
                               >
                                 <EyeIcon className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                                <span>View Details</span>
+                                <span>View Project</span>
                               </button>
                               <div className="relative flex-1">
                                 <button

@@ -856,7 +856,7 @@ function MatchCard({ match, delayMs }: {
         <p className="text-[11px] text-[#57534E] truncate">📍 {place}</p>
         {match.slug && (
           <span className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-semibold text-[#075E54]">
-            View details
+            View Project
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
           </span>
         )}
