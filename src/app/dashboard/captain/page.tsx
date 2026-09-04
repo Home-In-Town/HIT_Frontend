@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
-import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi, leadMatchingApi } from '@/lib/api';
+import { getLeadGenUrl, analyticsApi, projectsApi, crmBridgeApi, shareApi, leadMatchingApi, marketplaceApi } from '@/lib/api';
 import {
   Zap,
   ShoppingBag,
@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDerivedPricePerSqFt } from '@/utils/pricePerSqFt';
+import { computeAgentPayout, formatPayout } from '@/utils/agentPayout';
 
 interface ProjectCard {
   id: string;
@@ -48,6 +49,9 @@ interface ProjectCard {
   facingOptions: string[];
   priceRange: string;
   ownerName: string;
+  // Agent payout, derived from this project's marketplace listing (if any).
+  commissionType?: 'percentage' | 'fixed';
+  commissionValue?: number;
 }
 
 export default function CaptainDashboardPage() {
@@ -85,15 +89,27 @@ export default function CaptainDashboardPage() {
 
     const fetchData = async () => {
       try {
-        const [projectsResult, overview, crm] = await Promise.allSettled([
+        const [projectsResult, overview, crm, listingsResult] = await Promise.allSettled([
           projectsApi.getAllPublic(),
           analyticsApi.getOverview(),
           crmBridgeApi.getAnalytics(),
+          marketplaceApi.getListings({ listingType: 'selling' }),
         ]);
 
         const projectsList = projectsResult.status === 'fulfilled' ? projectsResult.value : [];
         const analyticsData = overview.status === 'fulfilled' ? overview.value : [];
         const crmData = crm.status === 'fulfilled' ? crm.value : null;
+        const listings = listingsResult.status === 'fulfilled' ? listingsResult.value : [];
+
+        // Map each project id -> its selling listing's commission, so cards can
+        // show "Earn ₹X at Y%" sourced from Create Listing (single source of truth).
+        const listingByProjectId = new Map<string, { commissionType?: string; commissionValue?: number }>();
+        for (const l of listings as any[]) {
+          const projId = typeof l.project === 'object' ? (l.project?._id || l.project?.id) : l.project;
+          if (projId) {
+            listingByProjectId.set(String(projId), { commissionType: l.commissionType, commissionValue: l.commissionValue });
+          }
+        }
 
         const totalViews = analyticsData.reduce((sum, p) => sum + (p.totalVisits || 0), 0);
         const totalLeads = analyticsData.reduce((sum, p) => sum + (p.uniqueLeads || 0), 0);
@@ -130,6 +146,8 @@ export default function CaptainDashboardPage() {
             facingOptions: p.facingOptions || p.configuration?.facingOptions || [],
             priceRange: p.priceRange || p.pricing?.totalPriceRange || '',
             ownerName: p.owner?.name || '',
+            commissionType: listingByProjectId.get(String(p.id || p._id))?.commissionType as ('percentage' | 'fixed' | undefined),
+            commissionValue: listingByProjectId.get(String(p.id || p._id))?.commissionValue,
           }));
 
         const captainCity = (user?.businessCity || '').toLowerCase().trim();
@@ -449,9 +467,25 @@ export default function CaptainDashboardPage() {
                       <h3 className="text-[13px] font-bold text-[#1C1917] font-serif leading-tight line-clamp-1">
                         {property.name}
                       </h3>
-                      <span className="text-[13px] font-black text-[#B45309]">
-                        {formatPrice(property.price)}
-                      </span>
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-[13px] font-black text-[#B45309]">
+                          {formatPrice(property.price)}
+                        </span>
+                        {/* Agent payout — from the project's marketplace listing, right-aligned next to the price. */}
+                        {(() => {
+                          const payout = property.commissionType === 'fixed'
+                            ? (Number(property.commissionValue) > 0 ? Number(property.commissionValue) : null)
+                            : computeAgentPayout(property.price, Number(property.commissionValue));
+                          if (!payout) return null;
+                          return (
+                            <span className="ml-auto inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[9px] font-bold">
+                              <TrendingUp className="w-2.5 h-2.5" />
+                              Earn {formatPayout(payout)}
+                              {property.commissionType !== 'fixed' && property.commissionValue ? ` at ${property.commissionValue}%` : ''}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
                 </div>
