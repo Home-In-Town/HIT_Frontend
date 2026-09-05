@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
 import { formatDerivedPricePerSqFt, derivePricePerSqFt } from '@/utils/pricePerSqFt';
+import { computeAgentPayout, formatPayout } from '@/utils/agentPayout';
 import {
   PlusIcon,
   MapPinIcon,
@@ -167,6 +168,9 @@ export default function MarketplacePage() {
   // Which card's "..." overflow menu is open (only one at a time). Null = none.
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  // Inline edit of a listing's commission (owner can change payout anytime).
+  const [editingListing, setEditingListing] = useState<{ id: string; commissionType: 'percentage' | 'fixed'; commissionValue: string } | null>(null);
+  const [savingListingEdit, setSavingListingEdit] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState<MarketplaceListing | null>(null);
   const [projects, setProjects] = useState<any[]>([]);
   const [myOwnProjects, setMyOwnProjects] = useState<any[]>([]);
@@ -546,6 +550,29 @@ export default function MarketplacePage() {
     } catch (err: any) {
       console.error('[Marketplace] Publish error:', err);
       toast.error(err.message || 'Error publishing listing');
+    }
+  };
+
+  const handleSaveListingEdit = async () => {
+    if (!editingListing) return;
+    const value = Number(editingListing.commissionValue);
+    if (!Number.isFinite(value) || value < 0) {
+      return toast.error('Enter a valid commission');
+    }
+    try {
+      setSavingListingEdit(true);
+      await marketplaceApi.updateListing(editingListing.id, {
+        commissionType: editingListing.commissionType,
+        commissionValue: value,
+      } as any);
+      toast.success('Payout updated');
+      setEditingListing(null);
+      fetchAll();
+    } catch (err: any) {
+      console.error('[Marketplace] Edit listing error:', err);
+      toast.error(err.message || 'Failed to update payout');
+    } finally {
+      setSavingListingEdit(false);
     }
   };
 
@@ -1062,7 +1089,7 @@ export default function MarketplacePage() {
                             </div>
 
                             {/* Price + Rate */}
-                            <div className="flex items-baseline gap-2 mb-1.5">
+                            <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
                               <span className="text-sm md:text-base font-black text-[#B45309] tracking-tight leading-none">
                                 {formatPrice(details.price)}
                               </span>
@@ -1071,6 +1098,21 @@ export default function MarketplacePage() {
                                   {formatDerivedPricePerSqFt(details.price, details.area)}
                                 </span>
                               )}
+                              {/* Agent payout — from the listing's commission, right-aligned off the image. */}
+                              {isListing && (item as any).listingType !== 'buying' && (() => {
+                                const cType = (item as any).commissionType;
+                                const cVal = Number((item as any).commissionValue);
+                                const payout = cType === 'fixed'
+                                  ? (cVal > 0 ? cVal : null)
+                                  : computeAgentPayout(details.price, cVal);
+                                if (!payout) return null;
+                                return (
+                                  <span className="ml-auto inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 rounded text-[8px] md:text-[9px] font-bold leading-none">
+                                    <SparklesIcon className="w-2 h-2" />
+                                    Earn {formatPayout(payout)}{cType !== 'fixed' && cVal ? ` at ${cVal}%` : ''}
+                                  </span>
+                                );
+                              })()}
                             </div>
 
                             {/* Matching signal — real live-buyer demand for this project.
@@ -1128,7 +1170,7 @@ export default function MarketplacePage() {
                                 className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
                               >
                                 <EyeIcon className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                                <span>View Project</span>
+                                <span>View Project </span>
                               </button>
                               <div className="relative flex-1">
                                 <button
@@ -1418,11 +1460,11 @@ export default function MarketplacePage() {
                       <div className="w-16 h-16 md:w-24 md:h-24 rounded-xl overflow-hidden flex-shrink-0 bg-[#FAF9F8] border border-[#E7E5E4]">
                         {d.media ? <img src={d.media} className="w-full h-full object-cover" /> : <BanknotesIcon className="w-full h-full p-4 md:p-6 text-[#E7E5E4]" />}
                       </div>
-                      <div className="flex-1 flex flex-col justify-between">
+                      <div className="flex-1 min-w-0 flex flex-col justify-between">
                         <div>
-                          <div className="flex items-center justify-between">
-                            <h4 className="font-bold text-base">{d.name}</h4>
-                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${STATUS_COLORS[l.status] || STATUS_COLORS.Active}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <h4 className="font-bold text-sm md:text-base truncate min-w-0">{d.name}</h4>
+                            <span className={`px-2 py-0.5 rounded text-[9px] font-bold border shrink-0 ${STATUS_COLORS[l.status] || STATUS_COLORS.Active}`}>
                               {l.status}
                             </span>
                           </div>
@@ -1433,8 +1475,52 @@ export default function MarketplacePage() {
                               </>
                             )}
                           </p>
+                          {l.listingType !== 'buying' && (() => {
+                            const payout = l.commissionType === 'percentage'
+                              ? computeAgentPayout(d.price, Number(l.commissionValue))
+                              : (Number(l.commissionValue) > 0 ? Number(l.commissionValue) : null);
+                            return payout ? (
+                              <p className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                                Agents earn {formatPayout(payout)}
+                                {l.commissionType === 'percentage' ? ` at ${l.commissionValue}%` : ''}
+                              </p>
+                            ) : null;
+                          })()}
+
+                          {/* Inline payout editor — change the commission without republishing the project. */}
+                          {editingListing?.id === String((l as any)._id) && (
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <div className="flex bg-white rounded-lg p-0.5 shadow-sm border border-[#E7E5E4]">
+                                <button
+                                  onClick={() => setEditingListing({ ...editingListing, commissionType: 'percentage' })}
+                                  className={`px-2 py-1 text-[8px] font-black rounded-md transition-all ${editingListing.commissionType === 'percentage' ? 'bg-[#B45309] text-white' : 'text-gray-400'}`}
+                                >PERCENT</button>
+                                <button
+                                  onClick={() => setEditingListing({ ...editingListing, commissionType: 'fixed' })}
+                                  className={`px-2 py-1 text-[8px] font-black rounded-md transition-all ${editingListing.commissionType === 'fixed' ? 'bg-[#B45309] text-white' : 'text-gray-400'}`}
+                                >FIXED ₹</button>
+                              </div>
+                              <input
+                                type="number"
+                                autoFocus
+                                value={editingListing.commissionValue}
+                                onChange={(e) => setEditingListing({ ...editingListing, commissionValue: e.target.value })}
+                                placeholder={editingListing.commissionType === 'percentage' ? '2.5' : '50000'}
+                                className="w-24 px-2 py-1.5 bg-white border border-[#E7E5E4] rounded-lg outline-none text-xs font-black text-[#B45309]"
+                              />
+                              <button
+                                onClick={handleSaveListingEdit}
+                                disabled={savingListingEdit}
+                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-50"
+                              >{savingListingEdit ? 'Saving…' : 'Save'}</button>
+                              <button
+                                onClick={() => setEditingListing(null)}
+                                className="px-3 py-1.5 bg-gray-100 text-gray-500 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-gray-200 active:scale-95 transition-all"
+                              >Cancel</button>
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-4 text-[9px] uppercase font-bold tracking-wider text-[#B45309] pt-2">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 md:gap-4 text-[9px] uppercase font-bold tracking-wider text-[#B45309] pt-2">
                           <span className="flex items-center gap-1"><EyeIcon className="w-3.5 h-3.5" /> {l.viewsCount} Views</span>
                           {d.slug && (
                             <button className="hover:underline flex items-center gap-1" onClick={(e) => handleShareProject(e, d)}>
@@ -1442,6 +1528,16 @@ export default function MarketplacePage() {
                             </button>
                           )}
                           <button className="hover:underline flex items-center gap-1" onClick={() => setShowDetailModal(l)}>Analytics <ArrowUpRightIcon className="w-2.5 h-2.5" /></button>
+                          {l.listingType === 'selling' && editingListing?.id !== String((l as any)._id) && (
+                            <button
+                              className="hover:underline flex items-center gap-1"
+                              onClick={() => setEditingListing({
+                                id: String((l as any)._id),
+                                commissionType: (l.commissionType as 'percentage' | 'fixed') || 'percentage',
+                                commissionValue: String(l.commissionValue ?? ''),
+                              })}
+                            >Edit Payout</button>
+                          )}
                           {user?.role === 'captain' && l.status === 'Active' && l.listingType === 'selling' && (
                             <button
                               onClick={() => handleAction((l as any)._id, 'deal_closed')}
@@ -1703,6 +1799,28 @@ export default function MarketplacePage() {
                         value={formData.commissionValue}
                         onChange={(e) => setFormData({ ...formData, commissionValue: e.target.value })}
                       />
+                      {/* Live payout preview — the amount an agent earns, shown exactly as on cards. */}
+                      {(() => {
+                        const selected = unlistedProjects.find(p => String(p.id) === String(formData.project));
+                        const baseValue = Number(selected?.startingPrice ?? selected?.pricing?.startingPrice ?? formData.expectedValue) || 0;
+                        const pct = Number(formData.commissionValue) || 0;
+                        const amount = formData.commissionType === 'percentage'
+                          ? computeAgentPayout(baseValue, pct)
+                          : (pct > 0 ? pct : null);
+                        if (!amount) {
+                          return (
+                            <p className="mt-2 text-[9px] text-zinc-400 font-medium pl-1">
+                              Agents will see what they can earn on the project card.
+                            </p>
+                          );
+                        }
+                        return (
+                          <p className="mt-2 text-[10px] text-[#3F6212] font-bold pl-1">
+                            Agents earn {formatPayout(amount)}
+                            {formData.commissionType === 'percentage' ? ` at ${pct}%` : ''}
+                          </p>
+                        );
+                      })()}
                     </div>
                   )}
 
