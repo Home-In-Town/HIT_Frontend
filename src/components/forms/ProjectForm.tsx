@@ -7,7 +7,7 @@ import { projectsApi, mediaApi} from '@/lib/api';
 import { PROPERTY_CATEGORIES, CATEGORY_PROPERTY_TYPES, PropertyCategory } from '@/lib/propertyConfig';
 import toast from 'react-hot-toast';
 import { useRef, useEffect } from 'react';
-import { derivePricePerSqFt, formatDerivedPricePerSqFt, parseAreaLowerBoundSqFt } from '@/utils/pricePerSqFt';
+import { derivePricePerSqFt, formatDerivedPricePerSqFt, parseAreaLowerBoundSqFt, normalizeAreaRangeToSqFt, AREA_UNIT_OPTIONS, AreaUnit } from '@/utils/pricePerSqFt';
 
 interface ProjectFormProps {
   initialData?: Partial<Project>;
@@ -144,11 +144,29 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
     initialData?.trackableLink || null
   );
 
+  // Plot-size UI state. The seller may enter size in acre/guntha/etc., but we
+  // always STORE plotSizeRange in sqft. `plotSizeUnit` + `plotSizeInput` are
+  // UI-only; on change we normalize to sqft and write into formData.plotSizeRange.
+  const [plotSizeUnit, setPlotSizeUnit] = useState<AreaUnit>('sqft');
+  const [plotSizeInput, setPlotSizeInput] = useState<string>(
+    // Existing projects store sqft; strip the unit suffix for the editable field.
+    (initialData?.plotSizeRange || '').replace(/sq\.?\s*ft|sqft/gi, '').trim()
+  );
+
   const updateField = <K extends keyof ProjectFormData>(
     field: K,
     value: ProjectFormData[K]
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  // Recompute the stored (sqft) plotSizeRange whenever the raw entry or unit
+  // changes. Keeps the backend value in sqft regardless of the unit chosen.
+  const handlePlotSizeChange = (rawValue: string, unit: AreaUnit) => {
+    setPlotSizeInput(rawValue);
+    setPlotSizeUnit(unit);
+    const normalized = normalizeAreaRangeToSqFt(rawValue, unit);
+    updateField('plotSizeRange', normalized);
   };
 
   // Auto-derive price-per-sqft from starting price and area so the stored value
@@ -202,10 +220,12 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   // carpetAreaRange. Mixed Use may carry either.
   if (formData.propertyType) {
     if (isPlotType) {
+      // plotSizeRange is always normalized to sqft (see handlePlotSizeChange),
+      // so validation stays on the stored sqft value regardless of the unit used.
       if (!formData.plotSizeRange?.trim()) {
         errors.plotSizeRange = 'Plot size is required';
       } else if (parseAreaLowerBoundSqFt(formData.plotSizeRange) === null) {
-        errors.plotSizeRange = 'Enter a valid area in sqft (e.g., 1000 - 2500 sqft)';
+        errors.plotSizeRange = 'Enter a valid plot size (e.g., 1000 - 2500)';
       }
     } else if (isMixedUse) {
       const area = formData.carpetAreaRange || formData.plotSizeRange;
@@ -996,16 +1016,53 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           {/* Plot/Land-specific fields - show for plot types OR Mixed Use (optional for Mixed Use) */}
           {(formData.category === 'Mixed Use' || ['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) || formData.propertyType.toLowerCase().includes('plot') || formData.propertyType.toLowerCase().includes('land')) && (
           <>
-            <InputField
-              label="Plot Size Range (sqft)"
-              name="plotSizeRange"
-              placeholder="e.g., 1000 - 2500 sqft"
-              required
-              value={formData.plotSizeRange || ''}
-              error={formErrors.plotSizeRange}
-              refCallback={(el) => (fieldRefs.current.plotSizeRange = el)}
-              onChange={(v) => updateField('plotSizeRange', v)}
-            />
+            <div>
+              <label className="block text-sm font-medium text-[#57534E] mb-1.5">
+                Plot Size Range <span className="text-red-500">*</span>
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  name="plotSizeRange"
+                  placeholder={
+                    plotSizeUnit === 'sqft'
+                      ? 'e.g., 1000 - 2500'
+                      : plotSizeUnit === 'acre'
+                      ? 'e.g., 1 - 2.5'
+                      : 'e.g., 5 - 10'
+                  }
+                  value={plotSizeInput}
+                  ref={(el) => {
+                    fieldRefs.current.plotSizeRange = el;
+                  }}
+                  onChange={(e) => handlePlotSizeChange(e.target.value, plotSizeUnit)}
+                  className={`flex-1 px-3 py-2 border rounded-lg bg-white text-[#292524] focus:outline-none focus:ring-2 focus:ring-green-600 ${
+                    formErrors.plotSizeRange ? 'border-red-500' : 'border-[#D6D3D1]'
+                  }`}
+                />
+                <select
+                  aria-label="Plot size unit"
+                  value={plotSizeUnit}
+                  onChange={(e) => handlePlotSizeChange(plotSizeInput, e.target.value as AreaUnit)}
+                  className="w-32 px-2 py-2 border border-[#D6D3D1] rounded-lg bg-white text-[#292524] focus:outline-none focus:ring-2 focus:ring-green-600"
+                >
+                  {AREA_UNIT_OPTIONS.map((u) => (
+                    <option key={u.value} value={u.value}>
+                      {u.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {/* Stored-as-sqft preview so the seller sees the normalized value */}
+              {plotSizeUnit !== 'sqft' && formData.plotSizeRange ? (
+                <p className="mt-1 text-xs text-[#78716C]">
+                  Stored as: <span className="font-medium">{formData.plotSizeRange}</span>
+                </p>
+              ) : null}
+              {formErrors.plotSizeRange ? (
+                <p className="mt-1 text-xs text-red-500">{formErrors.plotSizeRange}</p>
+              ) : null}
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-[#57534E] mb-1.5">
