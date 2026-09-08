@@ -165,6 +165,13 @@ export function useSocket() {
     };
   }, []);
 
+  const onProjectAnnouncementUpdated = useCallback((handler: (msg: any) => void) => {
+    socketRef.current?.on('project_announcement_updated', handler);
+    return () => {
+      socketRef.current?.off('project_announcement_updated', handler);
+    };
+  }, []);
+
   return {
     socket: socketRef.current,
     isConnected,
@@ -185,5 +192,6 @@ export function useSocket() {
     onGroupMessage,
     onGroupTyping,
     onMatchResults,
+    onProjectAnnouncementUpdated,
   };
 }

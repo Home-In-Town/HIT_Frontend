@@ -816,9 +816,35 @@ function SummaryBubble({ msg, onEdit, onConfirm, sending }: {
 // RESULTS BUBBLE
 // ═══════════════════════════════════════════════════════════
 
+interface AssistantMatchCard {
+  projectId: string;
+  projectName: string;
+  city?: string;
+  location?: string;
+  score: number;
+  matchedOn?: string[];
+  slug?: string;
+  coverImageUrl?: string;
+  startingPrice?: number;
+  bhkOptions?: string[];
+  projectStatus?: string;
+  reraNumber?: string;
+  bankLoanAvailable?: boolean;
+  builderName?: string;
+  builderCompany?: string;
+  isVerifiedBuilder?: boolean;
+  builderRating?: number;
+}
+
+function formatCardPrice(val?: number): string {
+  if (!val) return '';
+  if (val >= 10000000) return `₹${(val / 10000000).toFixed(1)}Cr`;
+  if (val >= 100000) return `₹${(val / 100000).toFixed(0)}L`;
+  return `₹${val.toLocaleString('en-IN')}`;
+}
+
 function ResultsBubble({ msg }: { msg: LeadChatMessage }) {
-  const matches: { projectId: string; projectName: string; city?: string; location?: string; score: number; slug?: string }[] =
-    msg.template?.options?.matches || [];
+  const matches: AssistantMatchCard[] = msg.template?.options?.matches || [];
   const hasMatches = matches.length > 0;
   return (
     <div className="flex items-end gap-2 justify-start ai-msg-in w-full min-w-0">
@@ -838,34 +864,59 @@ function ResultsBubble({ msg }: { msg: LeadChatMessage }) {
   );
 }
 
-// A single match result. Tappable when a slug is available — opens the public
-// project page in a new tab so the user keeps their chat thread. Falls back to
-// a static card when no slug exists (nothing to open).
+// A single match result rendered as the rich project card (same look as the
+// group-chat project announcement card) with the match score ring. The whole
+// card opens the public project page in a new tab when a slug is available.
 function MatchCard({ match, delayMs }: {
-  match: { projectId: string; projectName: string; city?: string; location?: string; score: number; slug?: string };
+  match: AssistantMatchCard;
   delayMs: number;
 }) {
   const place = [match.location, match.city].filter(Boolean).join(', ') || '—';
+  const builderLabel = match.builderCompany || match.builderName || 'Builder';
+  const price = formatCardPrice(match.startingPrice);
+
   const inner = (
     <>
-      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#B45309]/10 to-[#B45309]/5 flex items-center justify-center flex-shrink-0" aria-hidden="true">
-        <svg className="w-6 h-6 text-[#B45309]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m-5 0v-4a1 1 0 011-1h2a1 1 0 011 1v4m-4 0h4" /></svg>
+      {match.coverImageUrl && (
+        <div className="w-full h-28 sm:h-32 bg-gray-100 overflow-hidden rounded-xl mb-2.5">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={match.coverImageUrl} alt={match.projectName || 'Project'} className="w-full h-full object-cover" />
+        </div>
+      )}
+      <div className="flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-[14px] font-bold text-[#0B2B1E] truncate">{match.projectName || 'Project'}</p>
+          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+            <span className="text-[11px] text-[#57534E] truncate">by {builderLabel}</span>
+            {match.isVerifiedBuilder && (
+              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                Verified
+              </span>
+            )}
+            {match.builderRating ? <span className="text-[10px] text-amber-600 font-semibold">★ {match.builderRating.toFixed(1)}</span> : null}
+          </div>
+        </div>
+        <ScoreRing score={match.score} />
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-bold text-[#0B2B1E] truncate">{match.projectName || 'Project'}</p>
-        <p className="text-[11px] text-[#57534E] truncate">📍 {place}</p>
-        {match.slug && (
-          <span className="inline-flex items-center gap-0.5 mt-1 text-[11px] font-semibold text-[#075E54]">
-            View Project
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-          </span>
-        )}
+
+      <div className="flex flex-wrap gap-1 mt-2">
+        <span className="text-[10px] text-[#57534E] bg-gray-100 px-2 py-0.5 rounded-full">📍 {place}</span>
+        {price && <span className="text-[10px] text-[#57534E] bg-gray-100 px-2 py-0.5 rounded-full">💰 {price}+</span>}
+        {match.bhkOptions && match.bhkOptions.length > 0 && <span className="text-[10px] text-[#57534E] bg-gray-100 px-2 py-0.5 rounded-full">{match.bhkOptions.join(', ')}</span>}
+        {match.projectStatus && <span className="text-[10px] text-[#57534E] bg-gray-100 px-2 py-0.5 rounded-full">🏗️ {match.projectStatus}</span>}
+        {match.reraNumber && <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">RERA ✓</span>}
       </div>
-      <ScoreRing score={match.score} />
+
+      {match.slug && (
+        <div className="w-full mt-3 py-2 text-center text-xs font-bold text-white bg-[#075E54] rounded-xl">
+          View Project Details →
+        </div>
+      )}
     </>
   );
 
-  const baseClass = 'ai-opt-in bg-white rounded-2xl p-3 shadow-sm border border-black/5 flex items-center gap-3 transition-all';
+  const baseClass = 'ai-opt-in bg-white rounded-2xl p-3 shadow-sm border border-black/5 block transition-all';
 
   if (match.slug) {
     return (

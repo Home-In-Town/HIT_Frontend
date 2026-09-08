@@ -2245,12 +2245,33 @@ export interface GroupMessage {
   _id: string;
   room: string;
   sender: { _id: string; name: string; role: string; companyName?: string };
-  messageType: 'text' | 'inventory_card' | 'requirement_card' | 'system';
+  messageType: 'text' | 'inventory_card' | 'requirement_card' | 'system' | 'project_announcement';
   content: string;
   inventoryCard?: InventoryCard;
   requirementCard?: RequirementCard;
   matchResults?: MatchResult[];
+  projectAnnouncement?: ProjectAnnouncement;
   createdAt: string;
+}
+
+export interface ProjectAnnouncement {
+  project?: string;
+  kind: 'new' | 'updated';
+  projectName?: string;
+  coverImageUrl?: string;
+  slug?: string;
+  location?: string;
+  city?: string;
+  startingPrice?: number;
+  bhkOptions?: string[];
+  projectStatus?: string;
+  reraNumber?: string;
+  bankLoanAvailable?: boolean;
+  builderName?: string;
+  builderCompany?: string;
+  isVerifiedBuilder?: boolean;
+  builderRating?: number;
+  changedFields?: string[];
 }
 
 export interface DealRoom {
