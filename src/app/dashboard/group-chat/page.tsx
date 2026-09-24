@@ -197,7 +197,7 @@ export default function GroupChatPage() {
   const handleJoinRoom = async (roomId: string) => {
     try {
       const room = await groupChatApi.joinRoom(roomId);
-      setMyRooms(prev => [...prev, room]);
+      setMyRooms(prev => [...prev.filter(r => r._id !== room._id), room]);
       setDiscoverRooms(prev => prev.filter(r => r._id !== roomId));
       setActiveRoom(room);
       toast.success('Joined room!');
@@ -433,20 +433,32 @@ export default function GroupChatPage() {
                 </button>
               ))}
 
-              {discoverRooms.length > 0 && (
-                <div className="px-3 pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Discover</div>
+              {/* Discover Groups — public groups the user hasn't joined. The
+                  backend already excludes joined rooms; this guard keeps the
+                  list correct if a join resolves during a refresh, so a group
+                  never appears in both My Groups and Discover. */}
+              {discoverRooms.filter(r => !myRooms.some(m => m._id === r._id)).length > 0 && (
+                <div className="px-3 pt-4 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Discover Groups</div>
               )}
-              {discoverRooms.map(room => (
-                <div key={room._id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50">
-                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
+              {discoverRooms.filter(r => !myRooms.some(m => m._id === r._id)).map(room => (
+                <div key={room._id} className="flex items-center gap-3 px-3 sm:px-4 py-3 border-b border-gray-50">
+                  <div className="w-11 h-11 sm:w-10 sm:h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm flex-shrink-0">
                     {room.roomType === 'area' ? '📍' : '🏗️'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#2A2A2A] truncate">{room.name}</p>
-                    <p className="text-[10px] text-gray-400">{room.members?.length || 0} members</p>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {room.members?.length || 0} members
+                      {room.roomType === 'project' && room.project?.location
+                        ? ` · ${room.project.location}`
+                        : room.area?.city ? ` · ${room.area.city}` : ''}
+                    </p>
                   </div>
-                  <button onClick={() => handleJoinRoom(room._id)} className="px-3 py-1 text-xs font-bold text-[#B45309] border border-[#B45309]/30 rounded-lg hover:bg-[#B45309] hover:text-white transition-all">
-                    Join
+                  <button
+                    onClick={() => handleJoinRoom(room._id)}
+                    className="px-3 py-1.5 text-xs font-bold text-[#B45309] border border-[#B45309]/30 rounded-lg hover:bg-[#B45309] hover:text-white transition-all whitespace-nowrap flex-shrink-0"
+                  >
+                    Join Group
                   </button>
                 </div>
               ))}
