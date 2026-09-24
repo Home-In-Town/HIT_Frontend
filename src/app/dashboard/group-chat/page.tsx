@@ -13,6 +13,24 @@ import LeadConfirmModal from './LeadConfirmModal';
 type ActiveTab = 'rooms' | 'deals' | 'leads' | 'stats';
 type PostMode = 'text' | 'inventory' | 'requirement';
 
+/**
+ * Collapse project-announcement cards to one per project. If older duplicates
+ * exist in history (e.g. a "published" + "updated" pair from before this fix),
+ * keep only the most recent one so a single self-updating card remains.
+ */
+function dedupeAnnouncements(msgs: GMsg[]): GMsg[] {
+  const latestByProject = new Map<string, string>(); // projectId -> messageId to keep
+  for (const m of msgs) {
+    if (m.messageType === 'project_announcement' && m.projectAnnouncement?.project) {
+      latestByProject.set(m.projectAnnouncement.project, m._id); // later entries win
+    }
+  }
+  return msgs.filter(m => {
+    if (m.messageType !== 'project_announcement' || !m.projectAnnouncement?.project) return true;
+    return latestByProject.get(m.projectAnnouncement.project) === m._id;
+  });
+}
+
 export default function GroupChatPage() {
   const { user } = useAuth();
   const socket = useSocket();
@@ -165,10 +183,13 @@ export default function GroupChatPage() {
   useEffect(() => {
     setShowRoomMenu(false);
     if (!activeRoom) return;
+    // Project sub-groups don't support requirement/inventory cards — make sure
+    // the composer isn't left in one of those modes when switching into one.
+    if (activeRoom.roomType === 'project' && postMode !== 'text') setPostMode('text');
     const load = async () => {
       try {
         const msgs = await groupChatApi.getMessages(activeRoom._id);
-        setMessages(msgs);
+        setMessages(dedupeAnnouncements(msgs));
         socket.joinGroup(activeRoom._id);
       } catch (err: any) {
         toast.error('Failed to load messages');
@@ -187,6 +208,16 @@ export default function GroupChatPage() {
     });
     return cleanup;
   }, [activeRoom?._id, socket.onGroupMessage]);
+
+  // Listen for project-announcement updates — replace the existing card in place
+  // (there is only ever one announcement card per project).
+  useEffect(() => {
+    const cleanup = socket.onProjectAnnouncementUpdated((msg: GMsg) => {
+      if (msg.room !== activeRoom?._id && (msg as any).roomId !== activeRoom?._id) return;
+      setMessages(prev => prev.map(m => (m._id === msg._id ? msg : m)));
+    });
+    return cleanup;
+  }, [activeRoom?._id, socket.onProjectAnnouncementUpdated]);
 
   // Auto scroll
   useEffect(() => {
@@ -633,13 +664,15 @@ export default function GroupChatPage() {
 
             {/* Input Area */}
             <div className="px-2 py-1.5 sm:px-3 sm:py-2 bg-[#F0F2F5]">
-              {/* Mode switcher */}
+              {/* Mode switcher — requirement/inventory cards are for discovery
+                  (community/area rooms). A project sub-group is already scoped to
+                  one project, so only plain text is offered there. */}
               <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2 overflow-x-auto scrollbar-hide">
                 <button onClick={() => setPostMode('text')} className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${postMode === 'text' ? 'bg-[#075E54] text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>Text</button>
-                {(user?.role === 'agent' || user?.role === 'admin' || user?.role === 'captain') && (
+                {activeRoom.roomType !== 'project' && (user?.role === 'agent' || user?.role === 'admin' || user?.role === 'captain') && (
                   <button onClick={() => setPostMode('requirement')} className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${postMode === 'requirement' ? 'bg-orange-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>🔍 Requirement</button>
                 )}
-                {(user?.role === 'builder' || user?.role === 'admin' || user?.role === 'captain' || user?.role === 'agent') && (
+                {activeRoom.roomType !== 'project' && (user?.role === 'builder' || user?.role === 'admin' || user?.role === 'captain' || user?.role === 'agent') && (
                   <button onClick={() => setPostMode('inventory')} className={`px-2.5 py-1 text-[10px] sm:text-xs font-bold rounded-full transition-all whitespace-nowrap ${postMode === 'inventory' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-600 border border-gray-200'}`}>🏠 Inventory</button>
                 )}
               </div>
@@ -772,6 +805,69 @@ function MessageBubble({ msg, userId, onInterested, formatPrice }: {
     return (
       <div className="flex justify-center px-2">
         <span className="text-[10px] text-gray-500 bg-gray-100 px-3 py-1 rounded-full text-center max-w-[85%]">{msg.content}</span>
+      </div>
+    );
+  }
+
+  // Project Announcement Card (persistent — posted on publish / significant edit)
+  if (msg.messageType === 'project_announcement' && msg.projectAnnouncement) {
+    const a = msg.projectAnnouncement;
+    const isUpdate = a.kind === 'updated';
+    const builderLabel = a.builderCompany || a.builderName || 'Builder';
+    const openProject = () => {
+      if (a.slug) window.open(`${window.location.origin}/visit/${a.slug}`, '_blank');
+      else toast.error('Project link not available');
+    };
+    return (
+      <div className="flex flex-col items-center px-2 my-1">
+        {/* Ribbon */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className="h-px w-8 bg-gray-300" />
+          <span className={`text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full ${isUpdate ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+            ✦ {isUpdate ? 'Project Updated' : 'New Project Published'}
+          </span>
+          <span className="h-px w-8 bg-gray-300" />
+        </div>
+
+        {/* Card */}
+        <div className="w-full max-w-[92%] sm:max-w-[420px] bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          {a.coverImageUrl && (
+            <div className="w-full h-32 sm:h-36 bg-gray-100 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={a.coverImageUrl} alt={a.projectName || 'Project'} className="w-full h-full object-cover" />
+            </div>
+          )}
+          <div className="p-3.5">
+            <p className="text-sm font-bold text-[#2A2A2A] truncate">{a.projectName}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[11px] text-gray-500 truncate">by {builderLabel}</span>
+              {a.isVerifiedBuilder && (
+                <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                  <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+                  Verified
+                </span>
+              )}
+              {a.builderRating ? <span className="text-[10px] text-amber-600 font-semibold">★ {a.builderRating.toFixed(1)}</span> : null}
+            </div>
+
+            <div className="flex flex-wrap gap-1 mt-2">
+              {(a.location || a.city) && <span className="text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">📍 {a.location}{a.city ? `, ${a.city}` : ''}</span>}
+              {a.startingPrice ? <span className="text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">💰 {formatPrice(a.startingPrice)}+</span> : null}
+              {a.bhkOptions && a.bhkOptions.length > 0 && <span className="text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">{a.bhkOptions.join(', ')}</span>}
+              {a.projectStatus && <span className="text-[10px] text-gray-600 bg-gray-100 px-2 py-0.5 rounded-full">🏗️ {a.projectStatus}</span>}
+              {a.reraNumber && <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full">RERA ✓</span>}
+            </div>
+
+            {isUpdate && a.changedFields && a.changedFields.length > 0 && (
+              <p className="text-[10px] text-amber-600 mt-2">{a.changedFields.join(' · ')}</p>
+            )}
+
+            <button onClick={openProject} className="w-full mt-3 py-2 text-xs font-bold text-white bg-[#075E54] rounded-xl hover:bg-[#064c44] transition-colors">
+              View Project Details →
+            </button>
+          </div>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1">{time}</p>
       </div>
     );
   }

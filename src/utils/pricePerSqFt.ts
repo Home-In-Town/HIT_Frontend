@@ -71,3 +71,68 @@ export function formatDerivedPricePerSqFt(
   if (rate === null) return null;
   return `\u20B9${rate.toLocaleString('en-IN')}/sqft`;
 }
+
+// ─── Area unit conversion (for the upload form) ─────────────────────────────
+
+/**
+ * Supported area units the seller can enter plot/land size in. The platform
+ * always STORES size in sqft (so matching, price-per-sqft, and display stay
+ * consistent), but sellers of land often think in acres / guntha / sq yard.
+ */
+export type AreaUnit = 'sqft' | 'acre' | 'guntha' | 'sqyd' | 'sqm';
+
+export const AREA_UNIT_OPTIONS: { value: AreaUnit; label: string }[] = [
+  { value: 'sqft', label: 'sq ft' },
+  { value: 'acre', label: 'acre' },
+  { value: 'guntha', label: 'guntha' },
+  { value: 'sqyd', label: 'sq yard' },
+  { value: 'sqm', label: 'sq meter' },
+];
+
+/** Multiplier from each unit to square feet. */
+const AREA_TO_SQFT: Record<AreaUnit, number> = {
+  sqft: 1,
+  acre: 43560,
+  guntha: 1089,
+  sqyd: 9,
+  sqm: 10.7639,
+};
+
+/** Convert a single numeric value in `unit` to square feet (rounded). */
+export function convertAreaValueToSqFt(value: number, unit: AreaUnit): number {
+  return Math.round(value * (AREA_TO_SQFT[unit] ?? 1));
+}
+
+/**
+ * Convert an area range/value string entered in a given unit into a
+ * normalized sqft string that is stored in `plotSizeRange`.
+ *
+ * Preserves range shape: "1 - 2" acres → "43560 - 87120 sqft".
+ * A single value: "1200" sqft → "1200 sqft". A single "2" acre → "87120 sqft".
+ * Returns '' when no numbers can be parsed.
+ *
+ * When unit is already 'sqft' we still normalize the suffix to " sqft".
+ */
+export function normalizeAreaRangeToSqFt(
+  input: string,
+  unit: AreaUnit
+): string {
+  if (!input || typeof input !== 'string') return '';
+
+  const nums = input.replace(/,/g, '').match(/\d+(?:\.\d+)?/g);
+  if (!nums || nums.length === 0) return '';
+
+  const sqftNums = nums
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .map((n) => convertAreaValueToSqFt(n, unit));
+
+  if (sqftNums.length === 0) return '';
+
+  if (sqftNums.length === 1) return `${sqftNums[0]} sqft`;
+
+  // Range: use the min/max of whatever numbers were entered.
+  const min = Math.min(...sqftNums);
+  const max = Math.max(...sqftNums);
+  return `${min} - ${max} sqft`;
+}

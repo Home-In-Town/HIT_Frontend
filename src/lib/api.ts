@@ -117,6 +117,11 @@ export function transformBackendToFrontend(backendProject: any): Project {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
     } : undefined,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    coCaptains: Array.isArray(backendProject.coCaptains)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? backendProject.coCaptains.map((c: any) => ({ ...c, id: String(c.id || c._id || '') }))
+      : [],
     assignedAgent: backendProject.assignedAgent ? {
       ...backendProject.assignedAgent,
       id: String(backendProject.assignedAgent.id || backendProject.assignedAgent._id || ''),
@@ -325,6 +330,19 @@ export const projectsApi = {
       method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify({ captainId }),
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await handleResponse<any>(response);
+    return transformBackendToFrontend(data);
+  },
+
+  // Add or remove a co-captain (second captain) on a project
+  async assignCoCaptain(projectId: string, captainId: string, action: 'add' | 'remove' = 'add'): Promise<Project> {
+    const response = await fetch(`${API_URL}/projects/${projectId}/assign-co-captain`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ captainId, action }),
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const data = await handleResponse<any>(response);
@@ -1226,7 +1244,7 @@ export const chatApi = {
 -----------------------------------*/
 
 export type LeadChatInputType =
-  | 'choice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results' | 'actions';
+  | 'choice' | 'multichoice' | 'number' | 'text' | 'location' | 'phone' | 'summary' | 'results' | 'actions';
 
 export interface LeadChatOption {
   value: string;
@@ -1240,6 +1258,8 @@ export interface LeadChatTemplate {
   options?: any;
   unit?: string[];
   prefill?: string;
+  skippable?: boolean;
+  allowCustom?: boolean;
   progress?: { current: number; total: number };
 }
 
@@ -2225,12 +2245,33 @@ export interface GroupMessage {
   _id: string;
   room: string;
   sender: { _id: string; name: string; role: string; companyName?: string };
-  messageType: 'text' | 'inventory_card' | 'requirement_card' | 'system';
+  messageType: 'text' | 'inventory_card' | 'requirement_card' | 'system' | 'project_announcement';
   content: string;
   inventoryCard?: InventoryCard;
   requirementCard?: RequirementCard;
   matchResults?: MatchResult[];
+  projectAnnouncement?: ProjectAnnouncement;
   createdAt: string;
+}
+
+export interface ProjectAnnouncement {
+  project?: string;
+  kind: 'new' | 'updated';
+  projectName?: string;
+  coverImageUrl?: string;
+  slug?: string;
+  location?: string;
+  city?: string;
+  startingPrice?: number;
+  bhkOptions?: string[];
+  projectStatus?: string;
+  reraNumber?: string;
+  bankLoanAvailable?: boolean;
+  builderName?: string;
+  builderCompany?: string;
+  isVerifiedBuilder?: boolean;
+  builderRating?: number;
+  changedFields?: string[];
 }
 
 export interface DealRoom {

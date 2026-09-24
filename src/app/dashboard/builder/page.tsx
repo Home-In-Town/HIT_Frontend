@@ -490,14 +490,14 @@ export default function BuilderDashboardPage() {
                   )}
                 </div>
 
-                {/* View Details + Share (with all sharing options) */}
+                {/* View Project + Share (with all sharing options) */}
                 {property.slug && (
                   <div className="flex items-center gap-1.5">
                     <Link
                       href={`/visit/${property.slug}`}
                       className="flex-1 flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-md text-[9px] md:text-[10px] font-bold transition-all active:scale-95 bg-[#1C1917] text-white hover:bg-[#B45309] shadow-sm"
                     >
-                      <Eye className="w-3 h-3 md:w-3.5 md:h-3.5" />View Details
+                      <Eye className="w-3 h-3 md:w-3.5 md:h-3.5" />View Project
                     </Link>
                     <div className="relative flex-1">
                       <button

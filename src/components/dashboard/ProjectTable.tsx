@@ -16,15 +16,19 @@ interface ProjectTableProps {
   onDelete: (project: Project) => void;
   onCopyLink: (link: string) => void;
   onAssignCaptain?: (projectId: string, captainId: string | null, captainName: string | null) => Promise<void>;
+  onAssignCoCaptain?: (projectId: string, captainId: string, captainName: string, action: 'add' | 'remove') => Promise<void>;
   onAssignAgent?: (projectId: string, agentId: string | null, agentName: string | null) => Promise<void>;
 }
 
-export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignCaptain, onAssignAgent }: ProjectTableProps) {
+export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignCaptain, onAssignCoCaptain, onAssignAgent }: ProjectTableProps) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [captainComboboxProjectId, setCaptainComboboxProjectId] = useState<string | null>(null);
   const [captainTriggerEl, setCaptainTriggerEl] = useState<HTMLButtonElement | null>(null);
   const [captains, setCaptains] = useState<Captain[]>([]);
   const [captainsLoading, setCaptainsLoading] = useState(false);
+  // Co-captain assignment combobox (separate from primary captain)
+  const [coCaptainComboboxProjectId, setCoCaptainComboboxProjectId] = useState<string | null>(null);
+  const [coCaptainTriggerEl, setCoCaptainTriggerEl] = useState<HTMLButtonElement | null>(null);
   const [agentComboboxProjectId, setAgentComboboxProjectId] = useState<string | null>(null);
   const [agentTriggerEl, setAgentTriggerEl] = useState<HTMLButtonElement | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -74,6 +78,36 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
     setCaptainTriggerEl(null);
     if (onAssignCaptain) {
       onAssignCaptain(projectId, captain?.id || null, captain?.name || null);
+    }
+  };
+
+  const handleCoCaptainCellClick = async (projectId: string, e: React.MouseEvent<HTMLButtonElement>) => {
+    setCoCaptainTriggerEl(e.currentTarget);
+    setCoCaptainComboboxProjectId(projectId);
+    setCaptainsLoading(true);
+    try {
+      const data = await projectsApi.getCaptains();
+      setCaptains(data);
+    } catch {
+      toast.error('Failed to load captains');
+      setCoCaptainComboboxProjectId(null);
+      setCoCaptainTriggerEl(null);
+    } finally {
+      setCaptainsLoading(false);
+    }
+  };
+
+  const handleCoCaptainSelect = (captain: Captain | null, projectId: string) => {
+    setCoCaptainComboboxProjectId(null);
+    setCoCaptainTriggerEl(null);
+    if (captain && onAssignCoCaptain) {
+      onAssignCoCaptain(projectId, captain.id, captain.name, 'add');
+    }
+  };
+
+  const handleCoCaptainRemove = (projectId: string, captainId: string, captainName: string) => {
+    if (onAssignCoCaptain) {
+      onAssignCoCaptain(projectId, captainId, captainName, 'remove');
     }
   };
 
@@ -204,26 +238,60 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
                 </td>
 
                 {isAdmin && (
-                  <td className="px-6 py-3.5 whitespace-nowrap">
-                    <button
-                      onClick={(e) => handleCaptainCellClick(project.id, e)}
-                      className={`text-sm font-medium cursor-pointer hover:text-[#B45309] transition-colors ${
-                        project.owner?.name
-                          ? 'text-[#2A2A2A]'
-                          : 'text-[#A8A29E] italic'
-                      }`}
-                    >
-                      {project.owner?.name || 'Unassigned'}
-                    </button>
-                    {captainComboboxProjectId === project.id && (
-                      <CaptainCombobox
-                        captains={captains}
-                        isLoading={captainsLoading}
-                        onSelect={(captain) => handleCaptainSelect(captain, project.id)}
-                        onClose={() => { setCaptainComboboxProjectId(null); setCaptainTriggerEl(null); }}
-                        triggerEl={captainTriggerEl}
-                      />
-                    )}
+                  <td className="px-6 py-3.5 whitespace-nowrap align-top">
+                    {/* Primary captain */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[9px] font-bold text-[#A8A29E] uppercase tracking-wider">Primary</span>
+                      <button
+                        onClick={(e) => handleCaptainCellClick(project.id, e)}
+                        className={`text-sm font-medium cursor-pointer hover:text-[#B45309] transition-colors ${
+                          project.owner?.name ? 'text-[#2A2A2A]' : 'text-[#A8A29E] italic'
+                        }`}
+                      >
+                        {project.owner?.name || 'Unassigned'}
+                      </button>
+                      {captainComboboxProjectId === project.id && (
+                        <CaptainCombobox
+                          captains={captains}
+                          isLoading={captainsLoading}
+                          onSelect={(captain) => handleCaptainSelect(captain, project.id)}
+                          onClose={() => { setCaptainComboboxProjectId(null); setCaptainTriggerEl(null); }}
+                          triggerEl={captainTriggerEl}
+                        />
+                      )}
+                    </div>
+
+                    {/* Co-captains */}
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {(project.coCaptains || []).map((cc) => (
+                        <span key={cc.id} className="inline-flex items-center gap-1 pl-2 pr-1 py-0.5 rounded-full bg-[#B45309]/5 border border-[#B45309]/15 text-[11px] font-medium text-[#57534E]">
+                          {cc.name}
+                          <button
+                            onClick={() => handleCoCaptainRemove(project.id, cc.id, cc.name)}
+                            title="Remove co-captain"
+                            className="w-4 h-4 rounded-full flex items-center justify-center text-[#A8A29E] hover:text-red-500 hover:bg-red-50 transition-colors"
+                          >
+                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        onClick={(e) => handleCoCaptainCellClick(project.id, e)}
+                        className="inline-flex items-center gap-0.5 text-[11px] font-bold text-[#B45309] hover:text-[#92400E] transition-colors"
+                      >
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                        Co-captain
+                      </button>
+                      {coCaptainComboboxProjectId === project.id && (
+                        <CaptainCombobox
+                          captains={captains}
+                          isLoading={captainsLoading}
+                          onSelect={(captain) => handleCoCaptainSelect(captain, project.id)}
+                          onClose={() => { setCoCaptainComboboxProjectId(null); setCoCaptainTriggerEl(null); }}
+                          triggerEl={coCaptainTriggerEl}
+                        />
+                      )}
+                    </div>
                   </td>
                 )}
 
