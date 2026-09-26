@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "target": "ES2017",
+    "ignoreDeprecations": "6.0",
     "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
+    "noUncheckedSideEffectImports": false,
     "strict": true,
     "noEmit": true,
     "esModuleInterop": true,
