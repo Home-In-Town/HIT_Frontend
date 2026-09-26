@@ -1,12 +1,16 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import LeadDetailView from './LeadDetailView';
 import CaptainTeamPanel from './CaptainTeamPanel';
-import { projectsApi, humanLeadsApi, HumanLead } from '@/lib/api';
+import {
+  projectsApi, humanLeadsApi, HumanLead, LeadPerson,
+  LeadStage, QUALIFIED_STAGE, LeadRequirementsInput,
+} from '@/lib/api';
 import { useAuth } from '@/lib/authContext';
 
-const PIPELINE_STAGES = [
+const PIPELINE_STAGES: LeadStage[] = [
   'New Lead',
   'Contacted',
   'Qualified',
@@ -17,6 +21,29 @@ const PIPELINE_STAGES = [
   'Won',
   'Lost',
 ];
+
+// ── Matching requirement options ──
+// These drive the structured fields the property matching engine reads. The
+// possession values are the exact keys the engine understands, so nothing has
+// to be translated between the form and the matcher.
+const TRANSACTION_TYPES: { v: 'buy' | 'rent'; l: string }[] = [
+  { v: 'buy', l: 'Buy' },
+  { v: 'rent', l: 'Rent' },
+];
+
+const POSSESSION_OPTIONS: { v: NonNullable<LeadRequirementsInput['possessionNeeded']>; l: string }[] = [
+  { v: 'ready', l: 'Ready to move' },
+  { v: 'immediate', l: 'Immediate' },
+  { v: '6months', l: '6 months' },
+  { v: '1year', l: '1 year' },
+  { v: '2year', l: '2+ years' },
+  { v: 'under_construction', l: 'Under construction' },
+];
+
+// Home types that describe land rather than a built-up home. For these the
+// engine skips BHK scoring and uses AREA as the discriminator, so area becomes
+// the field that matters.
+const LAND_HOME_TYPES = ['Plot'];
 
 // Lead type: inbound = client raised their own enquiry, outbound = manually sourced / cold
 type LeadType = 'inbound' | 'outbound';
@@ -109,7 +136,7 @@ export default function HumanLeadManager() {
   const [saving, setSaving] = useState(false);
 
   // Team agents available for assignment (captain only) — includes partner captains
-  const [teamAgents, setTeamAgents] = useState<{ id: string; name: string; role: string }[]>([]);
+  const [teamAgents, setTeamAgents] = useState<LeadPerson[]>([]);
   // Captain team-up panel
   const [showTeamPanel, setShowTeamPanel] = useState(false);
 
@@ -154,8 +181,21 @@ export default function HumanLeadManager() {
   const [newLead, setNewLead] = useState({
     name: '', phone: '', altPhone: '', email: '', budget: '',
     homeType: '', buyingType: '', location: '', project: '',
-    source: 'Meta Ad', customSource: '', stage: 'New Lead',
+    source: 'Meta Ad', customSource: '', stage: 'New Lead' as LeadStage,
     leadType: 'inbound' as LeadType,
+
+    // ── Structured matching fields ──
+    // Budget is entered in LAKHS for a purchase and rupees/month for a rental;
+    // they are different quantities so they get different inputs.
+    transactionType: 'buy' as 'buy' | 'rent',
+    budgetMin: '',
+    budgetMax: '',
+    rentMonthly: '',
+    city: '',
+    area: '',
+    areaUnit: 'sqft' as 'sqft' | 'acres',
+    possessionNeeded: '' as '' | NonNullable<LeadRequirementsInput['possessionNeeded']>,
+    loanRequired: false,
   });
 
   // Projects list for dropdown (id + name for the form)
@@ -211,15 +251,84 @@ export default function HumanLeadManager() {
   const handleScheduleVisit = async () => {
     if (!schedulingLead || !visitDate || !visitTime) return;
     try {
-      const updated = await humanLeadsApi.update(schedulingLead.id, { siteVisitDate: visitDate, siteVisitTime: visitTime });
+      const { lead: updated } = await humanLeadsApi.update(schedulingLead.id, { siteVisitDate: visitDate, siteVisitTime: visitTime });
       setLeads(prev => prev.map(l => (l.id === updated.id ? updated : l)));
+      toast.success('Site visit scheduled');
     } catch {
-      // keep the modal state; surface nothing fancy — leads reload will correct
+      toast.error('Could not schedule visit');
     }
     setSchedulingLead(null);
     setVisitDate('');
     setVisitTime('');
   };
+
+  /**
+   * Build the structured requirements payload from the form.
+   *
+   * Derives bhkType/propertyType from the Home Type the agent already picked, so
+   * the same information is never asked for twice. Units are sent as entered and
+   * normalised server-side (budget → lakhs, area → sqft).
+   */
+  const buildRequirements = (): LeadRequirementsInput => {
+    const isRent = newLead.transactionType === 'rent';
+    const isLand = LAND_HOME_TYPES.includes(newLead.homeType);
+    const bhkMatch = newLead.homeType.match(/(\d+)\s*BHK/i);
+
+    const reqs: LeadRequirementsInput = {
+      transactionType: newLead.transactionType,
+      // Let the server's mapper canonicalise the label (e.g. "Row House" →
+      // row_house, "Shop" → retail) rather than duplicating that table here.
+      propertyType: newLead.homeType || null,
+      bhkType: bhkMatch ? `${bhkMatch[1]}BHK` : null,
+      locationRaw: newLead.location.trim() || null,
+      city: newLead.city.trim() || null,
+      loanRequired: newLead.loanRequired,
+      possessionNeeded: newLead.possessionNeeded || null,
+    };
+
+    if (isRent) {
+      reqs.rentBudgetMonthly = newLead.rentMonthly.trim() || null;
+    } else {
+      reqs.budget = newLead.budgetMin.trim() || null;
+      reqs.budgetMax = newLead.budgetMax.trim() || null;
+    }
+
+    if (newLead.area.trim()) {
+      reqs.area = newLead.area.trim();
+      reqs.areaUnit = newLead.areaUnit;
+    }
+
+    // Land leads are scored on area, not BHK.
+    if (isLand) reqs.bhkType = null;
+
+    return reqs;
+  };
+
+  /**
+   * Render the structured budget back into the legacy free-text `budget` field.
+   * That field is no longer typed by hand, but it is still part of the lead
+   * record and is what the server falls back to for older leads — so it must
+   * stay truthful rather than empty.
+   */
+  const legacyBudgetText = (): string => {
+    if (newLead.transactionType === 'rent') {
+      return newLead.rentMonthly.trim() ? `₹${newLead.rentMonthly.trim()}/mo` : '';
+    }
+    const min = newLead.budgetMin.trim();
+    const max = newLead.budgetMax.trim();
+    if (min && max) return `${min}L - ${max}L`;
+    if (min) return `${min}L`;
+    return '';
+  };
+
+  const resetNewLead = () => setNewLead({
+    name: '', phone: '', altPhone: '', email: '', budget: '',
+    homeType: '', buyingType: '', location: '', project: '',
+    source: 'Meta Ad', customSource: '', stage: 'New Lead',
+    leadType: 'inbound',
+    transactionType: 'buy', budgetMin: '', budgetMax: '', rentMonthly: '',
+    city: '', area: '', areaUnit: 'sqft', possessionNeeded: '', loanRequired: false,
+  });
 
   const handleAddLead = async () => {
     if (!newLead.name || !newLead.phone || saving) return;
@@ -230,19 +339,32 @@ export default function HumanLeadManager() {
         phone: newLead.phone,
         altPhone: newLead.altPhone,
         email: newLead.email,
-        budget: newLead.budget,
+        budget: legacyBudgetText(),
         homeType: newLead.homeType,
         buyingType: newLead.buyingType,
-        location: newLead.location,
+        // Keep the legacy combined form ("Locality, City") so existing views and
+        // search behave exactly as before.
+        location: [newLead.location.trim(), newLead.city.trim()].filter(Boolean).join(', '),
         projectName: newLead.project === '__other__' ? '' : newLead.project,
         source: newLead.source === 'Other' ? newLead.customSource || 'Other' : newLead.source,
         leadType: newLead.leadType,
         stage: newLead.stage,
+        requirements: buildRequirements(),
       });
       setLeads(prev => [created, ...prev]);
-      setNewLead({ name: '', phone: '', altPhone: '', email: '', budget: '', homeType: '', buyingType: '', location: '', project: '', source: 'Meta Ad', customSource: '', stage: 'New Lead', leadType: 'inbound' });
+      resetNewLead();
       setShowAddLead(false);
-    } catch {
+      toast.success('Lead added');
+    } catch (e: unknown) {
+      // Creating directly as "Qualified" is rejected when the requirements are
+      // incomplete — surface exactly what is missing instead of a generic error.
+      const err = e as { data?: { missing?: string[] }; message?: string };
+      const missing = err?.data?.missing;
+      if (Array.isArray(missing) && missing.length) {
+        toast.error(`Add ${missing.join(', ')} to qualify this lead`);
+      } else {
+        toast.error(err?.message || 'Could not add lead');
+      }
       // leave the form open so the user can retry
     } finally {
       setSaving(false);
@@ -271,15 +393,53 @@ export default function HumanLeadManager() {
 
   // If a lead is selected, show detail view
   if (selectedLead) {
-    const handleStageChange = async (newStage: string) => {
-      // Optimistic update, then persist
-      setLeads(prev => prev.map(l => l.id === selectedLead.id ? { ...l, stage: newStage } : l));
-      setSelectedLead({ ...selectedLead, stage: newStage });
+    /**
+     * Move the open lead to a new stage.
+     *
+     * Owns ALL user feedback for the operation — a failure used to revert the
+     * optimistic update silently, so the UI could appear to succeed and then
+     * quietly undo itself.
+     *
+     * Moving to Qualified also runs real property matching server-side, so the
+     * outcome of that is reported too.
+     */
+    const handleStageChange = async (newStage: LeadStage) => {
+      const previous = selectedLead;
+
+      // Optimistic update, then persist.
+      setLeads(prev => prev.map(l => (l.id === previous.id ? { ...l, stage: newStage } : l)));
+      setSelectedLead({ ...previous, stage: newStage });
+
       try {
-        const updated = await humanLeadsApi.updateStage(selectedLead.id, newStage);
+        const { lead: updated, matching } = await humanLeadsApi.updateStage(previous.id, newStage);
         setLeads(prev => prev.map(l => (l.id === updated.id ? updated : l)));
         setSelectedLead(updated);
-      } catch {
+
+        if (newStage === QUALIFIED_STAGE && matching) {
+          if (matching.skippedReason === 'rent_not_supported') {
+            toast('Lead qualified. Rent matching is not available yet.');
+          } else if (matching.matches.length > 0) {
+            toast.success(
+              `Qualified — ${matching.matches.length} matching ${matching.matches.length === 1 ? 'property' : 'properties'} found`,
+            );
+          } else {
+            toast('Qualified. No matching property right now — we will match it when new inventory is added.');
+          }
+        } else {
+          toast.success(`Moved to ${newStage}`);
+        }
+      } catch (e: unknown) {
+        // Roll the optimistic change back to exactly what it was.
+        setLeads(prev => prev.map(l => (l.id === previous.id ? previous : l)));
+        setSelectedLead(previous);
+
+        const err = e as { code?: string; data?: { missing?: string[] }; message?: string };
+        const missing = err?.data?.missing;
+        if (err?.code === 'INCOMPLETE_REQUIREMENTS' && Array.isArray(missing) && missing.length) {
+          toast.error(`Cannot qualify yet — add: ${missing.join(', ')}`);
+        } else {
+          toast.error(err?.message || 'Could not update stage');
+        }
         loadLeads();
       }
     };
@@ -574,10 +734,128 @@ export default function HumanLeadManager() {
                 <input type="email" placeholder="client@email.com" value={newLead.email} onChange={(e) => setNewLead(prev => ({ ...prev, email: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all" />
               </div>
 
-              {/* Budget */}
-              <div>
-                <label className="text-xs font-bold text-[#57534E] mb-1 block">Budget</label>
-                <input type="text" placeholder="e.g. 50L - 80L" value={newLead.budget} onChange={(e) => setNewLead(prev => ({ ...prev, budget: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all" />
+              {/* Requirement details used for property matching.
+                  These are what the matching engine actually reads. City and
+                  budget are required before a lead can be qualified. */}
+              <div className="rounded-xl border border-[#E7E5E4] bg-[#FAF7F2] p-3 space-y-3">
+                <div>
+                  <p className="text-xs font-bold text-[#2A2A2A]">Requirement details</p>
+                  <p className="text-[10px] text-[#A8A29E]">Used to match real properties once the lead is qualified.</p>
+                </div>
+
+                {/* Buy / Rent */}
+                <div>
+                  <label className="text-xs font-bold text-[#57534E] mb-1 block">Looking to</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {TRANSACTION_TYPES.map(t => (
+                      <button
+                        key={t.v}
+                        type="button"
+                        onClick={() => setNewLead(prev => ({ ...prev, transactionType: t.v }))}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          newLead.transactionType === t.v
+                            ? 'bg-[#B45309] text-white'
+                            : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40'
+                        }`}
+                      >
+                        {t.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Budget — lakhs for a purchase, rupees/month for a rental */}
+                {newLead.transactionType === 'rent' ? (
+                  <div>
+                    <label className="text-xs font-bold text-[#57534E] mb-1 block">Monthly Rent (₹)</label>
+                    <input
+                      type="number" placeholder="e.g. 25000" value={newLead.rentMonthly}
+                      onChange={(e) => setNewLead(prev => ({ ...prev, rentMonthly: e.target.value }))}
+                      className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-bold text-[#57534E] mb-1 block">Budget from (₹ Lakhs) *</label>
+                      <input
+                        type="number" placeholder="e.g. 50" value={newLead.budgetMin}
+                        onChange={(e) => setNewLead(prev => ({ ...prev, budgetMin: e.target.value }))}
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-[#57534E] mb-1 block">Budget to (₹ Lakhs)</label>
+                      <input
+                        type="number" placeholder="e.g. 65" value={newLead.budgetMax}
+                        onChange={(e) => setNewLead(prev => ({ ...prev, budgetMax: e.target.value }))}
+                        className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Area — the discriminator for plots and land, where the engine
+                    scores size instead of BHK. A land lead cannot be qualified
+                    without it. */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-[#57534E] mb-1 block">
+                      Area{LAND_HOME_TYPES.includes(newLead.homeType) ? ' *' : ''}
+                    </label>
+                    <input
+                      type="number" placeholder="e.g. 1100" value={newLead.area}
+                      onChange={(e) => setNewLead(prev => ({ ...prev, area: e.target.value }))}
+                      className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-[#57534E] mb-1 block">Unit</label>
+                    <select
+                      value={newLead.areaUnit}
+                      onChange={(e) => setNewLead(prev => ({ ...prev, areaUnit: e.target.value as 'sqft' | 'acres' }))}
+                      className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all"
+                    >
+                      <option value="sqft">sq.ft</option>
+                      <option value="acres">acres</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Possession */}
+                <div>
+                  <label className="text-xs font-bold text-[#57534E] mb-1 block">Possession</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {POSSESSION_OPTIONS.map(p => (
+                      <button
+                        key={p.v}
+                        type="button"
+                        onClick={() => setNewLead(prev => ({
+                          ...prev,
+                          possessionNeeded: prev.possessionNeeded === p.v ? '' : p.v,
+                        }))}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                          newLead.possessionNeeded === p.v
+                            ? 'bg-[#B45309] text-white'
+                            : 'bg-white text-[#57534E] border border-[#E7E5E4] hover:border-[#B45309]/40'
+                        }`}
+                      >
+                        {p.l}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Loan */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={newLead.loanRequired}
+                    onChange={(e) => setNewLead(prev => ({ ...prev, loanRequired: e.target.checked }))}
+                    className="w-4 h-4 accent-[#B45309]"
+                  />
+                  <span className="text-xs font-bold text-[#57534E]">Home loan required</span>
+                </label>
               </div>
 
               {/* Home Type */}
@@ -604,10 +882,18 @@ export default function HumanLeadManager() {
                 </div>
               </div>
 
-              {/* Location */}
-              <div>
-                <label className="text-xs font-bold text-[#57534E] mb-1 block">Location</label>
-                <input type="text" placeholder="Area / City" value={newLead.location} onChange={(e) => setNewLead(prev => ({ ...prev, location: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all" />
+              {/* Locality + City. Split deliberately: the engine scores locality
+                  and city separately and falls back to city when the locality
+                  misses, and city is required to qualify a lead. */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs font-bold text-[#57534E] mb-1 block">Locality / Area</label>
+                  <input type="text" placeholder="e.g. Besa" value={newLead.location} onChange={(e) => setNewLead(prev => ({ ...prev, location: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#57534E] mb-1 block">City *</label>
+                  <input type="text" placeholder="e.g. Nagpur" value={newLead.city} onChange={(e) => setNewLead(prev => ({ ...prev, city: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all" />
+                </div>
               </div>
 
               {/* Project Interest */}
@@ -669,7 +955,7 @@ export default function HumanLeadManager() {
               {/* Stage */}
               <div>
                 <label className="text-xs font-bold text-[#57534E] mb-1 block">Stage</label>
-                <select value={newLead.stage} onChange={(e) => setNewLead(prev => ({ ...prev, stage: e.target.value }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all">
+                <select value={newLead.stage} onChange={(e) => setNewLead(prev => ({ ...prev, stage: e.target.value as LeadStage }))} className="w-full px-3 py-2.5 rounded-xl border border-[#E7E5E4] text-sm bg-white focus:outline-none focus:border-[#B45309]/40 focus:ring-1 focus:ring-[#B45309]/20 transition-all">
                   {PIPELINE_STAGES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>

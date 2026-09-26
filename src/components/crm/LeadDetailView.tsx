@@ -1,18 +1,43 @@
 ﻿'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { useAuth } from '@/lib/authContext';
 import AiGuideChat from './AiGuideChat';
+import {
+  humanLeadsApi, HumanLead, LeadStage, MatchedProperty, LeadMatchesResponse,
+} from '@/lib/api';
 
-interface DemoLead {
-  id: string;
-  name: string;
-  phone: string;
-  project: string;
-  stage: string;
-  date: string;
-  source: string;
-  leadType: 'inbound' | 'outbound';
+// The full lead record from the API. Previously this file declared a narrow
+// local subset, which meant the matching fields on the lead were invisible here.
+type DemoLead = HumanLead;
+
+/** Compact rupee formatting for property prices. */
+function fmtPrice(v: number): string {
+  if (!v) return '—';
+  if (v >= 10000000) return `₹${(v / 10000000).toFixed(2).replace(/\.00$/, '')}Cr`;
+  if (v >= 100000) return `₹${(v / 100000).toFixed(0)}L`;
+  return `₹${v.toLocaleString('en-IN')}`;
+}
+
+/** Turn engine match reasons into short, readable chips. */
+const MATCH_REASON_LABELS: Record<string, string> = {
+  budget: 'Budget',
+  bhk: 'BHK',
+  bhk_adjacent: 'BHK ±1',
+  area: 'Area',
+  loan: 'Loan',
+  possession: 'Possession',
+  city: 'City',
+  verified_builder: 'Verified',
+  rera: 'RERA',
+};
+
+function matchReasonLabel(raw: string): string {
+  if (MATCH_REASON_LABELS[raw]) return MATCH_REASON_LABELS[raw];
+  if (raw.startsWith('location')) return 'Location';
+  if (raw.startsWith('type_')) return 'Type';
+  return raw.replace(/_/g, ' ');
 }
 
 // An attachment added to a journey step (photo, video or PDF)
@@ -44,9 +69,12 @@ interface ProjectAsset {
 interface Props {
   lead: DemoLead;
   onBack: () => void;
-  stages: string[];
+  stages: LeadStage[];
   stageColor: (stage: string) => string;
-  onStageChange?: (newStage: string) => void;
+  /**
+   * Owns the stage change AND all of its user feedback (success/error toasts).
+   */
+  onStageChange?: (newStage: LeadStage) => void;
   projectAssets?: ProjectAsset[];
 }
 
@@ -118,6 +146,110 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
 
   // Stage change
   const [showStageChange, setShowStageChange] = useState(false);
+
+  // ── Matched properties (real inventory from the matching engine) ──
+  const [matchInfo, setMatchInfo] = useState<LeadMatchesResponse | null>(null);
+  const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
+  const [rematching, setRematching] = useState(false);
+  const [dismissingId, setDismissingId] = useState<string | null>(null);
+
+  const loadMatches = useCallback(async () => {
+    setMatchesLoading(true);
+    setMatchesError(null);
+    try {
+      setMatchInfo(await humanLeadsApi.getMatches(lead.id));
+    } catch (e: unknown) {
+      setMatchesError(e instanceof Error ? e.message : 'Could not load matched properties.');
+    } finally {
+      setMatchesLoading(false);
+    }
+  }, [lead.id]);
+
+  // Refetch when the lead changes, and when the parent reports a new match count
+  // (which is how a fresh qualification propagates down).
+  useEffect(() => { loadMatches(); }, [loadMatches, lead.matchCount, lead.matchingEnabled]);
+
+  const handleRematch = async () => {
+    if (rematching) return;
+    setRematching(true);
+    try {
+      const { matching } = await humanLeadsApi.rematch(lead.id);
+      if (matching?.skippedReason === 'rent_not_supported') {
+        toast('Rent matching is not available yet.');
+      } else if (matching && matching.matches.length > 0) {
+        toast.success(`${matching.matches.length} matching ${matching.matches.length === 1 ? 'property' : 'properties'} found`);
+      } else {
+        toast('No matching property right now.');
+      }
+      await loadMatches();
+    } catch (e: unknown) {
+      const err = e as { data?: { missing?: string[] }; message?: string };
+      const missing = err?.data?.missing;
+      if (Array.isArray(missing) && missing.length) {
+        toast.error(`Add ${missing.join(', ')} to match properties`);
+      } else {
+        toast.error(err?.message || 'Could not refresh matches');
+      }
+    } finally {
+      setRematching(false);
+    }
+  };
+
+  const handleDismissMatch = async (match: MatchedProperty) => {
+    if (!match.matchId || dismissingId) return;
+    setDismissingId(match.matchId);
+    // Optimistic removal — the row stays on the server (flagged, not deleted),
+    // so this cannot lose data.
+    setMatchInfo(prev => prev && {
+      ...prev,
+      matches: prev.matches.filter(m => m.matchId !== match.matchId),
+      total: Math.max(0, prev.total - 1),
+    });
+    try {
+      await humanLeadsApi.dismissMatch(lead.id, match.matchId);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Could not dismiss match');
+      await loadMatches();   // put it back
+    } finally {
+      setDismissingId(null);
+    }
+  };
+
+  /** Send a matched property's real details to the client on WhatsApp. */
+  const shareMatchOnWhatsApp = (match: MatchedProperty) => {
+    const phone = lead.phone.replace(/[^0-9]/g, '');
+    const lines = [
+      match.projectName,
+      [match.location, match.city].filter(Boolean).join(', '),
+      match.startingPrice ? `Price: ${fmtPrice(match.startingPrice)} onwards` : '',
+      match.bhkOptions?.length ? `Config: ${match.bhkOptions.join(' / ')}` : '',
+      match.projectStatus ? `Status: ${match.projectStatus}` : '',
+      match.reraNumber ? `RERA: ${match.reraNumber}` : '',
+      match.builderCompany || match.builderName ? `By ${match.builderCompany || match.builderName}` : '',
+    ].filter(Boolean);
+    const message = encodeURIComponent(lines.join('\n'));
+    const url = phone ? `https://wa.me/${phone}?text=${message}` : `https://wa.me/?text=${message}`;
+    window.open(url, '_blank');
+  };
+
+  /**
+   * Why is the match list empty? Distinguishing these matters — "not qualified
+   * yet" and "nothing available yet" need very different actions from the agent.
+   */
+  const emptyMatchMessage = (): string => {
+    if (!matchInfo) return '';
+    if (!matchInfo.qualified && !matchInfo.matchingEnabled) {
+      return `Move this lead to "Qualified" to find matching properties.`;
+    }
+    if (matchInfo.matchingSkippedReason === 'rent_not_supported') {
+      return 'Rent matching is not available yet. The requirement is saved.';
+    }
+    if (!matchInfo.requirementsComplete) {
+      return `Add ${matchInfo.requirementsMissing.join(', ')} to match properties.`;
+    }
+    return 'No matching property right now. This lead stays active — we will match it automatically when new inventory is added.';
+  };
 
   const currentStages = journeyStages[journeyType];
   const currentStageIndex = stages.indexOf(lead.stage);
@@ -256,7 +388,7 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
             <p className="text-[10px] font-bold text-[#A8A29E] uppercase tracking-widest mb-1">Move to</p>
             <select
               value={lead.stage}
-              onChange={(e) => onStageChange(e.target.value)}
+              onChange={(e) => onStageChange(e.target.value as LeadStage)}
               className="w-full px-2.5 py-2 rounded-lg border border-[#E7E5E4] text-xs font-bold text-[#2A2A2A] bg-white focus:outline-none focus:border-[#B45309]/40 transition-all"
             >
               {stages.map(s => <option key={s} value={s}>{s}</option>)}
@@ -274,6 +406,127 @@ export default function LeadDetailView({ lead, onBack, stages, stageColor, onSta
         <div className="flex gap-1">
           {stages.map((_, i) => (<div key={i} className={`flex-1 h-1.5 rounded-full ${i < currentStep ? 'bg-[#B45309]' : 'bg-[#E7E5E4]'}`} />))}
         </div>
+      </div>
+
+      {/* Matched Properties — real inventory from the matching engine */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="text-sm font-bold text-[#2A2A2A]">
+            Matched Properties{matchInfo && matchInfo.matches.length > 0 ? ` (${matchInfo.matches.length})` : ''}
+          </h4>
+          {matchInfo?.matchingEnabled && (
+            <button
+              onClick={handleRematch}
+              disabled={rematching}
+              className="text-[10px] font-bold text-[#B45309] border border-[#B45309]/30 px-3 py-1.5 rounded-lg hover:bg-[#B45309]/5 transition-colors disabled:opacity-50"
+            >
+              {rematching ? 'Matching…' : 'Refresh'}
+            </button>
+          )}
+        </div>
+
+        {matchesLoading && !matchInfo ? (
+          <div className="flex items-center justify-center py-8 rounded-xl bg-[#FAF7F2] border border-[#E7E5E4]">
+            <div className="w-5 h-5 border-2 border-[#B45309] border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : matchesError ? (
+          <div className="rounded-xl bg-[#FAF7F2] border border-[#E7E5E4] p-4 text-center">
+            <p className="text-xs text-red-500">{matchesError}</p>
+            <button onClick={loadMatches} className="text-[10px] font-bold text-[#B45309] mt-2 hover:underline">Try again</button>
+          </div>
+        ) : matchInfo && matchInfo.matches.length > 0 ? (
+          <div className="space-y-2.5">
+            {matchInfo.matches.map(m => (
+              <div key={m.matchId || m.projectId} className="rounded-xl border border-[#E7E5E4] bg-white p-3 space-y-2">
+                {/* Header: name + match score */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-[#2A2A2A] truncate">{m.projectName}</p>
+                    <p className="text-[11px] text-[#57534E] truncate">
+                      📍 {[m.location, m.city].filter(Boolean).join(', ') || '—'}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 px-2 py-0.5 rounded-lg text-[11px] font-bold ${
+                    m.matchQuality === 'exact' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {Math.round(m.score)}%
+                  </span>
+                </div>
+
+                {/* Real property facts */}
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="text-xs font-bold text-[#B45309]">
+                    {fmtPrice(m.startingPrice)}{m.startingPrice ? '+' : ''}
+                  </span>
+                  {m.bhkOptions.length > 0 && (
+                    <span className="text-[11px] font-semibold text-[#57534E]">{m.bhkOptions.join(' / ')}</span>
+                  )}
+                  {!!(m.carpetAreaRange || m.plotSizeRange) && (
+                    <span className="text-[11px] font-semibold text-[#57534E]">{m.carpetAreaRange || m.plotSizeRange} sq.ft</span>
+                  )}
+                  {!!m.projectStatus && (
+                    <span className="text-[11px] font-semibold text-[#57534E]">{m.projectStatus}</span>
+                  )}
+                </div>
+
+                {/* Builder identity — verified badge only when actually verified */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-[#57534E] truncate">
+                    {m.builderCompany || m.builderName || 'Builder'}
+                  </span>
+                  {m.isVerifiedBuilder && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-emerald-50 text-emerald-700 border-emerald-200">
+                      VERIFIED
+                    </span>
+                  )}
+                  {m.reraApproved && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold border bg-[#FAF7F2] text-[#57534E] border-[#E7E5E4]">
+                      RERA
+                    </span>
+                  )}
+                </div>
+
+                {/* Why it matched — straight from the engine, not invented */}
+                {m.matchedOn.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {m.matchedOn.slice(0, 5).map(r => (
+                      <span key={r} className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#B45309]/10 text-[#B45309]">
+                        {matchReasonLabel(r)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => shareMatchOnWhatsApp(m)}
+                    className="flex-1 py-2 rounded-lg bg-emerald-700 text-white text-[11px] font-bold hover:bg-emerald-800 transition-colors"
+                  >
+                    Send to client
+                  </button>
+                  {m.matchId && (
+                    <button
+                      onClick={() => handleDismissMatch(m)}
+                      disabled={dismissingId === m.matchId}
+                      className="px-3 py-2 rounded-lg border border-[#E7E5E4] text-[11px] font-bold text-[#57534E] hover:border-[#B45309]/40 transition-colors disabled:opacity-50"
+                    >
+                      Not relevant
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-xl bg-[#FAF7F2] border border-[#E7E5E4] p-4 text-center">
+            <p className="text-[11px] text-[#57534E] leading-relaxed">{emptyMatchMessage()}</p>
+            {matchInfo?.lastMatchRunAt && (
+              <p className="text-[9px] text-[#A8A29E] mt-1.5">
+                Last checked {new Date(matchInfo.lastMatchRunAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Sales Journey */}

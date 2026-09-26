@@ -27,10 +27,25 @@ const COMMON_FETCH_OPTIONS: RequestInit = {
 
 export class ApiError extends Error {
   status: number;
+  /**
+   * Machine-readable error code from the response body, when the server sent
+   * one (e.g. 'INCOMPLETE_REQUIREMENTS', 'NOT_QUALIFIED').
+   */
+  code?: string;
+  /**
+   * The full parsed response body. Needed for errors carrying structured detail
+   * the UI must act on — e.g. the `missing` field list returned when a lead
+   * cannot be qualified yet.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: any;
 
-  constructor(message: string | null | undefined, status: number) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(message: string | null | undefined, status: number, body?: any) {
     super(message ?? "Unknown error");
     this.status = status;
+    this.data = body ?? undefined;
+    if (body && typeof body.error === "string") this.code = body.error;
   }
 }
 
@@ -51,7 +66,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
           ? body.error
           : `Request failed (${response.status})`;
 
-    throw new ApiError(String(message), response.status);
+    throw new ApiError(String(message), response.status, body);
   }
 
   return body as T;
@@ -2011,12 +2026,135 @@ export interface LeadPerson {
   role: string;
 }
 
+/**
+ * The CRM pipeline stages, mirroring HumanLead.STAGES on the backend.
+ * Typed as a union rather than `string` so a stage typo is a compile error
+ * instead of a silently failing request.
+ */
+export type LeadStage =
+  | 'New Lead'
+  | 'Contacted'
+  | 'Qualified'
+  | 'Site Visit Scheduled'
+  | 'Site Visit Done'
+  | 'Negotiation'
+  | 'Booking'
+  | 'Won'
+  | 'Lost';
+
+/** The stage at which a lead becomes eligible for property matching. */
+export const QUALIFIED_STAGE: LeadStage = 'Qualified';
+
+/**
+ * Structured requirements used for real property matching.
+ *
+ * UNITS MATTER — these mirror the backend exactly:
+ *   budget / budgetMax : LAKHS            (₹50,00,000 → 50)
+ *   rentBudgetMonthly  : RUPEES PER MONTH (rent leads only)
+ *   area               : SQFT (always, normalised server-side)
+ *   areaInput          : the number the agent actually typed, in `areaUnit`
+ */
+export interface LeadRequirements {
+  transactionType?: 'buy' | 'rent';
+  bhkType?: string | null;
+  propertyType?: string | null;
+  budget?: number | null;
+  budgetMax?: number | null;
+  rentBudgetMonthly?: number | null;
+  area?: number | null;
+  areaUnit?: 'sqft' | 'acres' | null;
+  areaInput?: number | null;
+  locationRaw?: string | null;
+  city?: string | null;
+  locationCanonical?: string | null;
+  possessionNeeded?: 'immediate' | '6months' | '1year' | '2year' | 'ready' | 'under_construction' | null;
+  loanRequired?: boolean;
+}
+
+/** What the client may send when writing requirements (accepts loose input). */
+export interface LeadRequirementsInput
+  extends Omit<LeadRequirements, 'budget' | 'budgetMax' | 'rentBudgetMonthly' | 'area'> {
+  budget?: number | string | null;
+  budgetMax?: number | string | null;
+  rentBudgetMonthly?: number | string | null;
+  area?: number | string | null;
+}
+
+/** Why matching did not run for a lead. */
+export type MatchingSkippedReason = 'rent_not_supported' | 'incomplete_requirements';
+
+/**
+ * A real property matched to a lead. Every field comes from the Projects
+ * collection — there is no mock data on this path.
+ */
+export interface MatchedProperty {
+  /** LeadPropertyMatch row id — needed to dismiss this specific match. */
+  matchId?: string;
+  /** Stable Project id — the Lead → Property relationship. */
+  projectId: string;
+  projectName: string;
+  slug: string;
+  city: string;
+  location: string;
+  propertyType: string;
+  projectStatus: string;
+
+  startingPrice: number;
+  bankLoanAvailable: boolean;
+  bhkOptions: string[];
+  carpetAreaRange: string;
+  plotSizeRange: string;
+
+  coverImageUrl: string;
+
+  reraApproved: boolean;
+  reraNumber: string;
+
+  builderName: string;
+  builderCompany: string;
+  isVerifiedBuilder: boolean;
+  builderRating: number;
+
+  score: number;
+  confidence?: number;
+  matchedOn: string[];
+  matchQuality?: 'exact' | 'close' | 'nearest';
+  matchSource?: 'qualification' | 'project_published' | 'manual_rematch';
+  firstMatchedAt?: string;
+  lastScoredAt?: string;
+  dismissed?: boolean;
+}
+
+/** Outcome of a match run, returned alongside a qualification or rematch. */
+export interface MatchingRunResult {
+  ran: boolean;
+  skippedReason: MatchingSkippedReason | null;
+  missing: string[];
+  matches: MatchedProperty[];
+  newCount: number;
+  total: number;
+  error: string | null;
+}
+
+/** Response of GET /human-leads/:id/matches */
+export interface LeadMatchesResponse {
+  matches: MatchedProperty[];
+  total: number;
+  qualified: boolean;
+  matchingEnabled: boolean;
+  matchingSkippedReason: MatchingSkippedReason | null;
+  lastMatchRunAt: string | null;
+  requirementsComplete: boolean;
+  requirementsMissing: string[];
+}
+
 export interface HumanLead {
   id: string;
   name: string;
   phone: string;
   altPhone?: string;
   email?: string;
+  /** Legacy free-text fields — display only. `requirements` is authoritative. */
   budget?: string;
   homeType?: string;
   buyingType?: string;
@@ -2024,13 +2162,28 @@ export interface HumanLead {
   project: string;
   source: string;
   leadType: 'inbound' | 'outbound';
-  stage: string;
+  stage: LeadStage;
   siteVisitDate?: string;
   siteVisitTime?: string;
   date: string;
   createdBy: LeadPerson | null;    // who brought the lead
   owningCaptain: LeadPerson | null; // the team owner
   assignedAgent: LeadPerson | null; // who it's assigned to
+
+  // ── Property matching ──
+  requirements: LeadRequirements;
+  /** False when the lead cannot be qualified yet. */
+  requirementsComplete: boolean;
+  /** Which requirement fields still need filling in. */
+  requirementsMissing: string[];
+  /** Requirement values inferred from the legacy free-text fields. */
+  requirementsDerivedFrom: string[];
+  qualifiedAt: string | null;
+  matchingEnabled: boolean;
+  matchingSkippedReason: MatchingSkippedReason | null;
+  lastMatchRunAt: string | null;
+  matchCount: number;
+  bestMatchScore: number;
 }
 
 export interface CreateHumanLeadInput {
@@ -2045,8 +2198,9 @@ export interface CreateHumanLeadInput {
   projectName?: string;
   source?: string;
   leadType?: 'inbound' | 'outbound';
-  stage?: string;
+  stage?: LeadStage;
   assignedAgent?: string | null;
+  requirements?: LeadRequirementsInput;
 }
 
 export const humanLeadsApi = {
@@ -2074,26 +2228,36 @@ export const humanLeadsApi = {
     return data.lead;
   },
 
-  async updateStage(id: string, stage: string): Promise<HumanLead> {
+  /**
+   * Move a lead to a new stage.
+   *
+   * Moving to 'Qualified' runs real property matching server-side, so the
+   * response carries a `matching` block with the matched properties.
+   * Throws with code 'INCOMPLETE_REQUIREMENTS' if the lead cannot be qualified.
+   */
+  async updateStage(id: string, stage: LeadStage): Promise<{ lead: HumanLead; matching: MatchingRunResult | null }> {
     const response = await fetch(`${API_URL}/human-leads/${id}/stage`, {
       ...COMMON_FETCH_OPTIONS,
       method: 'PUT',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify({ stage }),
     });
-    const data = await handleResponse<{ lead: HumanLead }>(response);
-    return data.lead;
+    const data = await handleResponse<{ lead: HumanLead; matching: MatchingRunResult | null }>(response);
+    return { lead: data.lead, matching: data.matching ?? null };
   },
 
-  async update(id: string, patch: Partial<CreateHumanLeadInput & { siteVisitDate: string; siteVisitTime: string }>): Promise<HumanLead> {
+  async update(
+    id: string,
+    patch: Partial<CreateHumanLeadInput & { siteVisitDate: string; siteVisitTime: string }>,
+  ): Promise<{ lead: HumanLead; rematchRecommended: boolean }> {
     const response = await fetch(`${API_URL}/human-leads/${id}`, {
       ...COMMON_FETCH_OPTIONS,
       method: 'PUT',
       headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
     });
-    const data = await handleResponse<{ lead: HumanLead }>(response);
-    return data.lead;
+    const data = await handleResponse<{ lead: HumanLead; rematchRecommended?: boolean }>(response);
+    return { lead: data.lead, rematchRecommended: !!data.rematchRecommended };
   },
 
   async assign(id: string, agentId: string | null): Promise<HumanLead> {
@@ -2107,13 +2271,53 @@ export const humanLeadsApi = {
     return data.lead;
   },
 
-  async teamAgents(): Promise<{ id: string; name: string; role: string }[]> {
+  async teamAgents(): Promise<LeadPerson[]> {
     const response = await fetch(`${API_URL}/human-leads/team-agents`, {
       ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
-    const data = await handleResponse<{ agents: { id: string; name: string; role: string }[] }>(response);
+    const data = await handleResponse<{ agents: LeadPerson[] }>(response);
     return data.agents;
+  },
+
+  // ── Property matching ──────────────────────────────────────────────────────
+
+  /**
+   * Real matched properties for a lead, strongest first.
+   * Also returns the context needed to explain an empty list (not qualified /
+   * rent / missing requirement fields / genuinely nothing available yet).
+   */
+  async getMatches(id: string, opts?: { includeDismissed?: boolean }): Promise<LeadMatchesResponse> {
+    const qs = opts?.includeDismissed ? '?includeDismissed=true' : '';
+    const response = await fetch(`${API_URL}/human-leads/${id}/matches${qs}`, {
+      ...COMMON_FETCH_OPTIONS,
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<LeadMatchesResponse>(response);
+  },
+
+  /**
+   * Re-run matching for an already-qualified lead, e.g. after editing its
+   * requirements. Safe to call repeatedly — the server de-duplicates matches.
+   */
+  async rematch(id: string): Promise<{ lead: HumanLead; matching: MatchingRunResult | null }> {
+    const response = await fetch(`${API_URL}/human-leads/${id}/rematch`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'POST',
+      headers: getAuthHeaders(),
+    });
+    const data = await handleResponse<{ lead: HumanLead; matching: MatchingRunResult | null }>(response);
+    return { lead: data.lead, matching: data.matching ?? null };
+  },
+
+  /** Hide a match the agent judged irrelevant. */
+  async dismissMatch(id: string, matchId: string): Promise<{ matchCount: number; bestMatchScore: number }> {
+    const response = await fetch(`${API_URL}/human-leads/${id}/matches/${matchId}/dismiss`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
+    });
+    return handleResponse<{ matchCount: number; bestMatchScore: number }>(response);
   },
 };
 
