@@ -12,20 +12,44 @@ export interface Landmark {
   placeId: string;
 }
 
+export type PlotStatus = 'available' | 'booked' | 'sold' | 'on-hold';
+export type OpenSpaceCategory = 'park' | 'clubhouse' | 'temple' | 'amenity' | 'open-space' | 'other';
+
 export interface LayoutEntity {
   id: string;
-  type: 'project-boundary' | 'subplot' | 'road' | 'ai-boundary';
+  // 'open-space' (park, clubhouse, ...) is new: before, a garden could only be
+  // drawn as a plot or a road, so it showed up as a plot for sale.
+  type: 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' | 'open-space';
   geometryType: 'polygon' | 'polyline';
   path: { lat: number; lng: number }[];
   aiBoundaryId?: string;
   deleted?: boolean;
   roadType?: 'lane' | 'internal' | 'main';
-  status?: 'available' | 'booked' | 'sold' | 'on-hold';
+  // Server-managed on the full PUT (stored value wins): change it only via
+  // PATCH /projects/:id/plots/:entityId/status.
+  status?: PlotStatus;
   plotNumber?: string;
   area?: number;
   facing?: 'north' | 'south' | 'east' | 'west';
   roadName?: string;
+  // open-space only
+  label?: string;
+  category?: OpenSpaceCategory;
+  // Server-managed (link-units / status PATCH). Read-only here; the full PUT ignores them.
+  unitId?: string | null;
+  updatedAt?: string | null;
   saved?: boolean;
+}
+
+// Rotated layout-plan image placed on the map (PUT /projects/:id/layout-overlay).
+// Separate from `layoutImage`, which is the legacy html2canvas map screenshot.
+export interface LayoutOverlay {
+  image?: FileData | null;
+  center?: { lat: number; lng: number } | null;
+  widthM?: number | null;
+  heightM?: number | null;
+  rotationDeg?: number | null;
+  opacity?: number | null;
 }
 
 export type FileData = {
@@ -89,6 +113,7 @@ export interface Project {
 
   // Layout entities (map polygons, plots, roads, boundaries)
   layoutEntities?: LayoutEntity[];
+  layoutOverlay?: LayoutOverlay | null;
 
   // Sales CTA
   ctaButtonText: string;

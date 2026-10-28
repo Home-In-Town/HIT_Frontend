@@ -690,10 +690,17 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ProjectMap from '@/components/public/ProjectMap';
-import { projectsApi, saveProjectLandmarks } from '@/lib/api';
-import { Landmark } from '@/types/project';
+import { ApiError, patchPlotStatus, projectsApi, saveProjectLandmarks } from '@/lib/api';
+import { Landmark, LayoutEntity, PlotStatus } from '@/types/project';
+import { PLOT_STATUSES, PLOT_STATUS_LABELS, plotStatusFeedback, unitRangePrefill } from '@/lib/layoutTools.mjs';
+import type { OverlayDraft } from '@/lib/layoutTools.mjs';
+import { OverlayAlignPanel, overlayToDraft } from '@/components/layout-editor/OverlayAlignTool';
+import LinkUnitsDialog from '@/components/layout-editor/LinkUnitsDialog';
+import GenerateUnitsDialog from '@/components/layout-editor/GenerateUnitsDialog';
+
+type StatusFeedback = ReturnType<typeof plotStatusFeedback>;
 
 // ─── ToolButton ─────────────────────────────────────────────────────────────
 function ToolButton({
@@ -721,7 +728,11 @@ function ToolButton({
 
   return (
     <div className="relative group hover:z-50">
+      {/* aria-label: the button shows only an emoji and the hover tooltip is a
+          sibling span, so screen readers announced these buttons with no name. */}
       <button
+        type="button"
+        aria-label={label}
         disabled={disabled}
         onClick={onClick}
         className={`h-12 w-full rounded-xl text-lg transition flex items-center justify-center
@@ -781,6 +792,10 @@ function PlotPanelFields({
   mapRef,
   onCancel,
   onConfirm,
+  statusOverride,
+  statusPending,
+  statusFeedback,
+  onStatusChange,
 }: {
   panelPlotId: string;
   plotNumberInput: string;
@@ -788,9 +803,21 @@ function PlotPanelFields({
   mapRef: React.RefObject<any>;
   onCancel: () => void;
   onConfirm: () => void;
+  // Status the server just returned. The panel reads the plot from the map
+  // ref during render, which can lag one render behind the map's state.
+  statusOverride?: PlotStatus;
+  statusPending: boolean;
+  statusFeedback: StatusFeedback | null;
+  onStatusChange: (id: string, status: PlotStatus) => void;
 }) {
   const plot = mapRef.current?.getPlot(panelPlotId);
   if (!plot) return null;
+  const statusId = `plot-status-${panelPlotId}`;
+  const hintId = `plot-status-hint-${panelPlotId}`;
+  // The PATCH needs the plot on the server. An unconfirmed plot only exists in
+  // this tab, and the full PUT no longer carries status (new plots are saved
+  // as available), so the select waits for Confirm.
+  const canSetStatus = plot.saved === true;
 
   return (
     <>
@@ -811,20 +838,39 @@ function PlotPanelFields({
       </div>
 
       <div>
-        <label className="text-xs text-gray-500">Status</label>
+        <label htmlFor={statusId} className="text-xs text-gray-500">Status</label>
+        {/* Before: onChange edited the local array and the change rode on the
+            next full PUT. The backend now ignores status on that PUT (it would
+            overwrite a sale made from the app), so this saves immediately via
+            PATCH /plots/:entityId/status and paints what the server returned. */}
         <select
-          value={plot.status || ""}
-          onChange={(e) =>
-            mapRef.current?.updatePlotField(panelPlotId, "status", e.target.value)
-          }
-          className="border p-2 w-full rounded text-xs mt-1"
+          id={statusId}
+          value={statusOverride ?? plot.status ?? "available"}
+          disabled={!canSetStatus || statusPending}
+          aria-describedby={hintId}
+          aria-busy={statusPending}
+          onChange={(e) => onStatusChange(panelPlotId, e.target.value as PlotStatus)}
+          className="border p-2 w-full rounded text-xs mt-1 disabled:bg-gray-100 disabled:text-gray-500"
         >
-          <option value="">Select</option>
-          <option value="available">Available</option>
-          <option value="booked">Booked</option>
-          <option value="sold">Sold</option>
-          <option value="on-hold">On Hold</option>
+          {PLOT_STATUSES.map((s) => (
+            <option key={s} value={s}>{PLOT_STATUS_LABELS[s]}</option>
+          ))}
         </select>
+        <div id={hintId} role="status" aria-live="polite" className="text-[11px] mt-1 min-h-[1rem]">
+          {!canSetStatus ? (
+            <span className="text-gray-500">Pehle Confirm karo, phir status badlo.</span>
+          ) : statusPending ? (
+            <span className="text-gray-500">Saving…</span>
+          ) : statusFeedback ? (
+            <span className={
+              statusFeedback.kind === "error" ? "text-red-700"
+                : statusFeedback.kind === "success" ? "text-green-700"
+                : "text-gray-600"
+            }>
+              {statusFeedback.message}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <div>
@@ -858,8 +904,8 @@ function PlotPanelFields({
 }
 
 // ─── Tab types ───────────────────────────────────────────────────────────────
-type TabType = "Boundary" | "Roads" | "Plots" | "AI" | "History" | "Canvas" | "Landmarks";
-const TABS: TabType[] = ["Boundary", "Roads", "Plots", "AI", "History", "Canvas", "Landmarks"];
+type TabType = "Boundary" | "Roads" | "Plots" | "Open Space" | "AI" | "Overlay" | "Units" | "History" | "Canvas" | "Landmarks";
+const TABS: TabType[] = ["Boundary", "Roads", "Plots", "Open Space", "AI", "Overlay", "Units", "History", "Canvas", "Landmarks"];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function LayoutEditorPage() {
@@ -881,7 +927,22 @@ export default function LayoutEditorPage() {
   const [drawingMode, setDrawingMode] =
     useState<'polygon' | 'rectangle' | 'circle' | 'polyline' | 'marker' | null>(null);
   const [drawingType, setDrawingType] =
-    useState<"project-boundary" | "subplot" | "road" | "ai-boundary" | undefined>("project-boundary");
+    useState<"project-boundary" | "subplot" | "road" | "ai-boundary" | "open-space" | undefined>("project-boundary");
+
+  // ── plot status (PATCH) ──
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, PlotStatus>>({});
+  const [statusPending,   setStatusPending]   = useState(false);
+  const [statusFeedback,  setStatusFeedback]  = useState<StatusFeedback | null>(null);
+
+  // ── overlay align tool ──
+  const [overlayDraft,      setOverlayDraft]      = useState<OverlayDraft | null>(null);
+  const [overlaySaved,      setOverlaySaved]      = useState<OverlayDraft | null>(null);
+  const [overlayEditing,    setOverlayEditing]    = useState(false);
+  const [overlayLockAspect, setOverlayLockAspect] = useState(true);
+
+  // ── units dialogs ──
+  const [linkOpen,       setLinkOpen]       = useState(false);
+  const [generatePrefill, setGeneratePrefill] = useState<ReturnType<typeof unitRangePrefill> | null>(null);
 
   // ── load project ──
   useEffect(() => {
@@ -892,8 +953,71 @@ export default function LayoutEditorPage() {
       const savedLandmarks = data.landmarks || [];
       setSelectedLandmarks(savedLandmarks);
       mapRef.current?.setSelectedLandmarks(savedLandmarks);
+      const savedOverlay = overlayToDraft(data.layoutOverlay);
+      setOverlaySaved(savedOverlay);
+      setOverlayDraft(savedOverlay);
     })();
   }, [projectId]);
+
+  const closePlotPanel = () => {
+    setPanelPlotId(null);
+    setStatusFeedback(null);
+    setStatusOverrides({});
+  };
+
+  const handlePlotStatusChange = async (id: string, status: PlotStatus) => {
+    const plot = mapRef.current?.getPlot(id) as LayoutEntity | undefined;
+    setStatusPending(true);
+    setStatusFeedback(null);
+    try {
+      const r = await patchPlotStatus(projectId, id, status);
+      const saved = (r.plot?.status ?? status) as PlotStatus;
+      mapRef.current?.setPlotStatusLocal(id, saved);
+      setStatusOverrides((o) => ({ ...o, [id]: saved }));
+      setStatusFeedback(plotStatusFeedback({
+        ok: true,
+        changed: r.changed,
+        plotNumber: r.plot?.plotNumber ?? plot?.plotNumber,
+        status: saved,
+      }));
+      setStatusPending(false);
+    } catch (err) {
+      setStatusPending(false);
+      const fb = plotStatusFeedback({
+        ok: false,
+        httpStatus: err instanceof ApiError ? err.status : 0,
+        serverMessage: err instanceof Error ? err.message : null,
+        plotNumber: plot?.plotNumber,
+      });
+      setStatusFeedback(fb);
+      // The select is controlled by the map's (unchanged) status, so on error
+      // it snaps back by itself; 404/409 also refresh from the server.
+      if (fb.reload) {
+        setStatusOverrides({});
+        await mapRef.current?.reloadEntities();
+      }
+    }
+  };
+
+  const getOverlayPlacementHints = useCallback(() => {
+    const entities = (mapRef.current?.getEntities?.() || []) as LayoutEntity[];
+    const boundary = entities.find((e) => e.type === "project-boundary" && !e.deleted);
+    const lat = Number(project?.latitude);
+    const lng = Number(project?.longitude);
+    return {
+      boundaryPath: boundary?.path ?? null,
+      fallbackCenter: Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0) ? { lat, lng } : null,
+    };
+  }, [project]);
+
+  const openGenerateUnits = () => {
+    setGeneratePrefill(unitRangePrefill((mapRef.current?.getEntities?.() || []) as LayoutEntity[]));
+  };
+
+  // link/generate apply changed plot statuses and unitIds on the server.
+  const reloadAfterUnits = () => {
+    void mapRef.current?.reloadEntities();
+  };
 
   // ── landmark search ──
   useEffect(() => {
@@ -913,7 +1037,7 @@ export default function LayoutEditorPage() {
   const handleConfirmPlot = () => {
     if (!panelPlotId) return;
     mapRef.current?.confirmPlot(panelPlotId);
-    setPanelPlotId(null);
+    closePlotPanel();
   };
 
   const handleFetchLandmarks = () => {
@@ -934,6 +1058,52 @@ export default function LayoutEditorPage() {
   };
 
   if (!project) return <div>Loading...</div>;
+
+  // Shared by the desktop sidebar and the mobile sheet.
+  function renderOverlayPanel() {
+    return (
+      <OverlayAlignPanel
+        projectId={projectId}
+        draft={overlayDraft}
+        savedDraft={overlaySaved}
+        editing={overlayEditing}
+        lockAspect={overlayLockAspect}
+        onDraftChange={setOverlayDraft}
+        onEditingChange={(v) => {
+          setOverlayEditing(v);
+          // Drawing clicks and overlay drags fight over the same pointer.
+          if (v) setDrawingMode(null);
+        }}
+        onLockAspectChange={setOverlayLockAspect}
+        onSaved={(saved) => { setOverlaySaved(saved); setOverlayDraft(saved); }}
+        getPlacementHints={getOverlayPlacementHints}
+      />
+    );
+  }
+
+  function renderUnitsButtons() {
+    return (
+      <div className="flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => setLinkOpen(true)}
+          className="w-full border border-orange-200 bg-orange-50 text-orange-800 py-2 rounded-lg text-xs font-medium hover:bg-orange-100"
+        >
+          🔗 Link plots ↔ units
+        </button>
+        <button
+          type="button"
+          onClick={openGenerateUnits}
+          className="w-full border border-orange-200 bg-orange-50 text-orange-800 py-2 rounded-lg text-xs font-medium hover:bg-orange-100"
+        >
+          ⚙ Generate units from plots
+        </button>
+        <p className="text-[11px] text-gray-500">
+          Sirf Confirm kiye hue plots count hote hain. Pehle unsaved changes save karo.
+        </p>
+      </div>
+    );
+  }
 
   // ─── Mobile tab content ──────────────────────────────────────────────────
   function renderMobileTabContent(tab: TabType) {
@@ -966,6 +1136,20 @@ export default function LayoutEditorPage() {
             <MobileToolButton label="Delete Plot"    color="red"    onClick={() => mapRef.current?.deleteSelectedPlot()} />
           </div>
         );
+
+      case "Open Space":
+        return (
+          <div className="grid grid-cols-3 gap-2">
+            <MobileToolButton label="Draw Open Space" color="green" onClick={() => { setDrawingType("open-space"); setDrawingMode('polygon'); }} />
+            <MobileToolButton label="Rect Open Space" color="green" onClick={() => { setDrawingType("open-space"); setDrawingMode('rectangle'); }} />
+          </div>
+        );
+
+      case "Overlay":
+        return renderOverlayPanel();
+
+      case "Units":
+        return renderUnitsButtons();
 
       case "AI":
         return (
@@ -1069,6 +1253,7 @@ export default function LayoutEditorPage() {
              : drawingType === "road"             ? "🛣 Drawing Road"
              : drawingType === "project-boundary" ? "🧱 Drawing Boundary"
              : drawingType === "ai-boundary"      ? "🟣 AI Boundary"
+             : drawingType === "open-space"       ? "🌳 Drawing Open Space"
              : "✏ Drawing"}
           </div>
         </div>
@@ -1188,6 +1373,14 @@ export default function LayoutEditorPage() {
           </div>
 
           <div>
+            <h3 className="text-xs font-semibold text-gray-400 mb-2">Open Spaces</h3>
+            <div className="grid grid-cols-3 gap-2">
+              <ToolButton icon="🌳" label="Draw Open Space"      color="green" onClick={() => { setDrawingType("open-space"); setDrawingMode('polygon'); }} />
+              <ToolButton icon="⬛" label="Rectangle Open Space" color="green" onClick={() => { setDrawingType("open-space"); setDrawingMode('rectangle'); }} />
+            </div>
+          </div>
+
+          <div>
             <h3 className="text-xs font-semibold text-gray-400 mb-2">AI Generated Plots</h3>
             <div className="grid grid-cols-3 gap-2">
               <ToolButton icon="🟣"  label="Draw AI Boundary"   color="purple" onClick={() => { mapRef.current?.toggleAiEditMode(false); setDrawingType("ai-boundary"); setDrawingMode('polygon'); }} />
@@ -1215,6 +1408,16 @@ export default function LayoutEditorPage() {
               <ToolButton icon="🗑" label="Delete Layout"    color="red"   onClick={() => mapRef.current?.deleteLayoutImage()} />
             </div>
           </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 mb-2">Layout Overlay</h3>
+            {renderOverlayPanel()}
+          </div>
+
+          <div>
+            <h3 className="text-xs font-semibold text-gray-400 mb-2">Units</h3>
+            {renderUnitsButtons()}
+          </div>
         </div>
       </div>
 
@@ -1230,10 +1433,36 @@ export default function LayoutEditorPage() {
             drawingMode={drawingMode}
             drawingType={drawingType}
             onPlotSelect={(id) => setSelectedPlotId(id)}
-            onOpenPlotPanel={(id) => setPanelPlotId(id)}
+            onOpenPlotPanel={(id) => {
+              setPanelPlotId(id);
+              setStatusFeedback(null);
+              setStatusOverrides({});
+            }}
+            overlay={overlayDraft}
+            // While a draw tool is active the overlay must not swallow the
+            // clicks that place points on top of it.
+            overlayEditable={overlayEditing && !drawingMode}
+            overlayLockAspect={overlayLockAspect}
+            onOverlayChange={setOverlayDraft}
           />
         </div>
       </div>
+
+      {linkOpen && (
+        <LinkUnitsDialog
+          projectId={projectId}
+          onClose={() => setLinkOpen(false)}
+          onApplied={reloadAfterUnits}
+        />
+      )}
+      {generatePrefill && (
+        <GenerateUnitsDialog
+          projectId={projectId}
+          prefill={generatePrefill}
+          onClose={() => setGeneratePrefill(null)}
+          onApplied={reloadAfterUnits}
+        />
+      )}
 
       {/* ── Plot config panel ── */}
       {panelPlotId && (
@@ -1246,14 +1475,18 @@ export default function LayoutEditorPage() {
               plotNumberInput={plotNumberInput}
               setPlotNumberInput={setPlotNumberInput}
               mapRef={mapRef}
-              onCancel={() => setPanelPlotId(null)}
+              onCancel={closePlotPanel}
               onConfirm={handleConfirmPlot}
+              statusOverride={statusOverrides[panelPlotId]}
+              statusPending={statusPending}
+              statusFeedback={statusFeedback}
+              onStatusChange={handlePlotStatusChange}
             />
           </div>
 
           {/* Mobile */}
           <div className="fixed inset-0 z-50 lg:hidden">
-            <div className="absolute inset-0 bg-black/35" onClick={() => setPanelPlotId(null)} />
+            <div className="absolute inset-0 bg-black/35" onClick={closePlotPanel} />
             <div className="absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl p-4 pb-8 space-y-3">
               <div className="w-9 h-1 bg-gray-300 rounded-full mx-auto mb-2" />
               <h3 className="font-medium text-sm">Plot configuration</h3>
@@ -1262,8 +1495,12 @@ export default function LayoutEditorPage() {
                 plotNumberInput={plotNumberInput}
                 setPlotNumberInput={setPlotNumberInput}
                 mapRef={mapRef}
-                onCancel={() => setPanelPlotId(null)}
+                onCancel={closePlotPanel}
                 onConfirm={handleConfirmPlot}
+                statusOverride={statusOverrides[panelPlotId]}
+                statusPending={statusPending}
+                statusFeedback={statusFeedback}
+                onStatusChange={handlePlotStatusChange}
               />
             </div>
           </div>

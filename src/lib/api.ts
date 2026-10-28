@@ -6,11 +6,14 @@ export function getLeadGenUrl() {
   return isLocal ? "http://localhost:5173" : "https://www.oneemployee.in";
 }
 
-import { Project, ProjectFormData, FileData, LayoutEntity, Landmark, Captain, Agent } from '@/types/project';
-export type { Project, ProjectFormData, FileData, LayoutEntity, Captain, Agent };
+import { Project, ProjectFormData, FileData, LayoutEntity, LayoutOverlay, PlotStatus, Landmark, Captain, Agent } from '@/types/project';
+export type { Project, ProjectFormData, FileData, LayoutEntity, LayoutOverlay, PlotStatus, Captain, Agent };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
-type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout";
+// 'overlay' = the layout-plan image for the overlay align tool. Its own slot
+// (layoutOverlay.image) because 'layout' is the html2canvas screenshot and
+// replace-file deletes the old 'layout' key from R2.
+type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout" | "overlay";
 
 
 // Get headers with auth
@@ -27,10 +30,14 @@ const COMMON_FETCH_OPTIONS: RequestInit = {
 
 export class ApiError extends Error {
   status: number;
+  // Parsed JSON error body. The layout endpoints put more than `message` in it
+  // (`index` on a 400, `blocks` / `conflicts` on a 409) and the editor shows it.
+  body: unknown;
 
-  constructor(message: string | null | undefined, status: number) {
+  constructor(message: string | null | undefined, status: number, body: unknown = null) {
     super(message ?? "Unknown error");
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -51,7 +58,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
           ? body.error
           : `Request failed (${response.status})`;
 
-    throw new ApiError(String(message), response.status);
+    throw new ApiError(String(message), response.status, body);
   }
 
   return body as T;
@@ -113,6 +120,7 @@ export function transformBackendToFrontend(backendProject: any): Project {
     isPublished: backendProject.status === 'published' || backendProject.isPublished,
     landmarks: backendProject.landmarks || [],
     layoutEntities: backendProject.layoutEntities || [],
+    layoutOverlay: backendProject.layoutOverlay ?? null,
     owner: backendProject.owner ? {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
@@ -562,13 +570,112 @@ export async function saveLayoutEntities(projectId: string, layoutEntities: Layo
     body: JSON.stringify({ layoutEntities }),
   });
 
-  if (!res.ok) {
-    const errorData = await res.json();
-    throw new Error(errorData.message || 'Failed to save layout entities');
-  }
+  // Before: a plain Error without the HTTP status, so callers could not tell
+  // the server's 409 ("Layout changed while saving", CAS gave up after 3
+  // tries) or the new 400 `{message, index}` validator from a network blip.
+  // ApiError keeps status + body; the message text is unchanged.
+  const data = await handleResponse<{ layoutEntities: LayoutEntity[] }>(res);
+  return data.layoutEntities;
+}
 
-  const data = await res.json();
-  return data.layoutEntities as LayoutEntity[];
+// ==============================
+// Layout Editor tools (plot status, overlay, units)
+// ==============================
+
+export type LayoutCounts = { available: number; booked: number; sold: number; onHold: number; total: number };
+
+export interface PlotStatusResult {
+  plot: { id: string; plotNumber: string; status: PlotStatus; linked: boolean } & Record<string, unknown>;
+  unit: { _id: string; label: string; status: PlotStatus } | null;
+  counts: LayoutCounts;
+  changed: boolean;
+}
+
+/**
+ * PATCH /projects/:projectId/plots/:entityId/status — the ONLY way a plot
+ * status changes now. The full layout PUT keeps the stored status (D2), so the
+ * editor's status select used to save silently into nothing once the backend
+ * shipped. One atomic write also mirrors the linked unit.
+ */
+export async function patchPlotStatus(projectId: string, entityId: string, status: PlotStatus): Promise<PlotStatusResult> {
+  const res = await fetch(
+    `${API_URL}/projects/${encodeURIComponent(projectId)}/plots/${encodeURIComponent(entityId)}/status`,
+    {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ status }),
+    },
+  );
+  return handleResponse<PlotStatusResult>(res);
+}
+
+/** PUT /projects/:projectId/layout-overlay. `null` clears it. The server builds the url from the key. */
+export async function saveLayoutOverlay(
+  projectId: string,
+  layoutOverlay: {
+    image: { key: string };
+    center: { lat: number; lng: number };
+    widthM: number;
+    heightM: number;
+    rotationDeg: number;
+    opacity: number;
+  } | null,
+): Promise<LayoutOverlay | null> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout-overlay`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ layoutOverlay }),
+  });
+  const data = await handleResponse<{ layoutOverlay: LayoutOverlay | null }>(res);
+  return data.layoutOverlay ?? null;
+}
+
+export interface LinkUnitsReport {
+  linked: { plotId: string; plotNumber: string; unitId: string; label: string; status: PlotStatus }[];
+  ambiguous: { plotNumber: string; reason: string }[];
+  unmatchedPlots: string[];
+  unmatchedUnits: string[];
+  applied: boolean;
+  // generate-units only: why linking was skipped (multi-block setup)
+  error?: string;
+  blocks?: string[];
+}
+
+/** POST /projects/:projectId/layout/link-units. 409 body may carry `blocks`. */
+export async function linkUnits(projectId: string, mode: 'preview' | 'apply'): Promise<LinkUnitsReport> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout/link-units`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ mode }),
+  });
+  return handleResponse<LinkUnitsReport>(res);
+}
+
+export interface GenerateUnitsResult {
+  units: { total: number; added: number; kept: number };
+  counts: LayoutCounts;
+  link: LinkUnitsReport;
+}
+
+/** POST /projects/:projectId/layout/generate-units (plot mode, one unnamed block). 409 body may carry `conflicts`. */
+export async function generateUnits(
+  projectId: string,
+  mode: 'preview' | 'apply',
+  range: { from: number; to: number },
+): Promise<GenerateUnitsResult> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout/generate-units`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({
+      mode,
+      unitSetup: { mode: 'plot', blocks: [{ name: '', from: range.from, to: range.to }] },
+    }),
+  });
+  return handleResponse<GenerateUnitsResult>(res);
 }
 
 // ==============================

@@ -11,8 +11,17 @@ import {
   GroundOverlay,
 } from '@react-google-maps/api';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { mediaApi, projectsApi, saveProjectLandmarks, saveLayoutEntities } from '@/lib/api';
-import { Landmark, Project } from '@/types/project';
+import { ApiError, mediaApi, projectsApi, saveProjectLandmarks, saveLayoutEntities } from '@/lib/api';
+import { Landmark, LayoutEntity, OpenSpaceCategory, Project } from '@/types/project';
+import {
+  getPlotColor,
+  OPEN_SPACE_CATEGORIES,
+  OPEN_SPACE_STYLE,
+  cleanOpenSpaceLabel,
+  layoutSaveErrorMessage,
+} from '@/lib/layoutTools.mjs';
+import type { OverlayDraft } from '@/lib/layoutTools.mjs';
+import { OverlayAlignLayer } from '../layout-editor/OverlayAlignTool';
 import SearchFiltersPanel from "./SearchFiltersPanel";
 import { useRouter } from 'next/navigation';
 import React from 'react';
@@ -42,8 +51,17 @@ type Props = {
   onPlotSelect?: (id: string) => void;
   onOpenPlotPanel?: (id: string) => void;
   onLandmarksChange?: (landmarks: Landmark[]) => void;
+  // Layout Editor overlay align tool. The page owns the draft (its panel has
+  // the sliders); the map only draws it and reports drags.
+  overlay?: OverlayDraft | null;
+  overlayEditable?: boolean;
+  overlayLockAspect?: boolean;
+  onOverlayChange?: (next: OverlayDraft) => void;
 };
-type MapEntityType = "project-boundary" | "subplot" | "road" | "ai-boundary" | undefined;
+type MapEntityType = "project-boundary" | "subplot" | "road" | "ai-boundary" | "open-space" | undefined;
+// What saveLayoutEntities accepts. Before, four call sites cast to a literal
+// union without 'open-space'; one alias keeps them in step with the type.
+type SavedEntityType = LayoutEntity['type'];
 
 type PlotStatus = "available" | "booked" | "sold" | "on-hold";
 
@@ -68,8 +86,29 @@ type MapEntity = {
   // road specific
   roadName?: string;
 
+  // open-space specific
+  label?: string;
+  category?: OpenSpaceCategory;
+
+  // server-managed (status PATCH / link-units); the full PUT ignores them
+  unitId?: string | null;
+  updatedAt?: string | null;
+
   // control flags
   saved?: boolean;
+};
+
+// Shared by every full-layout save. Before, failures were only
+// console.error'd, so a 409 CAS conflict or a 400 from the server validator
+// looked exactly like a successful save.
+const reportLayoutSaveError = (err: unknown) => {
+  console.error("Failed to persist layout entities", err);
+  if (err instanceof ApiError) {
+    const body = err.body as { index?: number } | null;
+    alert(layoutSaveErrorMessage(err.status, err.message, body?.index));
+  } else {
+    alert(layoutSaveErrorMessage(0, err instanceof Error ? err.message : null));
+  }
 };
 
 const containerStyle = {
@@ -81,18 +120,8 @@ const containerStyle = {
 // is never called with a new array reference (prevents the "Loader called again
 // with different options" error and avoids unnecessary reloads).
 const MAP_LIBRARIES: ('places' | 'geometry' | 'marker')[] = ['places', 'geometry', 'marker'];
-const getPlotColor = (status?: PlotStatus) => {
-  switch (status) {
-    case "sold":
-      return "#22c55e"; // green
-    case "booked":
-      return "#ef4444"; // red
-    case "on-hold":
-      return "#eab308"; // yellow
-    default:
-      return "#3b82f6"; // blue (available)
-  }
-};
+// getPlotColor now comes from src/lib/layoutTools.mjs. The local copy painted
+// available BLUE and sold GREEN, the opposite of the viewers' palette.
 
 const getPolygonCenter = (path: google.maps.LatLngLiteral[]) => {
   const lat =
@@ -200,6 +229,10 @@ const ProjectMap = forwardRef(
       onDrawerData,
       onPlotSelect,
       onOpenPlotPanel,
+      overlay,
+      overlayEditable = false,
+      overlayLockAspect = true,
+      onOverlayChange,
     }: Props,
     ref
   ) => {
@@ -285,6 +318,8 @@ const [history, setHistory] = useState<MapEntity[][]>([]);
 const [redoStack, setRedoStack] = useState<MapEntity[][]>([]);
  const [selectedPlotId, setSelectedPlotId] = useState<string | null>(null);
 const [editingPlotId, setEditingPlotId] = useState<string | null>(null);
+// Separate from editingPlotId, which the AI edit mode also uses for plots.
+const [editingOpenSpaceId, setEditingOpenSpaceId] = useState<string | null>(null);
 const [currentDrawingType, setCurrentDrawingType] =
   useState<MapEntityType>("project-boundary");
 const [mapEntities, setMapEntities] = useState<MapEntity[]>([]);
@@ -516,6 +551,24 @@ useEffect(() => {
       };
       updateEntities([...mapEntities, newEntity]);
       setEditingPlotId(id);
+      resetDrawingState();
+      return;
+    }
+
+    // Open space (park, clubhouse, ...). Before there was no such type, so a
+    // garden had to be drawn as a plot (numbered, coloured, for sale) or a road.
+    if (entityType === "open-space") {
+      const newEntity: MapEntity = {
+        id,
+        type: "open-space",
+        geometryType: "polygon",
+        path,
+        label: "",
+        category: "park",
+        saved: false,
+      };
+      updateEntities([...mapEntities, newEntity]);
+      setEditingOpenSpaceId(id);
       resetDrawingState();
       return;
     }
@@ -1259,7 +1312,7 @@ const deleteLayoutImage = async () => {
           .filter(e => !e.deleted && e.type != null)
           .map(e => ({
             ...e,
-            type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary',
+            type: e.type as SavedEntityType,
           }));
         await saveLayoutEntities(projectId, entitiesToSave);
         return true;
@@ -1297,10 +1350,10 @@ const deleteLayoutImage = async () => {
     try {
       const entitiesToSave = updated
         .filter(e => !e.deleted && e.type != null)
-        .map(e => ({ ...e, type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' }));
+        .map(e => ({ ...e, type: e.type as SavedEntityType }));
       await saveLayoutEntities(projectId, entitiesToSave);
     } catch (err) {
-      console.error("Failed to persist layout entities", err);
+      reportLayoutSaveError(err);
     }
 
     // exit edit mode
@@ -1371,6 +1424,34 @@ const deleteLayoutImage = async () => {
         return mapEntities.find(e => e.id === id);
       },
 
+      // Read-only snapshot for the Units dialogs (range prefill) and the
+      // overlay tool (initial placement on the boundary).
+      getEntities: () => mapEntities,
+
+      // Re-read layoutEntities from the server after a write that changed them
+      // server-side (link/generate units, a 404/409 on a status PATCH). Not an
+      // undo step: the server copy is the truth, there is nothing to undo to.
+      reloadEntities: async () => {
+        try {
+          const fresh = await projectsApi.getById(projectId);
+          if (Array.isArray(fresh?.layoutEntities)) {
+            setMapEntities(fresh.layoutEntities as MapEntity[]);
+            setHistory([]);
+            setRedoStack([]);
+          }
+        } catch (err) {
+          console.error("Failed to reload layout entities", err);
+        }
+      },
+
+      // Apply a status the server already saved (PATCH response). Before, the
+      // status select edited the local array and relied on the next full PUT,
+      // which the backend now ignores for status. Skips the undo history:
+      // undoing would only repaint a colour the server no longer has.
+      setPlotStatusLocal: (id: string, status: PlotStatus) => {
+        setMapEntities(prev => prev.map(e => (e.id === id ? { ...e, status } : e)));
+      },
+
       updatePlotField: (id: string, field: string, value: any) => {
         updateEntities(
           mapEntities.map(e =>
@@ -1389,10 +1470,10 @@ const deleteLayoutImage = async () => {
         try {
           const entitiesToSave = updated
             .filter(e => !e.deleted && e.type != null)
-            .map(e => ({ ...e, type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' }));
+            .map(e => ({ ...e, type: e.type as SavedEntityType }));
           await saveLayoutEntities(projectId, entitiesToSave);
         } catch (err) {
-          console.error("Failed to persist layout entities", err);
+          reportLayoutSaveError(err);
         }
       },
     editPlot: (id: string) => {
@@ -1431,10 +1512,10 @@ editBoundary: () => {
     try {
       const entitiesToSave = updated
         .filter(e => !e.deleted && e.type != null)
-        .map(e => ({ ...e, type: e.type as 'project-boundary' | 'subplot' | 'road' | 'ai-boundary' }));
+        .map(e => ({ ...e, type: e.type as SavedEntityType }));
       await saveLayoutEntities(projectId, entitiesToSave);
     } catch (err) {
-      console.error("Failed to persist layout entities", err);
+      reportLayoutSaveError(err);
     }
   },
   undo: () => {
@@ -1934,6 +2015,42 @@ const updatePlotField = (id: string, field: string, value: any) => {
   );
 };
 
+const persistEntities = async (next: MapEntity[]) => {
+  try {
+    await saveLayoutEntities(
+      projectId,
+      next
+        .filter(e => !e.deleted && e.type != null)
+        .map(e => ({ ...e, type: e.type as SavedEntityType })),
+    );
+  } catch (err) {
+    reportLayoutSaveError(err);
+  }
+};
+
+// Open spaces persist on Save / Remove like a confirmed plot does. (Roads only
+// flip `saved` locally and wait for the next plot/boundary save; an open space
+// is usually drawn last, so waiting would lose it on reload.)
+const saveOpenSpace = (id: string) => {
+  const updated = mapEntities.map(e =>
+    e.id === id ? { ...e, saved: true, label: cleanOpenSpaceLabel(e.label).trim() } : e
+  );
+  updateEntities(updated);
+  setEditingOpenSpaceId(null);
+  void persistEntities(updated);
+};
+const removeOpenSpace = (id: string) => {
+  const target = mapEntities.find(e => e.id === id);
+  const updated = mapEntities.map(e => (e.id === id ? { ...e, deleted: true } : e));
+  updateEntities(updated);
+  setEditingOpenSpaceId(null);
+  // Never-saved shapes only live in this tab; no request needed.
+  if (target?.saved) void persistEntities(updated);
+};
+const editingOpenSpace = editingOpenSpaceId
+  ? mapEntities.find(e => e.id === editingOpenSpaceId && e.type === "open-space" && !e.deleted)
+  : undefined;
+
 const isBoundarySaved = mapEntities.some(
   (e) => e.type === "project-boundary" && e.saved
 );
@@ -2101,6 +2218,17 @@ const showProjectUI =
       opacity={0.9}
     />
   )}
+  {/* Rotated layout-plan image (layoutOverlay). The legacy GroundOverlay above
+      stays: it can only stretch an image over the boundary bbox, it cannot
+      rotate, which is why the align tool is a custom OverlayView. */}
+  {overlay && (
+    <OverlayAlignLayer
+      draft={overlay}
+      editable={overlayEditable}
+      lockAspect={overlayLockAspect}
+      onChange={(next) => onOverlayChange?.(next)}
+    />
+  )}
   {mapEntities
     .filter(entity => !entity.deleted)
     .map((entity) => {
@@ -2134,6 +2262,8 @@ const showProjectUI =
             fillColor:
             entity.type === "subplot"
               ? getPlotColor(entity.status)
+              : entity.type === "open-space"
+              ? OPEN_SPACE_STYLE.fill
               : entity.type === "road"
               ? "#374151"
               : entity.type === "ai-boundary"
@@ -2144,12 +2274,16 @@ const showProjectUI =
                 ? 0.7
                 : entity.type === "subplot"
                 ? 1
+                : entity.type === "open-space"
+                ? OPEN_SPACE_STYLE.fillOpacity
                 : 0.4,
             strokeColor:
             entity.id === selectedPlotId
               ? "#000000"
               : entity.type === "subplot"
               ? getPlotColor(entity.status)
+              : entity.type === "open-space"
+              ? OPEN_SPACE_STYLE.stroke
               : entity.type === "project-boundary"
               ? "#374151"
               : entity.type === "ai-boundary"
@@ -2165,6 +2299,7 @@ const showProjectUI =
                 : 2,
             zIndex:
               entity.type === "subplot" ? 30 :
+              entity.type === "open-space" ? 25 :
               entity.type === "road" ? 20 :
               entity.type === "ai-boundary" ? 10 :
               5,
@@ -2176,6 +2311,11 @@ const showProjectUI =
 
             if (entity.type === "ai-boundary") {
               setActiveAiBoundaryId(entity.id);
+            }
+
+            // Saved open spaces stay editable (label / category) on click.
+            if (entity.type === "open-space") {
+              setEditingOpenSpaceId(entity.id);
             }
 
             if (entity.type === "subplot") {
@@ -2219,6 +2359,28 @@ const showProjectUI =
             </div>
           </OverlayView>
           )}
+          {entity.type === "open-space" && entity.label && (
+              <OverlayView
+                position={center}
+                mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+              >
+                <div
+                  style={{
+                    color: "#14532d",
+                    background: "rgba(255,255,255,0.85)",
+                    padding: "2px 8px",
+                    borderRadius: "999px",
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    transform: "translate(-50%, -50%)",
+                    whiteSpace: "nowrap",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {entity.label}
+                </div>
+              </OverlayView>
+            )}
           {entity.type === "road" && entity.roadName && (
               <OverlayView
                 position={center}
@@ -2452,6 +2614,83 @@ const showProjectUI =
                     >
                       Save Road
                     </button>
+                  </div>
+                </OverlayView>
+              )}
+
+              {editingOpenSpace && (
+                <OverlayView
+                  position={getPolygonCenter(editingOpenSpace.path)}
+                  mapPaneName={OverlayView.FLOAT_PANE}
+                >
+                  <div
+                    role="dialog"
+                    aria-label="Open space configuration"
+                    className="bg-white rounded-xl shadow-xl border p-4"
+                    style={{ width: "230px", transform: "translate(-50%, -50%)", pointerEvents: "auto" }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setEditingOpenSpaceId(null);
+                    }}
+                  >
+                    <div className="text-sm font-semibold mb-2">Open Space</div>
+
+                    <label htmlFor={`os-label-${editingOpenSpace.id}`} className="text-xs text-gray-500">
+                      Label
+                    </label>
+                    <input
+                      id={`os-label-${editingOpenSpace.id}`}
+                      placeholder="e.g. Garden"
+                      maxLength={80}
+                      value={editingOpenSpace.label || ""}
+                      onChange={(e) =>
+                        updatePlotField(editingOpenSpace.id, "label", cleanOpenSpaceLabel(e.target.value))
+                      }
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="border rounded-md px-2 py-2 w-full text-sm mt-1 outline-none focus:ring-2 focus:ring-green-600"
+                    />
+
+                    <label htmlFor={`os-cat-${editingOpenSpace.id}`} className="text-xs text-gray-500 mt-3 block">
+                      Category
+                    </label>
+                    <select
+                      id={`os-cat-${editingOpenSpace.id}`}
+                      value={editingOpenSpace.category || "park"}
+                      onChange={(e) =>
+                        updatePlotField(editingOpenSpace.id, "category", e.target.value as OpenSpaceCategory)
+                      }
+                      onMouseDown={(e) => e.stopPropagation()}
+                      className="border rounded-md px-2 py-2 w-full text-sm mt-1"
+                    >
+                      {OPEN_SPACE_CATEGORIES.map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+
+                    <div className="grid grid-cols-3 gap-2 mt-3">
+                      <button
+                        type="button"
+                        onClick={() => removeOpenSpace(editingOpenSpace.id)}
+                        className="border border-red-200 text-red-700 rounded-md py-2 text-xs hover:bg-red-50"
+                      >
+                        Remove
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingOpenSpaceId(null)}
+                        className="border rounded-md py-2 text-xs hover:bg-gray-100"
+                      >
+                        Close
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => saveOpenSpace(editingOpenSpace.id)}
+                        className="bg-green-700 text-white rounded-md py-2 text-xs hover:bg-green-800"
+                      >
+                        Save
+                      </button>
+                    </div>
                   </div>
                 </OverlayView>
               )}
