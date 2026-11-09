@@ -22,6 +22,8 @@ export type CardTemplate = 'classic' | 'dark' | 'minimal';
 
 export interface PublicCardProject {
   slug: string;
+  // true when the project has a plot-layout overlay (backend A7b). Absent on older backends: no link.
+  hasPlotLayout?: boolean;
   projectName: string;
   city: string | null;
   location: string | null;
@@ -229,11 +231,15 @@ export default function PublicCard({ card, shareUrl }: { card: PublicCardData; s
                 const price = formatInrPrice(pr.startingPrice);
                 const place = clean(pr.city) || clean(pr.location);
                 return (
-                  <Link
+                  // The plot link is a sibling of the tile link, not inside it: a link inside a link is invalid HTML.
+                  <div
                     key={pr.slug}
+                    className="overflow-hidden rounded-xl border border-[#E7E5E4] bg-white shadow-sm transition hover:border-[#B45309]/50"
+                  >
+                  <Link
                     href={`/visit/${encodeURIComponent(pr.slug)}`}
                     data-project={pr.slug}
-                    className="overflow-hidden rounded-xl border border-[#E7E5E4] bg-white shadow-sm transition hover:border-[#B45309]/50"
+                    className="block"
                   >
                     {cover ? (
                       <img src={cover} alt={pr.projectName} loading="lazy" className="aspect-[4/3] w-full object-cover" />
@@ -248,6 +254,16 @@ export default function PublicCard({ card, shareUrl }: { card: PublicCardData; s
                       {price && <p className="mt-1 text-xs font-bold text-[#B45309]">Starting {price}</p>}
                     </div>
                   </Link>
+                  {pr.hasPlotLayout === true && (
+                    <Link
+                      href={`/plots/${encodeURIComponent(pr.slug)}`}
+                      data-plot-layout={pr.slug}
+                      className="mx-2.5 mb-2.5 flex min-h-[44px] items-center justify-center rounded-lg border border-[#B45309] px-2 text-xs font-bold text-[#B45309] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#B45309]"
+                    >
+                      View Plot Layout
+                    </Link>
+                  )}
+                  </div>
                 );
               })}
             </div>

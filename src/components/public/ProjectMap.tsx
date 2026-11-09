@@ -12,6 +12,7 @@ import {
 } from '@react-google-maps/api';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { MAP_LIBRARIES } from '@/lib/mapLibraries';
 import { ApiError, mediaApi, projectsApi, saveProjectLandmarks, saveLayoutEntitiesVersioned } from '@/lib/api';
 import { Landmark, LayoutEntity, OpenSpaceCategory, Project } from '@/types/project';
 import {
@@ -133,7 +134,7 @@ const containerStyle = {
 // Stable reference — must live outside the component so the Loader singleton
 // is never called with a new array reference (prevents the "Loader called again
 // with different options" error and avoids unnecessary reloads).
-const MAP_LIBRARIES: ('places' | 'geometry' | 'marker')[] = ['places', 'geometry', 'marker'];
+// MAP_LIBRARIES lives in src/lib/mapLibraries.ts, shared with the Public_Plot_Page.
 // getPlotColor now comes from src/lib/layoutTools.mjs. The local copy painted
 // available BLUE and sold GREEN, the opposite of the viewers' palette.
 
