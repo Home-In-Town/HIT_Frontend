@@ -12,7 +12,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { checkDecodedDims, rotate90 } from '@/lib/layoutTools.mjs';
 
-export interface PreviewMarker { x: number; y: number; label: string }
+export interface PreviewMarker { x: number; y: number; label: string; index: number }
 
 const MIN_ZOOM = 100;
 const MAX_ZOOM = 800;
@@ -46,6 +46,7 @@ async function rotateBlob(blob: Blob, turns: number): Promise<{ blob: Blob; widt
 
 export default function LayoutPreview({
   blob,
+  src,
   fileName,
   busy,
   onConfirm,
@@ -53,8 +54,12 @@ export default function LayoutPreview({
   pickMode,
   onPick,
   markers,
+  onMarkerMove,
 }: {
-  blob: Blob;
+  /** The picked file (new upload). Exactly one of blob / src is given. */
+  blob?: Blob;
+  /** A URL of a saved image (reopening control points). */
+  src?: string;
   fileName: string;
   busy?: boolean;
   onConfirm?: (result: { blob: Blob; width: number; height: number }) => void;
@@ -63,6 +68,8 @@ export default function LayoutPreview({
   pickMode?: boolean;
   onPick?: (pt: { x: number; y: number }) => void;
   markers?: PreviewMarker[];
+  /** Drag a marker to a new image pixel (R6.11). */
+  onMarkerMove?: (index: number, pt: { x: number; y: number }) => void;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
@@ -77,15 +84,15 @@ export default function LayoutPreview({
   const [box, setBox] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
-    const u = URL.createObjectURL(blob);
+    const u = blob ? URL.createObjectURL(blob) : (src ?? null);
     setUrl(u);
     setNatural(null);
     setError(null);
     setZoom(MIN_ZOOM);
     setPan({ x: 0, y: 0 });
     setTurns(0);
-    return () => URL.revokeObjectURL(u);
-  }, [blob]);
+    return () => { if (blob && u) URL.revokeObjectURL(u); };
+  }, [blob, src]);
 
   useEffect(() => {
     const el = boxRef.current;
@@ -135,6 +142,7 @@ export default function LayoutPreview({
     setWorking(true);
     setError(null);
     try {
+      if (!blob) throw new Error('Nothing to confirm');
       onConfirm(await rotateBlob(blob, turns));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not prepare the image');
@@ -216,15 +224,30 @@ export default function LayoutPreview({
           // Marker position in box pixels from its image pixel (only valid unrotated).
           const mx = (m.x - natural.w / 2) * scale + pan.x + box.w / 2;
           const my = (m.y - natural.h / 2) * scale + pan.y + box.h / 2;
+          // The visible dot is 24 px; the wrapper is the 44x44 touch target.
           return (
             <span
-              key={m.label}
+              key={`${m.index}-${m.label}`}
               role="img"
               aria-label={`Control point ${m.label}`}
-              className="absolute -translate-x-1/2 -translate-y-1/2 w-6 h-6 rounded-full bg-orange-600 text-white text-[11px] flex items-center justify-center border-2 border-white"
-              style={{ left: mx, top: my, pointerEvents: 'none' }}
+              className="absolute -translate-x-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center"
+              style={{ left: mx, top: my, pointerEvents: onMarkerMove && !pickMode ? 'auto' : 'none', touchAction: 'none', cursor: 'grab' }}
+              onPointerDown={(e) => {
+                if (!onMarkerMove) return;
+                e.stopPropagation();
+                (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              }}
+              onPointerMove={(e) => {
+                if (!onMarkerMove || !(e.buttons & 1) || !imgRef.current) return;
+                const r = imgRef.current.getBoundingClientRect();
+                const x = Math.min(natural.w, Math.max(0, ((e.clientX - r.left) / r.width) * natural.w));
+                const y = Math.min(natural.h, Math.max(0, ((e.clientY - r.top) / r.height) * natural.h));
+                onMarkerMove(m.index, { x, y });
+              }}
             >
-              {m.label}
+              <span className="w-6 h-6 rounded-full bg-orange-600 text-white text-[11px] flex items-center justify-center border-2 border-white">
+                {m.label}
+              </span>
             </span>
           );
         })}

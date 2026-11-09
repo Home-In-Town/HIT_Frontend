@@ -262,7 +262,7 @@ export function corners(transform) {
 }
 
 /** Great-circle distance in metres, same earth radius as the plane. @param {LatLngLit} g1 @param {LatLngLit} g2 @returns {number} */
-function haversineM(g1, g2) {
+export function haversineM(g1, g2) {
   const dLat = toRad(g2.lat - g1.lat);
   const dLng = toRad(g2.lng - g1.lng);
   const h = Math.sin(dLat / 2) ** 2

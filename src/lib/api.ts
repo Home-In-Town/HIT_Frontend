@@ -761,11 +761,12 @@ export function uploadLayoutFile(
     let percent = 0;
     let settled = false;
     let stallTimer: ReturnType<typeof setTimeout> | undefined;
-    let tick: ReturnType<typeof setInterval> | undefined;
 
+    // Re-reports the last percent every second so the bar never looks frozen (R1.9).
+    const tick = setInterval(() => onProgress?.(percent), UPLOAD_TICK_MS);
     const cleanup = () => {
       if (stallTimer) clearTimeout(stallTimer);
-      if (tick) clearInterval(tick);
+      clearInterval(tick);
       signal?.removeEventListener('abort', onAbort);
     };
     const fail = (e: LayoutUploadError) => {
@@ -823,7 +824,6 @@ export function uploadLayoutFile(
     };
 
     armStall();
-    tick = setInterval(() => onProgress?.(percent), UPLOAD_TICK_MS);
     xhr.send(form);
   });
 }
