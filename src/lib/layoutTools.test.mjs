@@ -135,10 +135,13 @@ describe('drag / scale maths', () => {
     const d = draft();
     near((nudgeOverlay(d, 'ArrowUp', false).center.lat - d.center.lat) * M_PER_DEG_LAT, 1, 1e-6);
     near((d.center.lat - nudgeOverlay(d, 'ArrowDown', true).center.lat) * M_PER_DEG_LAT, 10, 1e-6);
-    near(nudgeOverlay(d, '+', false).widthM, 122.4, 1e-9);
-    near(nudgeOverlay(d, '-', false).heightM, 78.4, 1e-9);
-    assert.equal(nudgeOverlay(d, '[', false).rotationDeg, 359);
-    assert.equal(nudgeOverlay(d, ']', true).rotationDeg, 10);
+    near(nudgeOverlay(d, '+', false).widthM, 121.2, 1e-9); // R4.7: +/- is 1 %
+    near(nudgeOverlay(d, '-', false).heightM, 79.2, 1e-9);
+    assert.equal(nudgeOverlay(d, '[', false).rotationDeg, 359.9); // R4.7: [ ] are 0.1 deg
+    assert.equal(nudgeOverlay(d, ']', true).rotationDeg, 1);
+    assert.equal(nudgeOverlay(d, '{', false).rotationDeg, 359); // { } are 1 deg
+    assert.equal(nudgeOverlay(d, '}', false).rotationDeg, 1);
+    assert.equal(nudgeOverlay(d, '}', true).rotationDeg, 10);
     assert.equal(nudgeOverlay(d, 'a', false), null);
   });
 });
@@ -161,7 +164,7 @@ describe('initialOverlayDraft', () => {
     assert.equal(d.opacity, 0.85);
     assert.equal(d.rotationDeg, 0);
   });
-  test('no boundary → project pin at 100 m; nothing → null', () => {
+  test('no boundary: project pin, 200 m on the longest side (R5.5); nothing: null', () => {
     const d = initialOverlayDraft({ image, fallbackCenter: { lat: 21, lng: 79 }, aspect: 2 });
     assert.equal(d.widthM, 100);
     assert.equal(d.heightM, 200);

@@ -697,6 +697,9 @@ import { Landmark, LayoutEntity, PlotStatus } from '@/types/project';
 import { PLOT_STATUSES, PLOT_STATUS_LABELS, plotStatusFeedback, unitRangePrefill } from '@/lib/layoutTools.mjs';
 import type { OverlayDraft } from '@/lib/layoutTools.mjs';
 import { OverlayAlignPanel, overlayToDraft } from '@/components/layout-editor/OverlayAlignTool';
+import type { ControlPoint } from '@/components/layout-editor/GeorefPanel';
+import { useProjectPermissions } from '@/components/layout-editor/useProjectPermissions';
+import { useUnsavedGuard } from '@/components/layout-editor/useUnsavedGuard';
 import LinkUnitsDialog from '@/components/layout-editor/LinkUnitsDialog';
 import GenerateUnitsDialog from '@/components/layout-editor/GenerateUnitsDialog';
 
@@ -796,8 +799,13 @@ function PlotPanelFields({
   statusPending,
   statusFeedback,
   onStatusChange,
+  canEdit,
+  canEditStatus,
 }: {
   panelPlotId: string;
+  // false = status-only or read-only: no number/facing edits, no Confirm (R8.12).
+  canEdit: boolean;
+  canEditStatus: boolean;
   plotNumberInput: string;
   setPlotNumberInput: (v: string) => void;
   mapRef: React.RefObject<any>;
@@ -817,7 +825,7 @@ function PlotPanelFields({
   // The PATCH needs the plot on the server. An unconfirmed plot only exists in
   // this tab, and the full PUT no longer carries status (new plots are saved
   // as available), so the select waits for Confirm.
-  const canSetStatus = plot.saved === true;
+  const canSetStatus = plot.saved === true && canEditStatus;
 
   return (
     <>
@@ -826,9 +834,10 @@ function PlotPanelFields({
         <input
           value={plotNumberInput}
           onChange={(e) => setPlotNumberInput(e.target.value)}
-          onBlur={() =>
-            mapRef.current?.updatePlotField(panelPlotId, "plotNumber", plotNumberInput)
-          }
+          readOnly={!canEdit}
+          onBlur={() => {
+            if (canEdit) mapRef.current?.updatePlotField(panelPlotId, "plotNumber", plotNumberInput);
+          }}
           className="border p-2 w-full rounded text-xs mt-1"
         />
       </div>
@@ -873,7 +882,7 @@ function PlotPanelFields({
         </div>
       </div>
 
-      <div>
+      {canEdit && (<div>
         <label className="text-xs text-gray-500">Facing</label>
         <select
           value={plot.facing || ""}
@@ -888,24 +897,26 @@ function PlotPanelFields({
           <option value="east">East</option>
           <option value="west">West</option>
         </select>
-      </div>
+      </div>)}
 
       <div className="flex justify-between pt-1">
-        <button onClick={onCancel} className="text-gray-500 text-xs">Cancel</button>
+        <button onClick={onCancel} className="text-gray-500 text-xs min-h-[44px] min-w-[44px]">{canEdit ? 'Cancel' : 'Close'}</button>
+        {canEdit && (
         <button
           onClick={onConfirm}
           className="bg-emerald-600 text-white px-4 py-1 rounded text-xs"
         >
           Confirm
         </button>
+        )}
       </div>
     </>
   );
 }
 
 // ─── Tab types ───────────────────────────────────────────────────────────────
-type TabType = "Boundary" | "Roads" | "Plots" | "Open Space" | "AI" | "Overlay" | "Units" | "History" | "Canvas" | "Landmarks";
-const TABS: TabType[] = ["Boundary", "Roads", "Plots", "Open Space", "AI", "Overlay", "Units", "History", "Canvas", "Landmarks"];
+type TabType = "Boundary" | "Roads" | "Plots" | "Open Space" | "Grid" | "Overlay" | "Units" | "History" | "Canvas" | "Landmarks";
+const TABS: TabType[] = ["Boundary", "Roads", "Plots", "Open Space", "Grid", "Overlay", "Units", "History", "Canvas", "Landmarks"];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function LayoutEditorPage() {
@@ -939,12 +950,22 @@ export default function LayoutEditorPage() {
   const [overlaySaved,      setOverlaySaved]      = useState<OverlayDraft | null>(null);
   const [overlayEditing,    setOverlayEditing]    = useState(false);
   const [overlayLockAspect, setOverlayLockAspect] = useState(true);
+  const [overlayLocked,     setOverlayLocked]     = useState(false);
+  const [overlayDirty,      setOverlayDirty]      = useState(false);
+  const [overlayCps,        setOverlayCps]        = useState<ControlPoint[]>([]);
+  const [mapPickMode,       setMapPickMode]       = useState(false);
+  const [mapClick,          setMapClick]          = useState<{ lat: number; lng: number; n: number } | null>(null);
+  const [markerMove,        setMarkerMove]        = useState<{ index: number; lat: number; lng: number; n: number } | null>(null);
+  const perms = useProjectPermissions(project);
+  useUnsavedGuard(overlayDirty);
 
   // ── units dialogs ──
   const [linkOpen,       setLinkOpen]       = useState(false);
   const [generatePrefill, setGeneratePrefill] = useState<ReturnType<typeof unitRangePrefill> | null>(null);
 
   // ── load project ──
+  // Bumped by 'Reload' after a 409 LAYOUT_STALE so the page re-reads the project, its layoutVersion and its overlay.
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     if (!projectId) return;
     (async () => {
@@ -956,8 +977,9 @@ export default function LayoutEditorPage() {
       const savedOverlay = overlayToDraft(data.layoutOverlay);
       setOverlaySaved(savedOverlay);
       setOverlayDraft(savedOverlay);
+      setOverlayCps(savedOverlay?.controlPoints ?? []);
     })();
-  }, [projectId]);
+  }, [projectId, reloadKey]);
 
   const closePlotPanel = () => {
     setPanelPlotId(null);
@@ -1007,6 +1029,7 @@ export default function LayoutEditorPage() {
     return {
       boundaryPath: boundary?.path ?? null,
       fallbackCenter: Number.isFinite(lat) && Number.isFinite(lng) && (lat !== 0 || lng !== 0) ? { lat, lng } : null,
+      mapCenter: (mapRef.current?.getMapCenter?.() ?? null) as { lat: number; lng: number } | null,
     };
   }, [project]);
 
@@ -1068,6 +1091,18 @@ export default function LayoutEditorPage() {
         savedDraft={overlaySaved}
         editing={overlayEditing}
         lockAspect={overlayLockAspect}
+        locked={overlayLocked}
+        access={perms.access}
+        layoutVersion={perms.layoutVersion}
+        onLockedChange={setOverlayLocked}
+        onLayoutVersion={perms.setLayoutVersion}
+        onReload={() => { setOverlayEditing(false); setReloadKey((k) => k + 1); }}
+        onAccessLost={perms.loseAccess}
+        onDirtyChange={setOverlayDirty}
+        onControlPointsChange={setOverlayCps}
+        mapClick={mapClick}
+        markerMove={markerMove}
+        onMapPickModeChange={setMapPickMode}
         onDraftChange={setOverlayDraft}
         onEditingChange={(v) => {
           setOverlayEditing(v);
@@ -1151,7 +1186,7 @@ export default function LayoutEditorPage() {
       case "Units":
         return renderUnitsButtons();
 
-      case "AI":
+      case "Grid":
         return (
           <div className="grid grid-cols-3 gap-2">
             <MobileToolButton  label="Draw AI Boundary"   color="purple" onClick={() => { mapRef.current?.toggleAiEditMode(false); setDrawingType("ai-boundary"); setDrawingMode('polygon'); }} />
@@ -1260,6 +1295,7 @@ export default function LayoutEditorPage() {
       )}
 
       {/* ── Mobile bottom sheet ── */}
+      {perms.canEdit && (
       <div
         className={`fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-2xl border-t border-gray-200 lg:hidden transition-all duration-300 ${
           sheetExpanded ? "max-h-[70vh]" : "max-h-[200px]"
@@ -1295,8 +1331,16 @@ export default function LayoutEditorPage() {
           {renderMobileTabContent(activeTab)}
         </div>
       </div>
+      )}
 
       {/* ── Desktop left sidebar ── */}
+      {!perms.canEdit && (
+        <div role="note" className="hidden lg:flex w-80 bg-white shadow-xl p-4 z-30 flex-col gap-3 text-sm text-gray-700">
+          <h2 className="font-bold text-gray-600">LAYOUT</h2>
+          <p>{perms.access === 'status-only' ? 'You can change plot status. Select a plot on the map.' : 'View only. You do not have permission to edit this layout.'}</p>
+        </div>
+      )}
+      {perms.canEdit && (
       <div className="hidden lg:flex w-80 bg-white shadow-xl p-4 z-30 flex-col gap-6 overflow-y-auto">
 
         <div>
@@ -1420,6 +1464,7 @@ export default function LayoutEditorPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── Map area ── */}
       <div className="flex-1 relative">
@@ -1430,7 +1475,7 @@ export default function LayoutEditorPage() {
             lat={project.latitude}
             lng={project.longitude}
             focusOnly={true}
-            drawingMode={drawingMode}
+            drawingMode={perms.canEdit ? drawingMode : null}
             drawingType={drawingType}
             onPlotSelect={(id) => setSelectedPlotId(id)}
             onOpenPlotPanel={(id) => {
@@ -1444,6 +1489,13 @@ export default function LayoutEditorPage() {
             overlayEditable={overlayEditing && !drawingMode}
             overlayLockAspect={overlayLockAspect}
             onOverlayChange={setOverlayDraft}
+            overlayLocked={overlayLocked}
+            overlayControlPoints={overlayCps}
+            onOverlayControlPointMove={(index, geo) => setMarkerMove((m) => ({ index, ...geo, n: (m?.n ?? 0) + 1 }))}
+            mapPickMode={mapPickMode}
+            onMapPick={(geo) => setMapClick((m) => ({ ...geo, n: (m?.n ?? 0) + 1 }))}
+            layoutVersion={perms.layoutVersion}
+            onLayoutVersion={perms.setLayoutVersion}
           />
         </div>
       </div>
@@ -1481,6 +1533,8 @@ export default function LayoutEditorPage() {
               statusPending={statusPending}
               statusFeedback={statusFeedback}
               onStatusChange={handlePlotStatusChange}
+              canEdit={perms.canEdit}
+              canEditStatus={perms.canEditStatus}
             />
           </div>
 
@@ -1501,6 +1555,8 @@ export default function LayoutEditorPage() {
                 statusPending={statusPending}
                 statusFeedback={statusFeedback}
                 onStatusChange={handlePlotStatusChange}
+                canEdit={perms.canEdit}
+                canEditStatus={perms.canEditStatus}
               />
             </div>
           </div>

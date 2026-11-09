@@ -11,7 +11,9 @@ import {
   GroundOverlay,
 } from '@react-google-maps/api';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
-import { ApiError, mediaApi, projectsApi, saveProjectLandmarks, saveLayoutEntities } from '@/lib/api';
+import { createPortal } from 'react-dom';
+import { MAP_LIBRARIES } from '@/lib/mapLibraries';
+import { ApiError, mediaApi, projectsApi, saveProjectLandmarks, saveLayoutEntitiesVersioned } from '@/lib/api';
 import { Landmark, LayoutEntity, OpenSpaceCategory, Project } from '@/types/project';
 import {
   getPlotColor,
@@ -57,6 +59,19 @@ type Props = {
   overlayEditable?: boolean;
   overlayLockAspect?: boolean;
   onOverlayChange?: (next: OverlayDraft) => void;
+  // Lock (R4.8): handles hidden, map gestures restored, keys ignored.
+  overlayLocked?: boolean;
+  // Two-point georeferencing (R6): map-side control points, drag to adjust,
+  // and a one-shot "next map click is a pick" mode.
+  overlayControlPoints?: { u: number; v: number; lat: number; lng: number; role: 'align' | 'check' }[];
+  onOverlayControlPointMove?: (index: number, geo: { lat: number; lng: number }) => void;
+  mapPickMode?: boolean;
+  onMapPick?: (geo: { lat: number; lng: number }) => void;
+  // One Layout_Version for the whole editor page (R17.10): sent with every
+  // entity save and replaced by the one the server returns. undefined = no
+  // token (public pages); null = legacy project with no version yet.
+  layoutVersion?: string | null;
+  onLayoutVersion?: (v: string | null) => void;
 };
 type MapEntityType = "project-boundary" | "subplot" | "road" | "ai-boundary" | "open-space" | undefined;
 // What saveLayoutEntities accepts. Before, four call sites cast to a literal
@@ -119,7 +134,7 @@ const containerStyle = {
 // Stable reference — must live outside the component so the Loader singleton
 // is never called with a new array reference (prevents the "Loader called again
 // with different options" error and avoids unnecessary reloads).
-const MAP_LIBRARIES: ('places' | 'geometry' | 'marker')[] = ['places', 'geometry', 'marker'];
+// MAP_LIBRARIES lives in src/lib/mapLibraries.ts, shared with the Public_Plot_Page.
 // getPlotColor now comes from src/lib/layoutTools.mjs. The local copy painted
 // available BLUE and sold GREEN, the opposite of the viewers' palette.
 
@@ -233,11 +248,57 @@ const ProjectMap = forwardRef(
       overlayEditable = false,
       overlayLockAspect = true,
       onOverlayChange,
+      overlayLocked = false,
+      overlayControlPoints,
+      onOverlayControlPointMove,
+      mapPickMode = false,
+      onMapPick,
+      layoutVersion,
+      onLayoutVersion,
     }: Props,
     ref
   ) => {
   // 🔹 Always run hooks first
   const mapRef = useRef<google.maps.Map | null>(null);
+  // Overlay mode = the Layout Editor passes an `overlay` prop (null when none
+  // yet). Public pages never do, so their map is unchanged.
+  const overlayMode = overlay !== undefined;
+  const [mapInstance, setMapInstance] = useState<google.maps.Map | null>(null);
+  const [mapTypeHost, setMapTypeHost] = useState<HTMLDivElement | null>(null);
+  const [currentMapType, setCurrentMapType] = useState<string>('roadmap');
+
+  // Layout_Version for entity saves, kept in a ref so a save started in one
+  // handler uses the version the previous save returned (R17.10).
+  const layoutVersionRef = useRef<string | null | undefined>(layoutVersion);
+  useEffect(() => { layoutVersionRef.current = layoutVersion; }, [layoutVersion]);
+  const saveEntitiesVersioned = async (pid: string, list: LayoutEntity[]) => {
+    const r = await saveLayoutEntitiesVersioned(pid, list, layoutVersionRef.current);
+    if (layoutVersionRef.current !== undefined || r.layoutVersion) {
+      layoutVersionRef.current = r.layoutVersion;
+      onLayoutVersion?.(r.layoutVersion);
+    }
+    return r.layoutEntities;
+  };
+
+  // Map / Satellite / Hybrid toggle for overlay mode (R4.9). It lives in the
+  // map's own control area so it stays visible in fullscreen. Google's built-in
+  // mapTypeControl stays off because it also offers Terrain and a 45° tilt.
+  useEffect(() => {
+    if (!overlayMode || !mapInstance) return;
+    const host = document.createElement('div');
+    host.style.margin = '10px';
+    const controls = mapInstance.controls[google.maps.ControlPosition.TOP_LEFT];
+    controls.push(host);
+    setMapTypeHost(host);
+    setCurrentMapType(mapInstance.getMapTypeId() || 'roadmap');
+    const l = mapInstance.addListener('maptypeid_changed', () => setCurrentMapType(mapInstance.getMapTypeId() || 'roadmap'));
+    return () => {
+      l.remove();
+      const idx = controls.getArray().indexOf(host);
+      if (idx >= 0) controls.removeAt(idx);
+      setMapTypeHost(null);
+    };
+  }, [overlayMode, mapInstance]);
 const getNeighborhoodIcon = (type: string): google.maps.Icon => {
   const iconPaths: Record<string, string> = {
     hospital: "M10 2h4v6h6v4h-6v6h-4v-6H4V8h6z",
@@ -1314,7 +1375,7 @@ const deleteLayoutImage = async () => {
             ...e,
             type: e.type as SavedEntityType,
           }));
-        await saveLayoutEntities(projectId, entitiesToSave);
+        await saveEntitiesVersioned(projectId, entitiesToSave);
         return true;
       } catch (err) {
         console.error("Failed to save layout entities", err);
@@ -1351,7 +1412,7 @@ const deleteLayoutImage = async () => {
       const entitiesToSave = updated
         .filter(e => !e.deleted && e.type != null)
         .map(e => ({ ...e, type: e.type as SavedEntityType }));
-      await saveLayoutEntities(projectId, entitiesToSave);
+      await saveEntitiesVersioned(projectId, entitiesToSave);
     } catch (err) {
       reportLayoutSaveError(err);
     }
@@ -1471,7 +1532,7 @@ const deleteLayoutImage = async () => {
           const entitiesToSave = updated
             .filter(e => !e.deleted && e.type != null)
             .map(e => ({ ...e, type: e.type as SavedEntityType }));
-          await saveLayoutEntities(projectId, entitiesToSave);
+          await saveEntitiesVersioned(projectId, entitiesToSave);
         } catch (err) {
           reportLayoutSaveError(err);
         }
@@ -1513,7 +1574,7 @@ editBoundary: () => {
       const entitiesToSave = updated
         .filter(e => !e.deleted && e.type != null)
         .map(e => ({ ...e, type: e.type as SavedEntityType }));
-      await saveLayoutEntities(projectId, entitiesToSave);
+      await saveEntitiesVersioned(projectId, entitiesToSave);
     } catch (err) {
       reportLayoutSaveError(err);
     }
@@ -1649,6 +1710,13 @@ editBoundary: () => {
   });
 },
 
+    // Current view centre and pixel scale, for First_Placement's last resort
+    // (R5.2) and for turning drag pixels into metres.
+    getMapCenter: () => {
+      const c = mapRef.current?.getCenter();
+      return c ? { lat: c.lat(), lng: c.lng() } : null;
+    },
+
     toggleStreetView: () => {
         if (!mapRef.current) return;
 
@@ -1688,7 +1756,9 @@ editBoundary: () => {
 
 
       set3DView: () => {
-        if (!mapRef.current) return;
+        // Overlay mode stays flat (R4.9): a tilted view shows oblique imagery
+        // that never lines up with a flat plan.
+        if (!mapRef.current || overlayMode) return;
 
         if (!is3D.current) {
           mapRef.current.setTilt(45);
@@ -2017,7 +2087,7 @@ const updatePlotField = (id: string, field: string, value: any) => {
 
 const persistEntities = async (next: MapEntity[]) => {
   try {
-    await saveLayoutEntities(
+    await saveEntitiesVersioned(
       projectId,
       next
         .filter(e => !e.deleted && e.type != null)
@@ -2176,7 +2246,10 @@ const showProjectUI =
   center={mapCenter}
   zoom={16}
   onClick={(e) => {
-    if (isDrawing && e.latLng) {
+    if (mapPickMode && e.latLng) {
+      // Georeferencing: this click is a map control point, not a deselect.
+      onMapPick?.({ lat: e.latLng.lat(), lng: e.latLng.lng() });
+    } else if (isDrawing && e.latLng) {
       handleMapClickForDrawing(e);
     } else {
       setSelectedPlotId(null);
@@ -2185,6 +2258,7 @@ const showProjectUI =
   onMouseMove={isDrawing ? handleMapMouseMove : undefined}
   onLoad={(map: google.maps.Map) => {
     mapRef.current = map;
+    setMapInstance(map);
     setMapZoom(map.getZoom() || 16);
   }}
   onZoomChanged={() => {
@@ -2196,15 +2270,35 @@ const showProjectUI =
     if (!isFocusMode) filterProjectsInView();
   }}
   options={{
-    fullscreenControl: false,
+    // Overlay mode (R4.9): fullscreen for aligning on a phone, and tilt/heading
+    // forced to 0. Before, tilt: 45 showed oblique imagery, which makes a flat
+    // plan look misaligned at every zoom where 45° imagery exists.
+    fullscreenControl: overlayMode,
     streetViewControl: false,
     mapTypeControl: false,
     zoomControl: true,
     gestureHandling: "greedy",
     draggable: true,
-    tilt: 45,
+    tilt: overlayMode ? 0 : 45,
+    ...(overlayMode ? { heading: 0 } : {}),
   }}
 >
+  {overlayMode && mapTypeHost && createPortal(
+    <div role="group" aria-label="Map type" className="flex rounded-md overflow-hidden shadow border border-gray-300 bg-white">
+      {([['roadmap', 'Map'], ['satellite', 'Satellite'], ['hybrid', 'Hybrid']] as const).map(([id, label]) => (
+        <button
+          key={id}
+          type="button"
+          aria-pressed={currentMapType === id}
+          onClick={() => mapRef.current?.setMapTypeId(id)}
+          className={`min-h-[44px] min-w-[44px] px-3 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 ${currentMapType === id ? 'bg-orange-600 text-white' : 'bg-white text-gray-800'}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>,
+    mapTypeHost,
+  )}
   <ProjectBoundaryUI
     show={showProjectUI}
     boundaryTopLeft={boundaryTopLeft}
@@ -2226,6 +2320,9 @@ const showProjectUI =
       draft={overlay}
       editable={overlayEditable}
       lockAspect={overlayLockAspect}
+      locked={overlayLocked}
+      controlPoints={overlayControlPoints}
+      onControlPointMove={onOverlayControlPointMove}
       onChange={(next) => onOverlayChange?.(next)}
     />
   )}
