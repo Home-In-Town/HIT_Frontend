@@ -50,6 +50,13 @@ export interface LayoutOverlay {
   heightM?: number | null;
   rotationDeg?: number | null;
   opacity?: number | null;
+  // Overlay v2 (design A4). All optional: overlays saved before v2 have none.
+  preview?: FileData | null;
+  detail?: FileData | null;
+  imageSize?: { width: number; height: number } | null;
+  controlPoints?: { u: number; v: number; lat: number; lng: number; role: 'align' | 'check' }[] | null;
+  sourcePdf?: { page: number; extraRotationDeg: number } | null;
+  savedAt?: string | null;
 }
 
 export type FileData = {
@@ -114,6 +121,11 @@ export interface Project {
   // Layout entities (map polygons, plots, roads, boundaries)
   layoutEntities?: LayoutEntity[];
   layoutOverlay?: LayoutOverlay | null;
+  // From GET /projects/:id (backend task 3.2 / 4.1): role flags and the
+  // Layout_Version token. Absent on older backends and on public routes.
+  canEdit?: boolean;
+  canEditStatus?: boolean;
+  layoutVersion?: string | null;
 
   // Sales CTA
   ctaButtonText: string;

@@ -121,6 +121,9 @@ export function transformBackendToFrontend(backendProject: any): Project {
     landmarks: backendProject.landmarks || [],
     layoutEntities: backendProject.layoutEntities || [],
     layoutOverlay: backendProject.layoutOverlay ?? null,
+    canEdit: typeof backendProject.canEdit === 'boolean' ? backendProject.canEdit : undefined,
+    canEditStatus: typeof backendProject.canEditStatus === 'boolean' ? backendProject.canEditStatus : undefined,
+    layoutVersion: typeof backendProject.layoutVersion === 'string' ? backendProject.layoutVersion : (backendProject.layoutVersion === null ? null : undefined),
     owner: backendProject.owner ? {
       ...backendProject.owner,
       id: String(backendProject.owner.id || backendProject.owner._id || ''),
@@ -559,7 +562,18 @@ export async function saveProjectLandmarks(projectId: string, landmarks: Landmar
   return data.landmarks as Landmark[];
 }
 
-export async function saveLayoutEntities(projectId: string, layoutEntities: LayoutEntity[]) {
+/**
+ * PUT layout-entities with the Layout_Version token (R17.13). `layoutVersion`
+ * is sent only when the caller has one: a tokenless request is still accepted
+ * by the backend for one release (design 4.9 rollout), so callers that have not
+ * loaded a version yet keep working. The server's new version comes back so the
+ * editor can replace its copy (R17.10).
+ */
+export async function saveLayoutEntitiesVersioned(
+  projectId: string,
+  layoutEntities: LayoutEntity[],
+  layoutVersion?: string | null,
+): Promise<{ layoutEntities: LayoutEntity[]; layoutVersion: string | null }> {
   const res = await fetch(`${API_URL}/projects/${projectId}/layout-entities`, {
     ...COMMON_FETCH_OPTIONS,
     method: 'PUT',
@@ -567,15 +581,34 @@ export async function saveLayoutEntities(projectId: string, layoutEntities: Layo
       'Content-Type': 'application/json',
       ...getAuthHeaders()
     },
-    body: JSON.stringify({ layoutEntities }),
+    body: JSON.stringify(layoutVersion === undefined ? { layoutEntities } : { layoutEntities, layoutVersion }),
   });
 
   // Before: a plain Error without the HTTP status, so callers could not tell
   // the server's 409 ("Layout changed while saving", CAS gave up after 3
   // tries) or the new 400 `{message, index}` validator from a network blip.
   // ApiError keeps status + body; the message text is unchanged.
-  const data = await handleResponse<{ layoutEntities: LayoutEntity[] }>(res);
-  return data.layoutEntities;
+  const data = await handleResponse<{ layoutEntities: LayoutEntity[]; layoutVersion?: string | null }>(res);
+  return { layoutEntities: data.layoutEntities, layoutVersion: data.layoutVersion ?? null };
+}
+
+/** Same call, entities only. Kept so existing call sites compile; pass `layoutVersion` to opt in to the stale check. */
+export async function saveLayoutEntities(projectId: string, layoutEntities: LayoutEntity[], layoutVersion?: string | null) {
+  const r = await saveLayoutEntitiesVersioned(projectId, layoutEntities, layoutVersion);
+  return r.layoutEntities;
+}
+
+/**
+ * Which 409 this is (design 4.9 "409 bodies"): LAYOUT_STALE = the token no
+ * longer matches, reload; LAYOUT_CONFLICT = the server gave up after 3 status
+ * races, retry. null for any other error, including a 409 with no code (for
+ * example the units 409s that carry `blocks` / `conflicts`).
+ */
+export type LayoutConflictCode = 'LAYOUT_STALE' | 'LAYOUT_CONFLICT';
+export function layoutConflictCode(err: unknown): LayoutConflictCode | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const code = (err.body as { code?: unknown } | null)?.code;
+  return code === 'LAYOUT_STALE' || code === 'LAYOUT_CONFLICT' ? code : null;
 }
 
 // ==============================
@@ -610,26 +643,189 @@ export async function patchPlotStatus(projectId: string, entityId: string, statu
   return handleResponse<PlotStatusResult>(res);
 }
 
-/** PUT /projects/:projectId/layout-overlay. `null` clears it. The server builds the url from the key. */
-export async function saveLayoutOverlay(
+/** Control_Point as stored (design A4): u/v are image pixels, lat/lng the map point. */
+export interface OverlayControlPointBody {
+  u: number;
+  v: number;
+  lat: number;
+  lng: number;
+  role: 'align' | 'check';
+}
+
+/** Overlay save v2 body (design A4). Any client `url` is ignored by the server, so none is sent. */
+export interface LayoutOverlaySaveBody {
+  image: { key: string };
+  preview?: { key: string } | null;
+  detail?: { key: string } | null;
+  imageSize?: { width: number; height: number } | null;
+  center: { lat: number; lng: number };
+  widthM: number;
+  heightM: number;
+  rotationDeg: number;
+  opacity: number;
+  controlPoints?: OverlayControlPointBody[];
+  sourcePdf?: { key: string; page: number; extraRotationDeg: number } | null;
+}
+
+/**
+ * PUT /projects/:projectId/layout-overlay (A4). `null` clears the overlay and
+ * its Source_PDF. Sends `layoutVersion` when known and returns the new one
+ * (R17.10, R17.13); a 409 throws an ApiError that `layoutConflictCode` reads.
+ */
+export async function saveLayoutOverlayVersioned(
   projectId: string,
-  layoutOverlay: {
-    image: { key: string };
-    center: { lat: number; lng: number };
-    widthM: number;
-    heightM: number;
-    rotationDeg: number;
-    opacity: number;
-  } | null,
-): Promise<LayoutOverlay | null> {
+  layoutOverlay: LayoutOverlaySaveBody | null,
+  layoutVersion?: string | null,
+  onImageChange?: 'unlink' | 'discard-drafts',
+): Promise<{ layoutOverlay: LayoutOverlay | null; layoutVersion: string | null }> {
   const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout-overlay`, {
     ...COMMON_FETCH_OPTIONS,
     method: 'PUT',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ layoutOverlay }),
+    body: JSON.stringify({
+      ...(layoutVersion === undefined ? {} : { layoutVersion }),
+      layoutOverlay,
+      ...(onImageChange ? { onImageChange } : {}),
+    }),
   });
-  const data = await handleResponse<{ layoutOverlay: LayoutOverlay | null }>(res);
-  return data.layoutOverlay ?? null;
+  const data = await handleResponse<{ layoutOverlay: LayoutOverlay | null; layoutVersion?: string | null }>(res);
+  return { layoutOverlay: data.layoutOverlay ?? null, layoutVersion: data.layoutVersion ?? null };
+}
+
+/** Same call, overlay only. Kept so existing call sites compile. */
+export async function saveLayoutOverlay(
+  projectId: string,
+  layoutOverlay: LayoutOverlaySaveBody | null,
+  layoutVersion?: string | null,
+): Promise<LayoutOverlay | null> {
+  return (await saveLayoutOverlayVersioned(projectId, layoutOverlay, layoutVersion)).layoutOverlay;
+}
+
+/**
+ * GET /projects/:projectId/layout-overlay/source-pdf (A5). A 300 s presigned
+ * URL for "Choose a different page". 404 = no Source_PDF stored; callers show
+ * the R2.16 message and offer a new upload.
+ */
+export async function getSourcePdfUrl(projectId: string): Promise<{ url: string; page: number; extraRotationDeg: number }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout-overlay/source-pdf`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<{ url: string; page: number; extraRotationDeg: number }>(res);
+}
+
+export type LayoutUploadType = 'overlay' | 'overlay-preview' | 'overlay-detail' | 'layout-source';
+
+export type LayoutUploadFailureReason =
+  | 'network' | 'stalled' | 'aborted' | 'unauthorized' | 'forbidden' | 'too-large' | 'rejected' | 'server';
+
+/** Typed upload failure so the UI can say why and offer Retry (R1.9, R1.10). */
+export class LayoutUploadError extends Error {
+  reason: LayoutUploadFailureReason;
+  status: number;
+  constructor(reason: LayoutUploadFailureReason, message: string, status = 0) {
+    super(message);
+    this.reason = reason;
+    this.status = status;
+  }
+}
+
+/** A progress event is expected at least this often; no event for this long aborts the upload (R1.10). */
+export const UPLOAD_STALL_MS = 60_000;
+const UPLOAD_TICK_MS = 1000;
+
+/**
+ * POST /files/proxy-upload for the four layout types (A2) over XHR, because
+ * fetch has no upload progress. `onProgress` gets 0-100 on every browser
+ * progress event AND at least once a second (a 1 s ticker re-reports the last
+ * value) so the bar never looks frozen on a slow link. If nothing moves for 60
+ * s the request is aborted with reason 'stalled'. The response is
+ * `{ fileKey, fileUrl?, width?, height? }`; layout-source has no fileUrl.
+ */
+export function uploadLayoutFile(
+  file: Blob,
+  fileName: string,
+  projectId: string,
+  type: LayoutUploadType,
+  onProgress?: (percent: number) => void,
+  signal?: AbortSignal,
+): Promise<{ fileKey: string; fileUrl?: string; width?: number; height?: number }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    const form = new FormData();
+    form.append('file', file, fileName);
+    form.append('projectId', projectId);
+    form.append('type', type);
+
+    let percent = 0;
+    let settled = false;
+    let stallTimer: ReturnType<typeof setTimeout> | undefined;
+    let tick: ReturnType<typeof setInterval> | undefined;
+
+    const cleanup = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      if (tick) clearInterval(tick);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const fail = (e: LayoutUploadError) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(e);
+    };
+    const armStall = () => {
+      if (stallTimer) clearTimeout(stallTimer);
+      stallTimer = setTimeout(() => {
+        xhr.abort();
+        fail(new LayoutUploadError('stalled', 'Upload stopped making progress for 60 seconds'));
+      }, UPLOAD_STALL_MS);
+    };
+    const onAbort = () => {
+      xhr.abort();
+      fail(new LayoutUploadError('aborted', 'Upload cancelled'));
+    };
+    if (signal?.aborted) { onAbort(); return; }
+    signal?.addEventListener('abort', onAbort);
+
+    xhr.open('POST', `${API_URL}/files/proxy-upload`);
+    xhr.withCredentials = true; // same cookie session as COMMON_FETCH_OPTIONS
+    xhr.responseType = 'text';
+
+    xhr.upload.onprogress = (ev) => {
+      if (ev.lengthComputable && ev.total > 0) percent = Math.min(100, Math.round((ev.loaded / ev.total) * 100));
+      armStall();
+      onProgress?.(percent);
+    };
+    // Body fully sent: the server is now checking the file and writing to R2,
+    // which counts as progress for the stall timer.
+    xhr.upload.onload = () => { armStall(); onProgress?.(100); percent = 100; };
+    xhr.onerror = () => fail(new LayoutUploadError('network', 'Network error during upload'));
+    xhr.onabort = () => fail(new LayoutUploadError('aborted', 'Upload cancelled'));
+    xhr.onload = () => {
+      if (settled) return;
+      let body: { message?: unknown; fileKey?: string; fileUrl?: string; width?: number; height?: number } | null = null;
+      try { body = JSON.parse(xhr.responseText); } catch { body = null; }
+      if (xhr.status >= 200 && xhr.status < 300 && body && typeof body.fileKey === 'string') {
+        settled = true;
+        cleanup();
+        resolve({ fileKey: body.fileKey, fileUrl: body.fileUrl, width: body.width, height: body.height });
+        return;
+      }
+      const msg = typeof body?.message === 'string' ? body.message : `Upload failed (${xhr.status})`;
+      const reason: LayoutUploadFailureReason =
+        xhr.status === 401 ? 'unauthorized'
+        : xhr.status === 403 ? 'forbidden'
+        : xhr.status === 413 ? 'too-large'
+        : xhr.status >= 400 && xhr.status < 500 ? 'rejected'
+        : 'server';
+      fail(new LayoutUploadError(reason, msg, xhr.status));
+    };
+
+    armStall();
+    tick = setInterval(() => onProgress?.(percent), UPLOAD_TICK_MS);
+    xhr.send(form);
+  });
 }
 
 export interface LinkUnitsReport {
@@ -641,15 +837,17 @@ export interface LinkUnitsReport {
   // generate-units only: why linking was skipped (multi-block setup)
   error?: string;
   blocks?: string[];
+  // New Layout_Version after an applied write (R17.13); absent on a preview.
+  layoutVersion?: string | null;
 }
 
 /** POST /projects/:projectId/layout/link-units. 409 body may carry `blocks`. */
-export async function linkUnits(projectId: string, mode: 'preview' | 'apply'): Promise<LinkUnitsReport> {
+export async function linkUnits(projectId: string, mode: 'preview' | 'apply', layoutVersion?: string | null): Promise<LinkUnitsReport> {
   const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout/link-units`, {
     ...COMMON_FETCH_OPTIONS,
     method: 'POST',
     headers: getAuthHeaders(),
-    body: JSON.stringify({ mode }),
+    body: JSON.stringify(layoutVersion === undefined ? { mode } : { mode, layoutVersion }),
   });
   return handleResponse<LinkUnitsReport>(res);
 }
@@ -658,6 +856,7 @@ export interface GenerateUnitsResult {
   units: { total: number; added: number; kept: number };
   counts: LayoutCounts;
   link: LinkUnitsReport;
+  layoutVersion?: string | null;
 }
 
 /** POST /projects/:projectId/layout/generate-units (plot mode, one unnamed block). 409 body may carry `conflicts`. */
@@ -665,12 +864,14 @@ export async function generateUnits(
   projectId: string,
   mode: 'preview' | 'apply',
   range: { from: number; to: number },
+  layoutVersion?: string | null,
 ): Promise<GenerateUnitsResult> {
   const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout/generate-units`, {
     ...COMMON_FETCH_OPTIONS,
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({
+      ...(layoutVersion === undefined ? {} : { layoutVersion }),
       mode,
       unitSetup: { mode: 'plot', blocks: [{ name: '', from: range.from, to: range.to }] },
     }),
