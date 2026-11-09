@@ -348,6 +348,125 @@ export function solveTwoPoint(imageSize, p1, p2) {
   };
 }
 
+// ── File / raster / reduced-copy helpers (pure, design 3.1) ────────────────
+//
+// These run before any upload so a bad file is rejected locally with a reason,
+// and the PDF rasteriser (pdfLayout.ts) and the reduced-copy maker
+// (reducedCopy.ts) share one sizing rule. Kept pure (no DOM / canvas) so
+// `node --test` exercises them in bare Node; the DOM work lives in the TS
+// callers, which only pass numbers back here.
+
+// design 3.1: accepted extension → the browser MIME type(s) that identify the
+// same type. SVG and every other declared type are rejected (R22.2 on the
+// server rejects them too).
+export const ACCEPTED_LAYOUT_TYPES = {
+  png: ['image/png'],
+  jpg: ['image/jpeg'],
+  jpeg: ['image/jpeg'],
+  webp: ['image/webp'],
+  pdf: ['application/pdf'],
+};
+export const IMAGE_MAX_BYTES = 26214400; // 25 MiB
+export const PDF_MAX_BYTES = 52428800;   // 50 MiB
+// R22.6 decoded-pixel limits, same as the server's checkLayoutImageDims.
+export const DECODED_MAX_SIDE_PX = 8192;
+export const DECODED_MAX_PIXELS = 40000000; // 40 MP
+// Reduced-copy caps (D10). Preview_Copy / Detail_Copy longest side.
+export const PREVIEW_MAX_SIDE_PX = 2048;
+export const DETAIL_MAX_SIDE_PX = 4096;
+export const COPY_ASPECT_TOLERANCE = 0.005; // 0.5 %, R21.2
+
+/** Lower-case extension after the last dot, '' when there is none. @param {string} name @returns {string} */
+function lastExtension(name) {
+  const s = String(name ?? '');
+  const dot = s.lastIndexOf('.');
+  return dot >= 0 ? s.slice(dot + 1).toLowerCase() : '';
+}
+
+/**
+ * Accept a picked file by name + browser MIME + size (design 3.1 table). The
+ * extension and the MIME must identify the SAME accepted type (so a .png with
+ * an image/jpeg MIME, or a renamed file, is refused), the size must be > 0, and
+ * within the image or PDF cap. Returns a reason the picker can translate.
+ * @param {{ name?: string; type?: string; size?: number }} file
+ * @returns {{ ok: true; kind: 'image' | 'pdf' }
+ *   | { ok: false; reason: 'type' } | { ok: false; reason: 'empty' } | { ok: false; reason: 'size'; limit: number }}
+ */
+export function checkLayoutFile(file) {
+  const ext = lastExtension(file && file.name);
+  const allowed = Object.prototype.hasOwnProperty.call(ACCEPTED_LAYOUT_TYPES, ext)
+    ? ACCEPTED_LAYOUT_TYPES[/** @type {keyof typeof ACCEPTED_LAYOUT_TYPES} */ (ext)]
+    : null;
+  if (!allowed || !allowed.includes(String(file && file.type))) {
+    return { ok: false, reason: 'type' };
+  }
+  const size = Number(file && file.size);
+  if (!(size > 0)) return { ok: false, reason: 'empty' };
+  const limit = ext === 'pdf' ? PDF_MAX_BYTES : IMAGE_MAX_BYTES;
+  if (size > limit) return { ok: false, reason: 'size', limit };
+  return { ok: true, kind: ext === 'pdf' ? 'pdf' : 'image' };
+}
+
+/**
+ * Reject a decoded raster whose longest side exceeds 8192 px or whose area
+ * exceeds 40 MP, with the limit to show (R22.6, matches the server). Called
+ * after the browser decodes the image, so the sizes are the true pixel sizes.
+ * @param {number} width @param {number} height
+ * @returns {{ ok: true } | { ok: false; reason: 'side'; limit: number } | { ok: false; reason: 'pixels'; limit: number }}
+ */
+export function checkDecodedDims(width, height) {
+  const w = Number(width);
+  const h = Number(height);
+  if (!(w > 0) || !(h > 0)) return { ok: false, reason: 'side', limit: DECODED_MAX_SIDE_PX };
+  if (Math.max(w, h) > DECODED_MAX_SIDE_PX) return { ok: false, reason: 'side', limit: DECODED_MAX_SIDE_PX };
+  if (w * h > DECODED_MAX_PIXELS) return { ok: false, reason: 'pixels', limit: DECODED_MAX_PIXELS };
+  return { ok: true };
+}
+
+/**
+ * Raster scale for one PDF page (R2.4), with the page `/Rotate` already applied
+ * so `w`/`h` are the upright viewport size at scale 1. The scale fits the
+ * longest side to 8192 px and the area to `pixelCap`, whichever is smaller, and
+ * never upscales (capped at 1). `reduced` flags that the rendered longest side
+ * falls below 4096 px, so the UI can warn the plan may look soft (R2.5).
+ * @param {number} w @param {number} h @param {number} pixelCap
+ * @returns {{ scale: number; reduced: boolean }}
+ */
+export function rasterScale(w, h, pixelCap) {
+  const wN = Number(w);
+  const hN = Number(h);
+  const cap = Number(pixelCap);
+  if (!(wN > 0) || !(hN > 0) || !(cap > 0)) return { scale: 0, reduced: true };
+  const bySide = DECODED_MAX_SIDE_PX / Math.max(wN, hN);
+  const byArea = Math.sqrt(cap / (wN * hN));
+  // Never upscale a small page beyond 1:1; the plan is drawn, not photographed.
+  const scale = Math.min(bySide, byArea, 1);
+  return { scale, reduced: Math.max(wN, hN) * scale < 4096 };
+}
+
+/**
+ * Target pixel size of a reduced copy (design D10 table), never upscaling and
+ * keeping the aspect within 0.5 % of the source (R21.2). The Detail_Copy caps
+ * the longest side at 4096 px, the Preview_Copy at 2048 px; a source already
+ * within the cap keeps its size. The returned width/height are rounded
+ * integers; the caller passes them to createImageBitmap.
+ * @param {{ width: number; height: number }} imageSize source pixels
+ * @param {'preview' | 'detail'} kind
+ * @returns {{ width: number; height: number; maxBytes: number } | null}
+ */
+export function reducedCopyTarget(imageSize, kind) {
+  const w = Number(imageSize && imageSize.width);
+  const h = Number(imageSize && imageSize.height);
+  if (!(w > 0) || !(h > 0)) return null;
+  const maxSide = kind === 'detail' ? DETAIL_MAX_SIDE_PX : PREVIEW_MAX_SIDE_PX;
+  const maxBytes = kind === 'detail' ? 6291456 : 1572864; // 6 MB / 1.5 MB
+  // Never upscale: a source within maxSide keeps its exact size.
+  const factor = Math.min(1, maxSide / Math.max(w, h));
+  const tw = Math.max(1, Math.round(w * factor));
+  const th = Math.max(1, Math.round(h * factor));
+  return { width: tw, height: th, maxBytes };
+}
+
 /** Move a point by metres east / north (flat-earth, fine at layout scale). @param {LatLngLit} c @param {number} eastM @param {number} northM @returns {LatLngLit} */
 export function offsetCenter(c, eastM, northM) {
   const mPerDegLng = M_PER_DEG_LAT * Math.cos(toRad(c.lat));
