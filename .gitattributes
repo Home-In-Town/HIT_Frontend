@@ -1,0 +1,5 @@
+# Shared Overlay_Transform golden fixtures are byte-identical across
+# HIT_Backend, HIT_Frontend and HIT_Mobile and pinned by a SHA-256 in the
+# golden test. Keep them as exact LF bytes so a Windows checkout never rewrites
+# the line endings and flips the hash (see src/lib/overlayGolden.test.mjs).
+src/lib/__fixtures__/*.json -text

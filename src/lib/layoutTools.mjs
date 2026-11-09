@@ -88,6 +88,7 @@ export function cleanOpenSpaceLabel(v) {
 const EARTH_RADIUS_M = 6371008.8;
 const M_PER_DEG_LAT = (Math.PI / 180) * EARTH_RADIUS_M;
 const toRad = (/** @type {number} */ d) => (d * Math.PI) / 180;
+const toDeg = (/** @type {number} */ r) => (r * 180) / Math.PI;
 
 export const OVERLAY_MIN_M = 1;
 export const OVERLAY_MAX_M = 5000;
@@ -134,6 +135,216 @@ export function overlayGeometry(o) {
       east: lng + dLng(halfW),
     },
     bearing,
+  };
+}
+
+// ── Overlay_Transform (identical maths to HIT_Backend services/overlayTransform.js) ──
+//
+// The web editor, the Public_Plot_Page and the mobile viewer all need the same
+// image↔geo↔corner maths (design 7.3, R23.9). overlayGeometry above already
+// draws the image; these four exports add the pixel-exact Image_Space mapping
+// and the two-point solver. Every operation below is written in the same order
+// as overlayTransform.js so the doubles are bit-identical and the shared golden
+// fixture (src/lib/overlayGolden.test.mjs) agrees to ~1e-9 deg across all three
+// repos. Keep this block free of DOM / npm / google.maps, like the rest of the
+// file, so `node --test` runs it in bare Node.
+
+// R6.3 refusal limits for solveTwoPoint — same as overlayTransform.js.
+export const MIN_IMAGE_SEPARATION_PX = 20;
+export const MIN_GEO_SEPARATION_M = 2;
+// Re-centring passes: each pass shrinks the centre offset by orders of
+// magnitude; 5 is a hard stop, never a loop.
+const MAX_RECENTRE_PASSES = 5;
+const RECENTRE_TOLERANCE_M = 1e-6;
+
+const isFiniteNumber = (/** @type {unknown} */ v) => typeof v === 'number' && Number.isFinite(v);
+
+/** Metres per degree of longitude at `lat`. @param {number} lat @returns {number} */
+function mPerDegLng(lat) {
+  return M_PER_DEG_LAT * Math.cos(toRad(lat));
+}
+
+/**
+ * Geo point → plane metres around centre `c` (x east, y north).
+ * @param {LatLngLit} c @param {LatLngLit} p @returns {{ x: number; y: number }}
+ */
+function toPlane(c, p) {
+  return {
+    x: (p.lng - c.lng) * mPerDegLng(c.lat),
+    y: (p.lat - c.lat) * M_PER_DEG_LAT,
+  };
+}
+
+/**
+ * Plane metres around centre `c` → geo point. Inverse of toPlane. The
+ * `mPerDeg ? ... : 0` guard mirrors overlayGeometry: at a pole cos(lat) is ~0.
+ * @param {LatLngLit} c @param {{ x: number; y: number }} q @returns {LatLngLit}
+ */
+function fromPlane(c, q) {
+  const mLng = mPerDegLng(c.lat);
+  return {
+    lat: c.lat + q.y / M_PER_DEG_LAT,
+    lng: c.lng + (mLng ? q.x / mLng : 0),
+  };
+}
+
+/**
+ * Overlay-local metres (a right of centre, b up of centre, before rotation)
+ * → geo. Shared by imageToGeo and corners so both use one rotation, in the
+ * same clockwise sense and operand order as overlayGeometry's `at()`.
+ * @param {{ center: LatLngLit; rotationDeg?: number | null }} transform @param {number} a @param {number} b @returns {LatLngLit}
+ */
+function localToGeo(transform, a, b) {
+  const t = toRad(normalizeBearing(Number(transform.rotationDeg) || 0));
+  const cos = Math.cos(t);
+  const sin = Math.sin(t);
+  const x = a * cos + b * sin;
+  const y = -a * sin + b * cos;
+  return fromPlane(transform.center, { x, y });
+}
+
+/**
+ * Image_Space pixel → geo point.
+ * @param {{ center: LatLngLit; widthM: number; heightM: number; rotationDeg?: number | null }} transform
+ * @param {{ width: number; height: number }} imageSize
+ * @param {{ x: number; y: number }} pt pixels, origin top-left, y down
+ * @returns {LatLngLit}
+ */
+export function imageToGeo(transform, imageSize, pt) {
+  const a = (pt.x / imageSize.width - 0.5) * transform.widthM;
+  // Image y grows down, plane y grows north, hence (0.5 - v/H).
+  const b = (0.5 - pt.y / imageSize.height) * transform.heightM;
+  return localToGeo(transform, a, b);
+}
+
+/**
+ * Geo point → Image_Space pixel. The exact algebraic inverse of imageToGeo.
+ * @param {{ center: LatLngLit; widthM: number; heightM: number; rotationDeg?: number | null }} transform
+ * @param {{ width: number; height: number }} imageSize
+ * @param {LatLngLit} p
+ * @returns {{ x: number; y: number }}
+ */
+export function geoToImage(transform, imageSize, p) {
+  const { x, y } = toPlane(transform.center, p);
+  const t = toRad(normalizeBearing(Number(transform.rotationDeg) || 0));
+  const cos = Math.cos(t);
+  const sin = Math.sin(t);
+  const a = x * cos - y * sin;
+  const b = x * sin + y * cos;
+  return {
+    x: (a / transform.widthM + 0.5) * imageSize.width,
+    y: (0.5 - b / transform.heightM) * imageSize.height,
+  };
+}
+
+/**
+ * The 4 corners in the order NW, NE, SE, SW (the image's TL, TR, BR, BL). Same
+ * result as overlayGeometry().corners — kept as a named export because the
+ * public API and the golden fixture refer to it as `corners`. Depends only on
+ * widthM/heightM, so a legacy overlay with no imageSize still gets corners.
+ * @param {{ center: LatLngLit; widthM: number; heightM: number; rotationDeg?: number | null }} transform
+ * @returns {LatLngLit[]}
+ */
+export function corners(transform) {
+  const halfW = Math.max(0, Number(transform.widthM) || 0) / 2;
+  const halfH = Math.max(0, Number(transform.heightM) || 0) / 2;
+  return [
+    localToGeo(transform, -halfW, halfH),
+    localToGeo(transform, halfW, halfH),
+    localToGeo(transform, halfW, -halfH),
+    localToGeo(transform, -halfW, -halfH),
+  ];
+}
+
+/** Great-circle distance in metres, same earth radius as the plane. @param {LatLngLit} g1 @param {LatLngLit} g2 @returns {number} */
+function haversineM(g1, g2) {
+  const dLat = toRad(g2.lat - g1.lat);
+  const dLng = toRad(g2.lng - g1.lng);
+  const h = Math.sin(dLat / 2) ** 2
+    + Math.cos(toRad(g1.lat)) * Math.cos(toRad(g2.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+// Minimal complex arithmetic on { re, im }, same as overlayTransform.js.
+const cSub = (/** @type {{re:number,im:number}} */ p, /** @type {{re:number,im:number}} */ q) => ({ re: p.re - q.re, im: p.im - q.im });
+const cAdd = (/** @type {{re:number,im:number}} */ p, /** @type {{re:number,im:number}} */ q) => ({ re: p.re + q.re, im: p.im + q.im });
+const cMul = (/** @type {{re:number,im:number}} */ p, /** @type {{re:number,im:number}} */ q) => ({ re: p.re * q.re - p.im * q.im, im: p.re * q.im + p.im * q.re });
+const cDiv = (/** @type {{re:number,im:number}} */ p, /** @type {{re:number,im:number}} */ q) => {
+  const d = q.re * q.re + q.im * q.im;
+  return { re: (p.re * q.re + p.im * q.im) / d, im: (p.im * q.re - p.re * q.im) / d };
+};
+
+const refuse = (/** @type {string} */ check, /** @type {string} */ message) => ({ ok: /** @type {const} */ (false), check, message });
+const isPoint = (/** @type {any} */ p) => p && isFiniteNumber(p.x) && isFiniteNumber(p.y);
+const isGeo = (/** @type {any} */ g) => g && isFiniteNumber(g.lat) && isFiniteNumber(g.lng) && g.lat >= -90 && g.lat <= 90;
+
+/**
+ * Two-point alignment (R6.2): the similarity transform without reflection that
+ * maps both image points onto both geo points. Identical algorithm to
+ * overlayTransform.js solveTwoPoint. Returns a result (never throws): R6.3 says
+ * a refusal names the failed check and the tool keeps the current transform.
+ * @param {{ width: number; height: number }} imageSize
+ * @param {{ image: { x: number; y: number }; geo: LatLngLit }} p1
+ * @param {{ image: { x: number; y: number }; geo: LatLngLit }} p2
+ * @returns {{ ok: true; transform: { center: LatLngLit; widthM: number; heightM: number; rotationDeg: number } }
+ *   | { ok: false; check: 'INVALID_INPUT' | 'IMAGE_POINTS_TOO_CLOSE' | 'GEO_POINTS_TOO_CLOSE' | 'SIZE_OUT_OF_RANGE'; message: string }}
+ */
+export function solveTwoPoint(imageSize, p1, p2) {
+  if (!imageSize || !(imageSize.width > 0) || !(imageSize.height > 0)
+    || !isFiniteNumber(imageSize.width) || !isFiniteNumber(imageSize.height)
+    || !p1 || !p2 || !isPoint(p1.image) || !isPoint(p2.image) || !isGeo(p1.geo) || !isGeo(p2.geo)) {
+    return refuse('INVALID_INPUT', 'Image size and both control points must be finite numbers');
+  }
+
+  const W = imageSize.width;
+  const H = imageSize.height;
+  const g1 = p1.geo;
+  const g2 = p2.geo;
+
+  const imageSep = Math.hypot(p2.image.x - p1.image.x, p2.image.y - p1.image.y);
+  if (imageSep < MIN_IMAGE_SEPARATION_PX) {
+    return refuse('IMAGE_POINTS_TOO_CLOSE',
+      `The two image points must be at least ${MIN_IMAGE_SEPARATION_PX} px apart`);
+  }
+  if (haversineM(g1, g2) < MIN_GEO_SEPARATION_M) {
+    return refuse('GEO_POINTS_TOO_CLOSE',
+      `The two map points must be at least ${MIN_GEO_SEPARATION_M} m apart`);
+  }
+
+  const P1 = { re: p1.image.x, im: -p1.image.y };
+  const P2 = { re: p2.image.x, im: -p2.image.y };
+  const C = { re: W / 2, im: -H / 2 };
+  const dP = cSub(P2, P1);
+
+  let c = { lat: (g1.lat + g2.lat) / 2, lng: (g1.lng + g2.lng) / 2 };
+  let z = /** @type {{re:number,im:number}} */ ({ re: 1, im: 0 });
+  for (let pass = 0; pass < MAX_RECENTRE_PASSES; pass += 1) {
+    const q1 = toPlane(c, g1);
+    const q2 = toPlane(c, g2);
+    const Q1 = { re: q1.x, im: q1.y };
+    const Q2 = { re: q2.x, im: q2.y };
+    z = cDiv(cSub(Q2, Q1), dP);
+    const t = cSub(Q1, cMul(z, P1));
+    const Qc = cAdd(cMul(z, C), t);
+    if (Math.hypot(Qc.re, Qc.im) < RECENTRE_TOLERANCE_M) break;
+    c = fromPlane(c, { x: Qc.re, y: Qc.im });
+  }
+
+  const s = Math.hypot(z.re, z.im);
+  const widthM = s * W;
+  const heightM = s * H;
+  if (!(widthM >= OVERLAY_MIN_M && widthM <= OVERLAY_MAX_M
+    && heightM >= OVERLAY_MIN_M && heightM <= OVERLAY_MAX_M)) {
+    return refuse('SIZE_OUT_OF_RANGE',
+      `The computed overlay size must be between ${OVERLAY_MIN_M} and ${OVERLAY_MAX_M} m`);
+  }
+
+  let rotationDeg = normalizeBearing(-toDeg(Math.atan2(z.im, z.re)));
+  if (rotationDeg >= 360 || rotationDeg === 0) rotationDeg = 0;
+
+  return {
+    ok: true,
+    transform: { center: c, widthM, heightM, rotationDeg },
   };
 }
 
