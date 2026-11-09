@@ -26,6 +26,11 @@
  *   heightM: number;
  *   rotationDeg: number;
  *   opacity: number;
+ *   preview?: { key: string; url?: string } | null;
+ *   detail?: { key: string; url?: string } | null;
+ *   imageSize?: { width: number; height: number } | null;
+ *   controlPoints?: { u: number; v: number; lat: number; lng: number; role: 'align' | 'check' }[] | null;
+ *   sourcePdf?: { key: string; page: number; extraRotationDeg: number } | null;
  * }} OverlayDraft
  */
 
@@ -467,6 +472,30 @@ export function reducedCopyTarget(imageSize, kind) {
   return { width: tw, height: th, maxBytes };
 }
 
+/**
+ * Rotate an RGBA pixel buffer 90 degrees CLOCKWISE (R3.3). Pure: the preview
+ * calls it once per Rotate click on the re-encode path, so four calls give back
+ * the original pixels and size exactly. Source (x, y) lands at (h - 1 - y, x)
+ * in the new h-wide, w-tall image.
+ * @param {Uint8ClampedArray | Uint8Array} pixels RGBA, length w*h*4
+ * @param {number} w @param {number} h
+ * @returns {{ pixels: Uint8ClampedArray; width: number; height: number }}
+ */
+export function rotate90(pixels, w, h) {
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const s = (y * w + x) * 4;
+      const d = (x * h + (h - 1 - y)) * 4;
+      out[d] = pixels[s];
+      out[d + 1] = pixels[s + 1];
+      out[d + 2] = pixels[s + 2];
+      out[d + 3] = pixels[s + 3];
+    }
+  }
+  return { pixels: out, width: h, height: w };
+}
+
 /** Move a point by metres east / north (flat-earth, fine at layout scale). @param {LatLngLit} c @param {number} eastM @param {number} northM @returns {LatLngLit} */
 export function offsetCenter(c, eastM, northM) {
   const mPerDegLng = M_PER_DEG_LAT * Math.cos(toRad(c.lat));
@@ -531,13 +560,22 @@ export function resizeOverlay(start, dxPx, dyPx, mPerPx, lockAspect) {
 }
 
 /**
- * Keyboard alignment (the drag handles are mouse/touch only): arrows move
- * 1 m (Shift 10 m), + / - scale 2 % (Shift 10 %), [ / ] rotate 1° (Shift 10°).
+ * Keyboard alignment (R4.7): arrows move 1 m (Shift 10 m) in the compass
+ * direction, + / - scale 1 % (Shift 10 %), [ / ] rotate 0.1° (Shift 1°)
+ * counter-clockwise / clockwise, and { / } rotate 1° (Shift 10°).
+ * Before: + / - scaled 2 % and [ / ] rotated 1°; R4.7 and design 3.1 set 1 % and
+ * 0.1° for the fine keys and give the 1° step to the brace keys, so a nudge can
+ * be as small as the 0.1° rotation slider. Rotation is rounded to 0.1° after
+ * each step so repeated nudges do not accumulate float noise.
  * null = key not handled, so the caller lets it through.
  * @template {OverlayDraft} T @param {T} d @param {string} key @param {boolean} shift @returns {T | null}
  */
 export function nudgeOverlay(d, key, shift) {
   const step = shift ? 10 : 1;
+  const rot = (/** @type {number} */ delta) => ({
+    ...d,
+    rotationDeg: normalizeRotation(Math.round((d.rotationDeg + delta) * 10) / 10),
+  });
   switch (key) {
     case 'ArrowUp': return { ...d, center: offsetCenter(d.center, 0, step) };
     case 'ArrowDown': return { ...d, center: offsetCenter(d.center, 0, -step) };
@@ -547,19 +585,168 @@ export function nudgeOverlay(d, key, shift) {
     case '=':
     case '-':
     case '_': {
-      const pct = (shift ? 0.1 : 0.02) * (key === '+' || key === '=' ? 1 : -1);
+      const pct = (shift ? 0.1 : 0.01) * (key === '+' || key === '=' ? 1 : -1);
       const k0 = 1 + pct;
       const lo = Math.max(OVERLAY_MIN_M / d.widthM, OVERLAY_MIN_M / d.heightM);
       const hi = Math.min(OVERLAY_MAX_M / d.widthM, OVERLAY_MAX_M / d.heightM);
       const k = Math.min(hi, Math.max(lo, k0));
       return { ...d, widthM: d.widthM * k, heightM: d.heightM * k };
     }
-    case '[':
-    case '{': return { ...d, rotationDeg: normalizeBearing(d.rotationDeg - step) };
-    case ']':
-    case '}': return { ...d, rotationDeg: normalizeBearing(d.rotationDeg + step) };
+    case '[': return rot(-(shift ? 1 : 0.1));
+    case ']': return rot(shift ? 1 : 0.1);
+    case '{': return rot(-(shift ? 10 : 1));
+    case '}': return rot(shift ? 10 : 1);
     default: return null;
   }
+}
+
+// ── Gesture maths (R4.1-R4.5, R4.11, R4.12) ───────────────────────────────
+
+const toDegAngle = (/** @type {number} */ r) => (r * 180) / Math.PI;
+
+/**
+ * normalizeBearing, but never exactly 360: a tiny negative angle (-5e-324) rounds up to 360 inside normalizeBearing, which must stay as it is (the server and viewers share it bit for bit). The gesture helpers return a value that is always in [0, 360).
+ * @param {number} deg @returns {number}
+ */
+function normalizeRotation(deg) {
+  const r = normalizeBearing(deg);
+  return r >= 360 ? 0 : r;
+}
+
+/**
+ * Scale factor range that keeps BOTH sides inside [1, 5000] m.
+ * @param {number} w @param {number} h @returns {{ lo: number; hi: number }}
+ */
+function scaleRange(w, h) {
+  return {
+    lo: Math.max(OVERLAY_MIN_M / w, OVERLAY_MIN_M / h),
+    hi: Math.min(OVERLAY_MAX_M / w, OVERLAY_MAX_M / h),
+  };
+}
+
+/**
+ * Drag one corner (0 NW, 1 NE, 2 SE, 3 SW, the image's own corners) so the
+ * OPPOSITE corner stays on the ground (R4.1). The pointer delta is turned into
+ * the image's axes, the size changes by that much in the corner's direction,
+ * and the centre moves by half the size change along the rotated axes, which is
+ * exactly what keeps the opposite corner still. With `lockAspect` the delta is
+ * projected on the diagonal so the picture is never stretched.
+ * @template {OverlayDraft} T
+ * @param {T} start @param {number} cornerIndex @param {number} dxPx @param {number} dyPx
+ * @param {number} mPerPx @param {boolean} lockAspect @returns {T}
+ */
+export function resizeFromCorner(start, cornerIndex, dxPx, dyPx, mPerPx, lockAspect) {
+  if (!(mPerPx > 0) || !(start.widthM > 0) || !(start.heightM > 0)) return start;
+  const sx = cornerIndex === 1 || cornerIndex === 2 ? 1 : -1; // right / left
+  const sy = cornerIndex === 2 || cornerIndex === 3 ? 1 : -1; // down / up (image axes)
+  const local = screenToLocal(dxPx, dyPx, normalizeBearing(start.rotationDeg));
+  const growX = sx * local.x * mPerPx; // metres the width grows
+  const growY = sy * local.y * mPerPx; // metres the height grows
+  let w;
+  let h;
+  if (lockAspect) {
+    const len2 = start.widthM * start.widthM + start.heightM * start.heightM;
+    const s = ((start.widthM + growX) * start.widthM + (start.heightM + growY) * start.heightM) / len2;
+    const { lo, hi } = scaleRange(start.widthM, start.heightM);
+    const k = Math.min(hi, Math.max(lo, s));
+    w = start.widthM * k;
+    h = start.heightM * k;
+  } else {
+    w = clampSize(start.widthM + growX);
+    h = clampSize(start.heightM + growY);
+  }
+  // Centre moves half the size change toward the dragged corner, in the image's
+  // axes (a right, b up), then is turned CLOCKWISE by the bearing to east/north.
+  const a = (sx * (w - start.widthM)) / 2;
+  const b = (-sy * (h - start.heightM)) / 2;
+  const t = toRad(normalizeBearing(start.rotationDeg));
+  const east = a * Math.cos(t) + b * Math.sin(t);
+  const north = -a * Math.sin(t) + b * Math.cos(t);
+  return { ...start, widthM: w, heightM: h, center: offsetCenter(start.center, east, north) };
+}
+
+/** Angle in degrees of a screen point around a centre; y grows down so it increases CLOCKWISE, like a map bearing. @param {{x:number;y:number}} c @param {{x:number;y:number}} p @returns {number} */
+export function pointerAngleDeg(c, p) {
+  return toDegAngle(Math.atan2(p.y - c.y, p.x - c.x));
+}
+
+/**
+ * Rotate-handle drag (R4.4): the overlay turns by the angle the pointer has
+ * swept around the overlay centre since the drag began. Angles come from
+ * pointerAngleDeg, so a clockwise sweep adds to the bearing.
+ * @template {OverlayDraft} T @param {T} start @param {number} startAngle @param {number} currentAngle @returns {T}
+ */
+export function rotateByHandle(start, startAngle, currentAngle) {
+  return { ...start, rotationDeg: normalizeRotation(start.rotationDeg + (currentAngle - startAngle)) };
+}
+
+/**
+ * Two-finger pinch-and-twist (R4.5): size scales by the ratio of finger
+ * distances (kept inside 1-5000 m, aspect unchanged) and the bearing changes by
+ * the change of the finger angle. The caller only starts this when the gesture
+ * began on the overlay.
+ * @template {OverlayDraft} T
+ * @param {T} start
+ * @param {[{x:number;y:number},{x:number;y:number}]} startPair
+ * @param {[{x:number;y:number},{x:number;y:number}]} currentPair
+ * @returns {T}
+ */
+export function pinchTwist(start, startPair, currentPair) {
+  const d0 = Math.hypot(startPair[1].x - startPair[0].x, startPair[1].y - startPair[0].y);
+  const d1 = Math.hypot(currentPair[1].x - currentPair[0].x, currentPair[1].y - currentPair[0].y);
+  if (!(d0 > 0) || !(d1 > 0)) return start;
+  const { lo, hi } = scaleRange(start.widthM, start.heightM);
+  const k = Math.min(hi, Math.max(lo, d1 / d0));
+  const a0 = pointerAngleDeg(startPair[0], startPair[1]);
+  const a1 = pointerAngleDeg(currentPair[0], currentPair[1]);
+  return {
+    ...start,
+    widthM: start.widthM * k,
+    heightM: start.heightM * k,
+    rotationDeg: normalizeRotation(start.rotationDeg + (a1 - a0)),
+  };
+}
+
+/**
+ * Clamp a draft into the legal ranges (R4.11): both sides to 1-5000 m (with
+ * `lockAspect` they scale together so the ratio holds, otherwise each is
+ * clamped alone) and rotation into [0, 360). A non-finite value keeps nothing
+ * it can trust: size falls back to the nearest bound, rotation to 0.
+ * @template {OverlayDraft} T @param {T} d @param {boolean} [lockAspect] @returns {T}
+ */
+export function clampDraft(d, lockAspect = true) {
+  let w = Number(d.widthM);
+  let h = Number(d.heightM);
+  if (!Number.isFinite(w)) w = OVERLAY_MIN_M;
+  if (!Number.isFinite(h)) h = OVERLAY_MIN_M;
+  if (lockAspect && w > 0 && h > 0) {
+    const { lo, hi } = scaleRange(w, h);
+    // lo > hi happens for extreme aspect ratios; the lower bound wins so neither side is < 1 m.
+    const k = lo > hi ? lo : Math.min(hi, Math.max(lo, 1));
+    w *= k;
+    h *= k;
+  }
+  return {
+    ...d,
+    widthM: clampSize(w),
+    heightM: clampSize(h),
+    rotationDeg: normalizeRotation(Number(d.rotationDeg)),
+  };
+}
+
+/**
+ * Parse the numeric rotation field (R4.6, R4.12). Anything that is not a finite
+ * number is rejected, and the caller restores the previous value. A valid entry
+ * is normalised into [0, 360) and rounded to 1 decimal.
+ * @param {unknown} raw @returns {{ ok: true; value: number } | { ok: false }}
+ */
+export function parseRotationInput(raw) {
+  if (typeof raw === 'number' ? !Number.isFinite(raw) : !/^\s*-?\d+(\.\d+)?\s*$/.test(String(raw ?? ''))) {
+    return { ok: false };
+  }
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return { ok: false };
+  return { ok: true, value: normalizeRotation(Math.round(n * 10) / 10) };
 }
 
 /**
@@ -598,33 +785,113 @@ export function pathExtentM(path) {
  * @returns {OverlayDraft | null}  null when there is nowhere to put it
  */
 export function initialOverlayDraft(a) {
+  return firstPlacement(a).draft;
+}
+
+/** |lat| < 0.001 and |lng| < 0.001: the "0,0" a missing coordinate becomes (R5.3, Null_Island_Location). @param {Partial<LatLngLit> | null | undefined} p @returns {boolean} */
+export function isNullIsland(p) {
+  return !!p && Math.abs(Number(p.lat)) < 0.001 && Math.abs(Number(p.lng)) < 0.001;
+}
+
+// Rough bounding box of India incl. islands; only drives a NON-blocking
+// warning (R5.7), so a generous box is fine. Positions outside it still save.
+const INDIA_BOUNDS = { south: 6.0, north: 37.6, west: 68.0, east: 97.5 };
+
+/** True when a valid position lies outside India's bounding box (non-blocking warning, R5.7). @param {Partial<LatLngLit> | null | undefined} p @returns {boolean} */
+export function outsideIndia(p) {
+  if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lng)) return false;
+  return p.lat < INDIA_BOUNDS.south || p.lat > INDIA_BOUNDS.north
+    || p.lng < INDIA_BOUNDS.west || p.lng > INDIA_BOUNDS.east;
+}
+
+/** @param {unknown} p @returns {boolean} */
+const isUsablePoint = (p) => !!p && Number.isFinite(/** @type {any} */ (p).lat) && Number.isFinite(/** @type {any} */ (p).lng)
+  && !isNullIsland(/** @type {any} */ (p));
+
+/**
+ * Largest rectangle of the image's aspect that fits inside w x h (R5.4).
+ * @param {number} w @param {number} h @param {number} aspect naturalHeight / naturalWidth
+ * @returns {{ widthM: number; heightM: number }}
+ */
+function largestFit(w, h, aspect) {
+  const a = aspect > 0 ? aspect : 1;
+  const byWidth = { widthM: w, heightM: w * a };
+  const fit = byWidth.heightM <= h ? byWidth : { widthM: h / a, heightM: h };
+  const { lo, hi } = scaleRange(fit.widthM, fit.heightM);
+  const k = lo > hi ? lo : Math.min(hi, Math.max(lo, 1));
+  return { widthM: clampSize(fit.widthM * k), heightM: clampSize(fit.heightM * k) };
+}
+
+/**
+ * First_Placement (R5.1, R5.2, R5.4, R5.5), in this order:
+ *   1. a saved overlay keeps its position (only the picture changed);
+ *   2. boundary with >= 3 vertices and none at Null Island: centre of its
+ *      bounding box, largest aspect-preserving fit inside it;
+ *   3. else the project lat/lng (not Null Island): 200 m on the longest side;
+ *   4. else the map centre, 200 m, with `hint` asking the Editor to search for
+ *      or pan to the site;
+ *   5. else nothing (draft null).
+ * Before: no boundary meant 100 m, and a 2-vertex or Null Island boundary was
+ * accepted; both put the picture somewhere the Editor had to drag from far away.
+ * @param {{
+ *   existing?: Partial<OverlayDraft> | null;
+ *   image: { url: string; key: string };
+ *   boundaryPath?: LatLngLit[] | null;
+ *   fallbackCenter?: LatLngLit | null;
+ *   mapCenter?: LatLngLit | null;
+ *   aspect?: number | null;   // naturalHeight / naturalWidth
+ * }} a
+ * @returns {{ draft: OverlayDraft | null; source: 'existing' | 'boundary' | 'project' | 'map' | null; hint: string | null }}
+ */
+export function firstPlacement(a) {
   const ex = a.existing;
   if (ex && ex.center && Number.isFinite(ex.center.lat) && Number.isFinite(ex.center.lng)
     && Number(ex.widthM) > 0 && Number(ex.heightM) > 0) {
     return {
-      image: a.image,
-      center: { lat: ex.center.lat, lng: ex.center.lng },
-      widthM: clampSize(Number(ex.widthM)),
-      heightM: clampSize(Number(ex.heightM)),
-      rotationDeg: normalizeBearing(Number(ex.rotationDeg) || 0),
-      opacity: clampOpacity(ex.opacity),
+      source: 'existing',
+      hint: null,
+      draft: {
+        image: a.image,
+        center: { lat: ex.center.lat, lng: ex.center.lng },
+        widthM: clampSize(Number(ex.widthM)),
+        heightM: clampSize(Number(ex.heightM)),
+        rotationDeg: normalizeBearing(Number(ex.rotationDeg) || 0),
+        opacity: clampOpacity(ex.opacity),
+      },
     };
   }
-  const ext = pathExtentM(a.boundaryPath);
-  const center = ext?.center
-    ?? (a.fallbackCenter && Number.isFinite(a.fallbackCenter.lat) && Number.isFinite(a.fallbackCenter.lng)
-      ? a.fallbackCenter : null);
-  if (!center) return null;
-  const widthM = clampSize(ext && ext.widthM >= OVERLAY_MIN_M ? ext.widthM : 100);
-  const aspect = Number(a.aspect) > 0 ? Number(a.aspect) : (ext && ext.widthM > 0 ? ext.heightM / ext.widthM : 1);
-  return {
-    image: a.image,
-    center: { lat: center.lat, lng: center.lng },
-    widthM,
-    heightM: clampSize(widthM * (aspect > 0 ? aspect : 1)),
-    rotationDeg: 0,
-    opacity: OVERLAY_DEFAULT_OPACITY,
+  const aspect = Number(a.aspect) > 0 ? Number(a.aspect) : 1;
+  const base = { image: a.image, rotationDeg: 0, opacity: OVERLAY_DEFAULT_OPACITY };
+  /** @param {LatLngLit} c @returns {OverlayDraft} */
+  const at200 = (c) => {
+    // 200 m on the LONGEST side, aspect kept.
+    const widthM = aspect <= 1 ? 200 : 200 / aspect;
+    const heightM = aspect <= 1 ? 200 * aspect : 200;
+    return { ...base, center: { lat: c.lat, lng: c.lng }, widthM: clampSize(widthM), heightM: clampSize(heightM) };
   };
+
+  const path = (a.boundaryPath || []).filter((p) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng));
+  const boundaryOk = path.length >= 3 && !path.some((p) => isNullIsland(p));
+  const ext = boundaryOk ? pathExtentM(path) : null;
+  if (ext && ext.widthM >= OVERLAY_MIN_M && ext.heightM >= OVERLAY_MIN_M) {
+    const fit = largestFit(ext.widthM, ext.heightM, aspect);
+    return {
+      source: 'boundary',
+      hint: null,
+      draft: { ...base, center: { lat: ext.center.lat, lng: ext.center.lng }, ...fit },
+    };
+  }
+  if (isUsablePoint(a.fallbackCenter)) {
+    return { source: 'project', hint: null, draft: at200(/** @type {LatLngLit} */ (a.fallbackCenter)) };
+  }
+  if (isUsablePoint(a.mapCenter)) {
+    return {
+      source: 'map',
+      hint: 'Search or pan to your site, then move the overlay there.',
+      draft: at200(/** @type {LatLngLit} */ (a.mapCenter)),
+    };
+  }
+  return { source: null, hint: null, draft: null };
 }
 
 /** @param {unknown} v @returns {number} */
@@ -675,6 +942,58 @@ export function overlaySavePayload(d, projectId) {
       opacity: Math.round(opacity * 100) / 100,
     },
   };
+}
+
+/** A key is this project's when it sits under projects/{id}/ with no traversal (mirrors the server's isProjectKey). @param {unknown} key @param {string} projectId @returns {boolean} */
+function isOwnKey(key, projectId) {
+  return typeof key === 'string' && key.startsWith(`projects/${projectId}/`)
+    && !key.includes('..') && !key.includes('\\');
+}
+
+/**
+ * Body for overlay save v2 (design A4): everything overlaySavePayload checks,
+ * plus the Preview/Detail copies, pixel size, Control_Points and Source_PDF
+ * page, and the Null_Island block (R5.6). `layoutVersion` is added by the
+ * caller. Keys only; no URL is sent.
+ * @param {OverlayDraft | null | undefined} d @param {string} projectId
+ * @returns {{ ok: true; body: Record<string, any> } | { ok: false; message: string }}
+ */
+export function overlaySavePayloadV2(d, projectId) {
+  const base = overlaySavePayload(d, projectId);
+  if (!base.ok || !d) return base;
+  if (isNullIsland(d.center)) {
+    return { ok: false, message: 'Overlay ka centre (0, 0) hai. Pehle use apni site pe le jao.' };
+  }
+  /** @type {Record<string, any>} */
+  const body = { ...base.body };
+  for (const [field, f] of /** @type {[string, { key: string } | null | undefined][]} */ ([['preview', d.preview], ['detail', d.detail]])) {
+    if (!f) continue;
+    if (!isOwnKey(f.key, projectId)) return { ok: false, message: `${field} image is project ki nahi hai, dobara upload karo` };
+    body[field] = { key: f.key };
+  }
+  if (d.imageSize) {
+    const { width, height } = d.imageSize;
+    if (!(width > 0) || !(height > 0)) return { ok: false, message: 'Image size galat hai' };
+    body.imageSize = { width, height };
+  }
+  const cps = d.controlPoints || [];
+  if (cps.length > 3) return { ok: false, message: 'Maximum 3 control points' };
+  if (cps.length) {
+    for (const p of cps) {
+      if (![p.u, p.v, p.lat, p.lng].every(Number.isFinite) || isNullIsland(p)) {
+        return { ok: false, message: 'Control point galat hai' };
+      }
+      if (d.imageSize && (p.u < 0 || p.v < 0 || p.u > d.imageSize.width || p.v > d.imageSize.height)) {
+        return { ok: false, message: 'Control point image ke bahar hai' };
+      }
+    }
+    body.controlPoints = cps.map((p) => ({ u: p.u, v: p.v, lat: p.lat, lng: p.lng, role: p.role }));
+  }
+  if (d.sourcePdf) {
+    if (!isOwnKey(d.sourcePdf.key, projectId)) return { ok: false, message: 'Source PDF is project ki nahi hai, dobara upload karo' };
+    body.sourcePdf = { key: d.sourcePdf.key, page: d.sourcePdf.page, extraRotationDeg: d.sourcePdf.extraRotationDeg };
+  }
+  return { ok: true, body };
 }
 
 /**
