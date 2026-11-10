@@ -157,6 +157,31 @@ export function toOverlayViewBounds(b) {
   return { ne: { lat: b.north, lng: b.east }, sw: { lat: b.south, lng: b.west } };
 }
 
+/**
+ * CSS matrix that maps an element laid out at its own W x H px (transform-origin
+ * 0 0) onto three projected corners: image pixel (x, y) -> NW + x/W*(NE-NW) + y/H*(SW-NW)
+ * (design 7.2). The three anchors are exact on screen at any zoom, and the
+ * fourth corner is off only by Mercator curvature.
+ *
+ * Why: the editor used `rotate(bearing)` on an unrotated lat/lng box. That is
+ * right only while one pixel is the same size east and north, and it could not
+ * express an unlocked aspect or the shear a tilted projection gives, so the
+ * editor image drifted from the corners the server and the public page use.
+ * @param {{ x: number; y: number }} nw @param {{ x: number; y: number }} ne @param {{ x: number; y: number }} sw
+ * @param {number} w natural width px @param {number} h natural height px
+ * @returns {[number, number, number, number, number, number] | null} [a, b, c, d, e, f], null when W/H or a point is unusable
+ */
+export function cornersToMatrix(nw, ne, sw, w, h) {
+  if (!nw || !ne || !sw || !(w > 0) || !(h > 0)) return null;
+  const m = [(ne.x - nw.x) / w, (ne.y - nw.y) / w, (sw.x - nw.x) / h, (sw.y - nw.y) / h, nw.x, nw.y];
+  return m.every(Number.isFinite) ? /** @type {[number, number, number, number, number, number]} */ (m) : null;
+}
+
+/** `matrix(a, b, c, d, e, f)` string for {@link cornersToMatrix}'s result. @param {number[]} m @returns {string} */
+export function matrixToCss(m) {
+  return `matrix(${m.join(', ')})`;
+}
+
 // ── Overlay_Transform (identical maths to HIT_Backend services/overlayTransform.js) ──
 //
 // The web editor, the Public_Plot_Page and the mobile viewer all need the same
