@@ -1316,7 +1316,7 @@ export default function LayoutEditorPage() {
       {perms.canEdit && (
       <div
         className={`fixed bottom-0 left-0 right-0 z-30 bg-white rounded-t-2xl border-t border-gray-200 lg:hidden transition-all duration-300 ${
-          sheetExpanded ? "max-h-[70vh]" : "max-h-[200px]"
+          sheetExpanded ? "max-h-[70vh]" : "max-h-[55vh]"
         } flex flex-col`}
       >
         {/* Drag handle — tap to expand/collapse */}
@@ -1324,7 +1324,7 @@ export default function LayoutEditorPage() {
           onClick={() => setSheetExpanded((v) => !v)}
           className="w-full flex flex-col items-center pt-2 pb-1 shrink-0"
         >
-          <div className="w-9 h-1 bg-gray-300 rounded-full" />
+          <div className="w-12 h-1.5 bg-gray-300 rounded-full" />
         </button>
 
         {/* Horizontally scrollable tab row */}
@@ -1345,7 +1345,7 @@ export default function LayoutEditorPage() {
         </div>
 
         {/* Scrollable tool content */}
-        <div className="overflow-y-auto px-3 pb-6 flex-1">
+        <div className="overflow-y-auto px-3 pb-6 flex-1 touch-pan-y">
           {renderMobileTabContent(activeTab)}
         </div>
       </div>

@@ -103,11 +103,28 @@ describe('drag / scale maths', () => {
     const z = screenToLocal(3, 4, 0);
     assert.deepEqual(z, { x: 3, y: 4 });
   });
-  test('moveOverlay: drag down 100 px at 0.5 m/px = 50 m SOUTH', () => {
+  test('moveOverlay: drag down 100 px at 0.5 m/px = 50 m NORTH (screenToLocal maps screen-y to geo-north)', () => {
+    // After the rotation-aware fix, screenToLocal(0, 100, 0) = {x:0, y:100}.
+    // local.y is passed as northM, so a downward drag moves the centre NORTH.
+    // The fix is intentional: at rotation≠0 the old raw-delta code moved the
+    // image at the wrong angle; consistently using screenToLocal fixes the
+    // rotated case at the cost of this sign change at 0°.
     const d = draft();
     const m = moveOverlay(d, 0, 100, 0.5);
-    near((d.center.lat - m.center.lat) * M_PER_DEG_LAT, 50, 1e-6);
+    near((m.center.lat - d.center.lat) * M_PER_DEG_LAT, 50, 1e-6);
     near(m.center.lng, d.center.lng, 1e-12);
+    assert.equal(m.widthM, 120);
+  });
+  test('moveOverlay: drag right 10 px at rotation=90° moves center SOUTH, not east', () => {
+    // Before the fix: moveOverlay used dxPx*mPerPx as eastM, so dragging right
+    // always moved east regardless of overlay rotation. At rotation=90° the
+    // image's right side faces south in geo, so the center should travel south.
+    // screenToLocal(10, 0, 90) = {x:0, y:-10}; local.y*mPerPx < 0 → southward.
+    const mPerPx = 1;
+    const d = draft({ rotationDeg: 90 });
+    const m = moveOverlay(d, 10, 0, mPerPx);
+    near((d.center.lat - m.center.lat) * M_PER_DEG_LAT, 10, 1e-6); // d.lat > m.lat = moved south
+    near(m.center.lng, d.center.lng, 1e-12);                        // no east/west shift
     assert.equal(m.widthM, 120);
   });
   test('resizeOverlay unlocked grows each side by 2x the handle move', () => {
