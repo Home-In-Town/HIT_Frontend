@@ -23,7 +23,7 @@ import type { LayoutOverlay } from '@/types/project';
 import {
   overlayGeometry, moveOverlay, resizeFromCorner, rotateByHandle, pinchTwist, pointerAngleDeg,
   nudgeOverlay, firstPlacement, overlaySavePayloadV2, normalizeBearing, clampOpacity, clampDraft,
-  parseRotationInput, isNullIsland, outsideIndia, IMAGE_MAX_BYTES, OVERLAY_MIN_M, OVERLAY_MAX_M,
+  toOverlayViewBounds, parseRotationInput, isNullIsland, outsideIndia, IMAGE_MAX_BYTES, OVERLAY_MIN_M, OVERLAY_MAX_M,
 } from '@/lib/layoutTools.mjs';
 import type { OverlayDraft } from '@/lib/layoutTools.mjs';
 import { openPdf, rasterisePage, PdfLayoutError } from '@/lib/pdfLayout';
@@ -185,7 +185,10 @@ export function OverlayAlignLayer({
   return (
     <>
       <OverlayView
-        bounds={g.bounds}
+        // Was `bounds={g.bounds}` ({south, west, north, east}). The library only
+        // understands a LatLngBounds or {ne, sw}, so it read `ne.lat` on undefined
+        // and threw a TypeError on every draw for any project with a saved overlay.
+        bounds={toOverlayViewBounds(g.bounds) as unknown as google.maps.LatLngBounds}
         // Mouse-target pane only while aligning; otherwise the image sits under
         // the plots and lets every click through to them.
         mapPaneName={active ? OverlayView.OVERLAY_MOUSE_TARGET : OverlayView.OVERLAY_LAYER}

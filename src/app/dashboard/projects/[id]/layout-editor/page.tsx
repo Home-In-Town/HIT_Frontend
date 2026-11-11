@@ -689,7 +689,8 @@
 
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import MapErrorBoundary from '@/components/layout-editor/MapErrorBoundary';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ProjectMap from '@/components/public/ProjectMap';
 import { ApiError, patchPlotStatus, projectsApi, saveProjectLandmarks } from '@/lib/api';
@@ -966,10 +967,27 @@ export default function LayoutEditorPage() {
   // ── load project ──
   // Bumped by 'Reload' after a 409 LAYOUT_STALE so the page re-reads the project, its layoutVersion and its overlay.
   const [reloadKey, setReloadKey] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const router = useRouter();
   useEffect(() => {
     if (!projectId) return;
     (async () => {
-      const data = await projectsApi.getById(projectId);
+      // Before: a failed getById was an unhandled rejection and the page sat on
+      // "Loading..." forever (logged out, or project deleted).
+      let data;
+      try {
+        data = await projectsApi.getById(projectId);
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          router.replace('/login');
+        } else if (err instanceof ApiError && err.status === 404) {
+          setLoadError('Project not found');
+        } else {
+          setLoadError('Could not load the project. Please reload the page.');
+        }
+        return;
+      }
+      setLoadError(null);
       setProject(data);
       const savedLandmarks = data.landmarks || [];
       setSelectedLandmarks(savedLandmarks);
@@ -979,7 +997,7 @@ export default function LayoutEditorPage() {
       setOverlayDraft(savedOverlay);
       setOverlayCps(savedOverlay?.controlPoints ?? []);
     })();
-  }, [projectId, reloadKey]);
+  }, [projectId, reloadKey, router]);
 
   const closePlotPanel = () => {
     setPanelPlotId(null);
@@ -1080,7 +1098,7 @@ export default function LayoutEditorPage() {
     }
   };
 
-  if (!project) return <div>Loading...</div>;
+  if (!project) return <div>{loadError ?? 'Loading...'}</div>;
 
   // Shared by the desktop sidebar and the mobile sheet.
   function renderOverlayPanel() {
@@ -1469,6 +1487,7 @@ export default function LayoutEditorPage() {
       {/* ── Map area ── */}
       <div className="flex-1 relative">
         <div className="h-full pb-[220px] lg:pb-0">
+          <MapErrorBoundary>
           <ProjectMap
             ref={mapRef}
             projectId={projectId}
@@ -1497,6 +1516,7 @@ export default function LayoutEditorPage() {
             layoutVersion={perms.layoutVersion}
             onLayoutVersion={perms.setLayoutVersion}
           />
+          </MapErrorBoundary>
         </div>
       </div>
 

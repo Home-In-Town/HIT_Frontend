@@ -8,7 +8,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getPlotColor, PLOT_STATUS_COLORS, normalizePlotStatus, OPEN_SPACE_CATEGORIES, cleanOpenSpaceLabel,
-  overlayGeometry, normalizeBearing, offsetCenter, screenToLocal, moveOverlay, resizeOverlay, nudgeOverlay,
+  overlayGeometry, toOverlayViewBounds, normalizeBearing, offsetCenter, screenToLocal, moveOverlay, resizeOverlay, nudgeOverlay,
   pathExtentM, initialOverlayDraft, clampOpacity, overlaySavePayload, overlayResetRestoreBody,
   unitRangePrefill, validateUnitRange, plotStatusFeedback, PLOT_NO_PERMISSION, layoutSaveErrorMessage,
 } from './layoutTools.mjs';
@@ -274,5 +274,25 @@ describe('feedback', () => {
     assert.match(layoutSaveErrorMessage(409, 'Layout changed while saving, reload and try again'), /reload/);
     assert.match(layoutSaveErrorMessage(400, 'path needs 3 points', 4), /shape #5/);
     assert.match(layoutSaveErrorMessage(500, null), /server/);
+  });
+});
+
+// <OverlayView bounds> in @react-google-maps/api reads bounds.ne.lat / sw.lat.
+// Passing overlayGeometry().bounds ({south, west, north, east}) made it read
+// `ne.lat` on undefined and throw "Cannot read properties of undefined
+// (reading 'lat')" on every draw for any project with a saved layoutOverlay.
+describe('toOverlayViewBounds', () => {
+  test('maps a {south, west, north, east} literal to {ne, sw}', () => {
+    const r = toOverlayViewBounds({ south: 1, west: 2, north: 3, east: 4 });
+    assert.deepEqual(r, { ne: { lat: 3, lng: 4 }, sw: { lat: 1, lng: 2 } });
+  });
+  test('round-trips overlayGeometry().bounds so the map reads ne/sw', () => {
+    const g = overlayGeometry({ center: { lat: 19.8489, lng: 77.4067 }, widthM: 200, heightM: 108.76, rotationDeg: 0 });
+    const b = toOverlayViewBounds(g.bounds);
+    assert.equal(b.ne.lat, g.bounds.north);
+    assert.equal(b.ne.lng, g.bounds.east);
+    assert.equal(b.sw.lat, g.bounds.south);
+    assert.equal(b.sw.lng, g.bounds.west);
+    assert.ok(b.ne.lat > b.sw.lat && b.ne.lng > b.sw.lng);
   });
 });
