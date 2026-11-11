@@ -143,6 +143,20 @@ export function overlayGeometry(o) {
   };
 }
 
+/**
+ * Converts overlayGeometry().bounds ({south, west, north, east}) to the shape
+ * @react-google-maps/api's <OverlayView bounds> actually reads: a
+ * google.maps.LatLngBounds, or {ne: {lat, lng}, sw: {lat, lng}}. Passing the
+ * {south, west, north, east} literal made the library read `bounds.ne.lat` on
+ * undefined and throw a TypeError on every draw whenever a project had a saved
+ * layoutOverlay (Layout Editor crashed with "Application error").
+ * @param {{ south: number; west: number; north: number; east: number }} b
+ * @returns {{ ne: LatLngLit; sw: LatLngLit }}
+ */
+export function toOverlayViewBounds(b) {
+  return { ne: { lat: b.north, lng: b.east }, sw: { lat: b.south, lng: b.west } };
+}
+
 // ── Overlay_Transform (identical maths to HIT_Backend services/overlayTransform.js) ──
 //
 // The web editor, the Public_Plot_Page and the mobile viewer all need the same
