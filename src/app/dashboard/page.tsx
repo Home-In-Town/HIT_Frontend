@@ -45,6 +45,15 @@ export default function DashboardPage() {
       case 'captain':
         router.replace('/dashboard/captain');
         break;
+      case 'user':
+        // The mobile app registers every new account as role 'user' (backend
+        // register defaults to it). This switch had no case for it, so the
+        // default branch below sent a successfully logged-in user straight back
+        // to /login: "Welcome back!" toast, then the login page again. There is
+        // no web dashboard for plain users, so land them on the profile page,
+        // which works for every role and has Sign Out in the dashboard layout.
+        router.replace('/dashboard/profile');
+        break;
       default:
         router.replace('/login');
     }
