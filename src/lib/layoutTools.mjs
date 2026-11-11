@@ -535,10 +535,22 @@ const clampSize = (v) => Math.min(OVERLAY_MAX_M, Math.max(OVERLAY_MIN_M, v));
 /**
  * Drag the image body: screen y grows downward, so a drag down is SOUTH.
  * `mPerPx` is captured at drag start (zoom does not change mid-drag).
+ *
+ * Before: used raw dxPx/dyPx as east/north metres — that is correct only when
+ * the overlay has 0° rotation. When the overlay is rotated by θ the screen x/y
+ * axes no longer coincide with the geo east/north axes, so the image drifted at
+ * an angle instead of following the finger.
+ *
+ * Fix: rotate the screen delta by –bearing via screenToLocal, whose output IS
+ * the east/north decomposition of the displacement (local.x = east, local.y =
+ * north when the image coordinate frame is aligned with east/north at bearing=0,
+ * and the inverse rotation undoes the mis-alignment for other bearings).
+ *
  * @template {OverlayDraft} T @param {T} start @param {number} dxPx @param {number} dyPx @param {number} mPerPx @returns {T}
  */
 export function moveOverlay(start, dxPx, dyPx, mPerPx) {
-  return { ...start, center: offsetCenter(start.center, dxPx * mPerPx, -dyPx * mPerPx) };
+  const local = screenToLocal(dxPx, dyPx, normalizeBearing(start.rotationDeg ?? 0));
+  return { ...start, center: offsetCenter(start.center, local.x * mPerPx, local.y * mPerPx) };
 }
 
 /**
