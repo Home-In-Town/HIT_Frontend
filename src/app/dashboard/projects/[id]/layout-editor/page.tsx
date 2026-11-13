@@ -703,6 +703,7 @@ import { useProjectPermissions } from '@/components/layout-editor/useProjectPerm
 import { useUnsavedGuard } from '@/components/layout-editor/useUnsavedGuard';
 import LinkUnitsDialog from '@/components/layout-editor/LinkUnitsDialog';
 import GenerateUnitsDialog from '@/components/layout-editor/GenerateUnitsDialog';
+import ReviewTool from '@/components/layout-editor/ReviewTool';
 
 type StatusFeedback = ReturnType<typeof plotStatusFeedback>;
 
@@ -916,8 +917,8 @@ function PlotPanelFields({
 }
 
 // ─── Tab types ───────────────────────────────────────────────────────────────
-type TabType = "Boundary" | "Roads" | "Plots" | "Open Space" | "Grid" | "Overlay" | "Units" | "History" | "Canvas" | "Landmarks";
-const TABS: TabType[] = ["Boundary", "Roads", "Plots", "Open Space", "Grid", "Overlay", "Units", "History", "Canvas", "Landmarks"];
+type TabType = "Boundary" | "Roads" | "Plots" | "Open Space" | "Grid" | "Overlay" | "Units" | "History" | "Canvas" | "Landmarks" | "Review";
+const TABS: TabType[] = ["Boundary", "Roads", "Plots", "Open Space", "Grid", "Overlay", "Units", "History", "Canvas", "Landmarks", "Review"];
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function LayoutEditorPage() {
@@ -963,6 +964,13 @@ export default function LayoutEditorPage() {
   // ── units dialogs ──
   const [linkOpen,       setLinkOpen]       = useState(false);
   const [generatePrefill, setGeneratePrefill] = useState<ReturnType<typeof unitRangePrefill> | null>(null);
+
+  // ── review plots state (Phase 2) ──
+  // WHY separate state: the review tab maintains its own draft of plots (with
+  // classification, approval and undo) independently from the main map entities.
+  // It syncs back to the server via reviewSave, not via the main layout PUT.
+  const [reviewPlots, setReviewPlots] = useState<any[]>([]);
+  const [reviewSelectedId, setReviewSelectedId] = useState<string | null>(null);
 
   // ── load project ──
   // Bumped by 'Reload' after a 409 LAYOUT_STALE so the page re-reads the project, its layoutVersion and its overlay.
@@ -1204,6 +1212,9 @@ export default function LayoutEditorPage() {
       case "Units":
         return renderUnitsButtons();
 
+      case "Review":
+        return renderReviewTab();
+
       case "Grid":
         return (
           <div className="grid grid-cols-3 gap-2">
@@ -1280,6 +1291,26 @@ export default function LayoutEditorPage() {
       default:
         return null;
     }
+  }
+
+  function renderReviewTab() {
+    // R8.12: in status-only or read-only mode, detect/approve/overlay controls
+    // must not appear in the review tab either.
+    return (
+      <ReviewTool
+        projectId={projectId}
+        layoutVersion={perms.layoutVersion}
+        onLayoutVersionChange={perms.setLayoutVersion}
+        plots={reviewPlots.length > 0 ? reviewPlots : (mapRef.current?.getEntities?.() || []).filter((e: any) => e.type === 'subplot')}
+        onPlotsChange={setReviewPlots}
+        onSelectPlot={setReviewSelectedId}
+        selectedPlotId={reviewSelectedId}
+        hasTransform={!!(overlaySaved?.center)}
+        canEdit={perms.canEdit}
+        initialPriceMode={(project?.priceMode as any) ?? 'hidden'}
+        pricePerSqFt={project?.pricePerSqFt}
+      />
+    );
   }
 
   return (
