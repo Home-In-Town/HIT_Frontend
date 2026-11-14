@@ -6,8 +6,13 @@
 // Ported from the homeintown.ai plot viewer (read only, D16): centroid,
 // bounds and the status palette. Its login, session and status-edit helpers
 // are deliberately not ported (D11): this page is read-only.
+//
+// Phase 2 (R19.4–19.16): area formatting, price line, WhatsApp text and
+// searchPlots are added here. normalisePlotNumber is imported from layoutTools.mjs
+// (design §3.4: one normalisation function, no duplicate implementation).
 
 import { safeHttpUrl } from './vcard.mjs';
+import { normalisePlotNumber } from './layoutTools.mjs';
 
 export const PLOTS_ORIGIN = 'https://homeintown.in';
 
@@ -197,4 +202,155 @@ export async function fetchPublicLayout(slug, o = {}) {
   } finally {
     clearTimeout(timer);
   }
+}
+
+// ── Phase 2: Area, price, WhatsApp text and search (R19.4–19.16) ─────────
+//
+// WHY these are here and not in layoutTools.mjs: they depend on the PUBLIC
+// layout shape (plot.areaSqm, layout.priceMode, layout.cta) which is specific to
+// the viewer, whereas layoutTools.mjs is shared with the editor and mobile.
+//
+// Finding 9 (design-review MEDIUM): the backend `toPublicPlot` function in
+// PlotLayoutService.js (line 548) renames the internal `e.area` field to
+// `areaSqm` in the public response:
+//   `areaSqm: isFiniteNumber(e.area) && e.area > 0 ? e.area : null`
+// So the public API returns `plot.areaSqm`, not `plot.area`. All helpers read
+// `plot.areaSqm` throughout. Any reference to `plot.area` in an older comment
+// or draft was wrong and has been corrected here.
+
+export const SQFT_PER_SQM = 10.7639;
+
+/**
+ * Area in sq ft from m², 2 decimal places.
+ * Returns null for ≤0, null, undefined or non-finite input (R19.5: missing
+ * lines must not render at all, never as "0 sq ft" or "NaN sq ft").
+ * Also returns null when the computed value rounds to 0.00 (very small area).
+ * @param {number | null | undefined} areaSqm
+ * @returns {string | null}
+ */
+export function formatAreaSqFt(areaSqm) {
+  const v = Number(areaSqm);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  const sqft = v * SQFT_PER_SQM;
+  if (sqft < 0.005) return null; // rounds to 0.00 sq ft → hide
+  return sqft.toFixed(2) + ' sq ft';
+}
+
+/**
+ * Area in m², 2 decimal places.
+ * Returns null for ≤0, null, undefined or non-finite (same reasoning as above).
+ * Also returns null when the value rounds to 0.00.
+ * @param {number | null | undefined} areaSqm
+ * @returns {string | null}
+ */
+export function formatAreaSqM(areaSqm) {
+  const v = Number(areaSqm);
+  if (!Number.isFinite(v) || v <= 0) return null;
+  if (v < 0.005) return null; // rounds to 0.00 m² → hide
+  return v.toFixed(2) + ' m²';
+}
+
+/**
+ * Price line for a plot (R19.11, R19.12, R19.14, R19.16).
+ *   per-plot:  plot.price > 0 → '₹ X' (Indian locale, no "indicative").
+ *   per-sqft:  layout.pricePerSqFt > 0 AND areaSqft > 0 → '₹ X (indicative)'.
+ *   hidden:    null.
+ *   any other missing value: null.
+ * Never returns a string containing 'undefined', 'null', 'NaN' or '0 sq ft'.
+ *
+ * Finding HIGH-4 (design-review): areaSqft is derived here from plot.areaSqm
+ * (the backend public field name, confirmed in PlotLayoutService.toPublicPlot).
+ * Formula: areaSqft = (plot.areaSqm ?? 0) * 10.7639.
+ *
+ * B8/B9 do NOT update layoutVersion — price updates do not go through the
+ * Layout_Version CAS, so we never update the editor's layoutVersion after them.
+ *
+ * @param {{ areaSqm?: number | null; price?: number | null; [k: string]: any }} plot
+ * @param {{ priceMode?: string | null; pricePerSqFt?: number | null; [k: string]: any }} layout
+ * @returns {string | null}
+ */
+export function formatPriceLine(plot, layout) {
+  const priceMode = layout && layout.priceMode;
+  if (priceMode === 'per-plot') {
+    const price = Number(plot && plot.price);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    return '₹ ' + price.toLocaleString('en-IN');
+  }
+  if (priceMode === 'per-sqft') {
+    const ppsf = Number(layout && layout.pricePerSqFt);
+    const areaSqft = (Number(plot && plot.areaSqm) || 0) * SQFT_PER_SQM;
+    if (!Number.isFinite(ppsf) || ppsf <= 0) return null;
+    if (!Number.isFinite(areaSqft) || areaSqft <= 0) return null;
+    const total = ppsf * areaSqft;
+    return '₹ ' + Math.round(total).toLocaleString('en-IN') + ' (indicative)';
+  }
+  return null; // 'hidden' or unknown
+}
+
+/**
+ * Hinglish WhatsApp enquiry text (R19.8). The EXACT format per the spec:
+ * 'Namaste, mujhe <Project> ka Plot <No> ke baare me jaankari chahiye.'
+ * @param {string} projectName
+ * @param {string} plotNumber
+ * @returns {string}
+ */
+export function formatWhatsAppText(projectName, plotNumber) {
+  return `Namaste, mujhe ${projectName} ka Plot ${plotNumber} ke baare me jaankari chahiye.`;
+}
+
+/**
+ * All panel lines for a plot (R19.4, R19.5). Missing fields are `null`,
+ * never `undefined`, never 'undefined' / 'null' / 'NaN' / '0 sq ft'.
+ *
+ * WHY this function: the component renders nothing for null lines (R19.5).
+ * Returning null instead of a formatted zero or missing value means the UI
+ * never shows a meaningless line, without the component having to do extra
+ * null checks for each field.
+ *
+ * @param {{ id: string; plotNumber?: string | null; status?: string | null; facing?: string | null; areaSqm?: number | null; price?: number | null; unit?: any; [k: string]: any }} plot
+ * @param {{ projectName?: string | null; priceMode?: string | null; pricePerSqFt?: number | null; cta?: { whatsappNumber?: string | null; callNumber?: string | null } | null; [k: string]: any }} layout
+ * @returns {{ number: string | null; status: string | null; facing: string | null; areaSqFt: string | null; areaSqM: string | null; priceLine: string | null; unitCorner: string | null; unitDimensions: string | null; whatsapp: string | null }}
+ */
+export function formatPanelLines(plot, layout) {
+  const plotNumber = String(plot.plotNumber ?? '').trim() || null;
+  const statusRaw = String(plot.status ?? '').trim();
+  const status = statusRaw || null;
+  const facing = plot.facing ? String(plot.facing).trim() || null : null;
+  const areaSqFt = formatAreaSqFt(plot.areaSqm);
+  const areaSqM = formatAreaSqM(plot.areaSqm);
+  const priceLine = formatPriceLine(plot, layout);
+
+  let unitCorner = null;
+  let unitDimensions = null;
+  if (plot.unit) {
+    const corner = plot.unit.corner ? String(plot.unit.corner).trim() : null;
+    unitCorner = corner || null;
+    const dim = plot.unit.dimensions ? String(plot.unit.dimensions).trim() : null;
+    unitDimensions = dim || null;
+  }
+
+  const projectName = String(layout && layout.projectName ? layout.projectName : '').trim();
+  const whatsapp = plotNumber && projectName
+    ? formatWhatsAppText(projectName, plotNumber)
+    : null;
+
+  return { number: plotNumber, status, facing, areaSqFt, areaSqM, priceLine, unitCorner, unitDimensions, whatsapp };
+}
+
+/**
+ * Search plots by normalised plot number prefix (R19.12, R19.14).
+ * Finding MEDIUM-7 (design-review): whitespace-only query returns [] via
+ * normalisePlotNumber(query.trim()) guard — if the result is empty or null,
+ * the function returns [] immediately without iterating plots.
+ * @param {{ plotNumber?: string | null; [k: string]: any }[]} plots
+ * @param {string} query
+ * @returns {typeof plots}
+ */
+export function searchPlots(plots, query) {
+  const q = normalisePlotNumber((query ?? '').trim());
+  if (!q) return []; // empty string or null (all-stripped input) → no results
+  return plots.filter((p) => {
+    const n = normalisePlotNumber(String(p.plotNumber ?? ''));
+    return n && n.startsWith(q);
+  });
 }

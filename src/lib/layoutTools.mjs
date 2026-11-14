@@ -1162,3 +1162,345 @@ export function layoutSaveErrorMessage(httpStatus, serverMessage, index) {
   }
   return `Layout save nahi hua: ${msg || 'network / server error'}`;
 }
+
+// ── Phase 2: Plot-number normalisation and facing (R13.4, R16.6) ──────────
+//
+// WHY same rules as the backend detector: the editor and the detection run
+// must agree on what a "valid" plot number looks like so the review list shows
+// consistent classification. The old behaviour was no normalisation at all —
+// whatever the OCR returned stayed in the field, including spaces and
+// punctuation that the backend validator would later reject.
+
+/** Allowed characters in a normalised plot number, same as the backend detector. */
+const PLOT_NUMBER_RE = /[^A-Z0-9\/-]/g;
+
+/**
+ * Normalise a raw plot-number input (R13.4). Rules:
+ *   trim → uppercase → keep only [A-Z0-9/-].
+ *   empty string → '' (clears the field, which is allowed and distinct from null).
+ *   empty after stripping  → null (invalid non-empty input; caller keeps old value).
+ *   > 20 chars after stripping → null (too long; caller keeps old value).
+ *   1–20 chars → the normalised string.
+ * Never returns 'undefined' or 'null' as a string.
+ * @param {unknown} raw @returns {string | null}
+ */
+export function normalisePlotNumber(raw) {
+  // empty string is explicitly allowed (clears the number)
+  if (raw === '' || raw === null || raw === undefined) return '';
+  const s = String(raw).trim().toUpperCase().replace(PLOT_NUMBER_RE, '');
+  if (s.length === 0) return null; // non-empty input collapsed to nothing → invalid
+  if (s.length > 20) return null;  // too long → invalid
+  return s;
+}
+
+/** Valid facing directions.  'none' is a UI-only label meaning "no facing stored". */
+export const FACINGS = /** @type {const} */ (['north', 'south', 'east', 'west', 'none']);
+
+/**
+ * Parse a facing input (R16.6).
+ *   'north'|'south'|'east'|'west' → returned as-is.
+ *   'none' → undefined (absent facing — the model's 4-value enum has no "none"
+ *             slot, so we store absence rather than adding a fifth value).
+ *   anything else → null (invalid; caller keeps old value).
+ * @param {unknown} raw @returns {'north'|'south'|'east'|'west'|undefined|null}
+ */
+export function parseFacing(raw) {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (s === 'none') return undefined;
+  if (s === 'north' || s === 'south' || s === 'east' || s === 'west') {
+    return /** @type {'north'|'south'|'east'|'west'} */ (s);
+  }
+  return null; // invalid → caller keeps old value
+}
+
+// ── Phase 2: Vertex add / move / remove (R16.2–R16.4) ────────────────────
+//
+// WHY these operate on a plain array of {lat,lng} and return a new array:
+// the editor keeps geo coordinates as the source of truth, and the map
+// component (Polygon) derives pixel coordinates from them. Keeping these
+// functions pure (no DOM / google.maps) makes them testable in bare Node.
+
+/** Minimum and maximum vertex count for a legal plot ring (design 4.5, R16.2). */
+export const VERTEX_MIN = 3;
+export const VERTEX_MAX = 200;
+
+/**
+ * Insert a new vertex AFTER `insertAfterIdx` in `path`. Returns the new path
+ * (always a new array) or null when the result would exceed VERTEX_MAX.
+ * @param {LatLngLit[]} path @param {number} insertAfterIdx @param {LatLngLit} newPoint @returns {LatLngLit[] | null}
+ */
+export function addVertex(path, insertAfterIdx, newPoint) {
+  if (path.length >= VERTEX_MAX) return null; // already at max → refuse
+  const next = [...path];
+  next.splice(insertAfterIdx + 1, 0, newPoint);
+  return next;
+}
+
+/**
+ * Move vertex at `idx` to `newPoint`. Returns a new path. The index wraps
+ * modulo `path.length` so callers that tracked an index across an edit do not
+ * have to bounds-check.
+ * @param {LatLngLit[]} path @param {number} idx @param {LatLngLit} newPoint @returns {LatLngLit[]}
+ */
+export function moveVertex(path, idx, newPoint) {
+  const i = ((idx % path.length) + path.length) % path.length;
+  const next = [...path];
+  next[i] = newPoint;
+  return next;
+}
+
+/**
+ * Remove vertex at `idx`. Returns the new path (always a new array) or null
+ * when the result would have fewer than VERTEX_MIN vertices (the ring would
+ * degenerate). Keeping the minimum at 3 matches the polygon-clipping library's
+ * expectation that a ring has at least 3 non-collinear points.
+ * @param {LatLngLit[]} path @param {number} idx @returns {LatLngLit[] | null}
+ */
+export function removeVertex(path, idx) {
+  if (path.length <= VERTEX_MIN) return null; // would go below minimum
+  const i = ((idx % path.length) + path.length) % path.length;
+  const next = [...path.slice(0, i), ...path.slice(i + 1)];
+  return next;
+}
+
+// ── Phase 2: Merge and split plots (R16.3, R16.4) ────────────────────────
+//
+// WHY the local plane: for sub-km plots the flat-earth error is < 0.1 mm per
+// 100 m, so we can use the same (x east, y north) plane that imageToGeo /
+// geoToImage already use. Switching to geodesic operations would add a spherical
+// library dependency (e.g. turf) for negligible accuracy improvement. The
+// original design considered turf but D15 (no new npm packages in helpers)
+// steered toward the lighter approach.
+//
+// polygon-clipping (CJS) is loaded lazily via createRequire so this file stays
+// importable in both Node --test and the Next.js bundler.
+//
+// WHY conditional require: `createRequire` only works in Node.js (--test, server
+// components). In the browser bundle Next.js cannot resolve `import.meta.url` for
+// createRequire, so we guard with a typeof check. mergePlots/splitPlot return an
+// error string when called without polygon-clipping (browser can only do vertex
+// edits; merge/split require the editor server action or the SSR path).
+
+/** @returns {{ union: Function; difference: Function; intersection: Function } | null} */
+function getPC() {
+  if (typeof process === 'undefined' || typeof process.versions?.node === 'undefined') {
+    // Browser context — polygon-clipping CJS require is not available
+    return null;
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return require('polygon-clipping');
+  } catch {
+    return null;
+  }
+}
+
+/** Snap threshold: vertices within 0.5 m are considered the same point. */
+const MERGE_SNAP_M = 0.5;
+/** Minimum shared segment length for merge eligibility. */
+const MERGE_MIN_SHARED_M = 1.0;
+
+/**
+ * Convert a geo path to plane coordinates around `centre`.
+ * @param {LatLngLit} centre @param {LatLngLit[]} path @returns {[number,number][]}
+ */
+function pathToPlane(centre, path) {
+  return path.map((p) => {
+    const { x, y } = toPlane(centre, p);
+    return [x, y];
+  });
+}
+
+/**
+ * Convert plane coordinates back to geo.
+ * @param {LatLngLit} centre @param {[number,number][]} pts @returns {LatLngLit[]}
+ */
+function planeToPath(centre, pts) {
+  return pts.map(([x, y]) => fromPlane(centre, { x, y }));
+}
+
+/**
+ * Distance between two plane points.
+ * @param {[number,number]} a @param {[number,number]} b @returns {number}
+ */
+function planeDist(a, b) {
+  return Math.hypot(b[0] - a[0], b[1] - a[1]);
+}
+
+/**
+ * Shoelace area of a plane ring (unsigned, in m²).
+ * @param {[number,number][]} pts @returns {number}
+ */
+function ringArea(pts) {
+  let a = 0;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    const q = pts[(i + 1) % pts.length];
+    a += p[0] * q[1] - q[0] * p[1];
+  }
+  return Math.abs(a) / 2;
+}
+
+/**
+ * Check whether two plane rings share at least one segment of MERGE_MIN_SHARED_M
+ * or more after snapping vertices within MERGE_SNAP_M.
+ * @param {[number,number][]} rA @param {[number,number][]} rB @returns {boolean}
+ */
+function hasSharedSegment(rA, rB) {
+  for (let i = 0; i < rA.length; i++) {
+    const a1 = rA[i];
+    const a2 = rA[(i + 1) % rA.length];
+    for (let j = 0; j < rB.length; j++) {
+      const b1 = rB[j];
+      const b2 = rB[(j + 1) % rB.length];
+      // Snap: if both endpoints are within MERGE_SNAP_M, count the segment
+      const d1 = planeDist(a1, b1) < MERGE_SNAP_M && planeDist(a2, b2) < MERGE_SNAP_M;
+      const d2 = planeDist(a1, b2) < MERGE_SNAP_M && planeDist(a2, b1) < MERGE_SNAP_M;
+      if (d1 || d2) {
+        const len = planeDist(a1, a2);
+        if (len >= MERGE_MIN_SHARED_M) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/**
+ * Merge two plots into one (R16.3). Uses polygon-clipping union on the local
+ * plane. Requirements:
+ *   - Vertices must snap within 0.5 m AND share a segment ≥ 1 m.
+ *   - Union result must be a single valid polygon (no holes, no multipolygon).
+ *   - Result must have VERTEX_MIN–VERTEX_MAX vertices.
+ *   - The larger-area plot keeps its plotNumber; the smaller's number is cleared.
+ * @param {{ id: string; path: LatLngLit[]; plotNumber?: string | null; [k: string]: any }} plotA
+ * @param {{ id: string; path: LatLngLit[]; plotNumber?: string | null; [k: string]: any }} plotB
+ * @param {{ center: LatLngLit } | null} [transformOrNull]
+ * @returns {{ merged: { path: LatLngLit[]; plotNumber: string } } | { error: string }}
+ */
+export function mergePlots(plotA, plotB, transformOrNull) {
+  const pc = getPC();
+  if (!pc) {
+    return { error: 'polygon-clipping is not available in this environment (browser). Use the server-side merge action.' };
+  }
+  const centre = (transformOrNull && transformOrNull.center) ? transformOrNull.center
+    : { lat: (plotA.path[0].lat + plotB.path[0].lat) / 2, lng: (plotA.path[0].lng + plotB.path[0].lng) / 2 };
+  const rA = pathToPlane(centre, plotA.path);
+  const rB = pathToPlane(centre, plotB.path);
+  if (!hasSharedSegment(rA, rB)) {
+    return { error: 'Plots are not adjacent (no shared segment ≥ 1 m found after snapping)' };
+  }
+  let result;
+  try {
+    result = pc.union([[rA]], [[rB]]);
+  } catch (e) {
+    return { error: `polygon-clipping union failed: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!Array.isArray(result) || result.length !== 1) {
+    return { error: 'Union produced more than one polygon; plots may overlap in a complex way' };
+  }
+  const outerRing = result[0][0];
+  if (!outerRing || outerRing.length < VERTEX_MIN + 1) { // polygon-clipping closes the ring (first = last)
+    return { error: 'Merged polygon has too few vertices' };
+  }
+  // polygon-clipping closes the ring by repeating the first point; remove the duplicate.
+  const closed = outerRing[outerRing.length - 1][0] === outerRing[0][0]
+    && outerRing[outerRing.length - 1][1] === outerRing[0][1];
+  const pts = /** @type {[number,number][]} */ (closed ? outerRing.slice(0, -1) : outerRing);
+  if (pts.length > VERTEX_MAX) {
+    return { error: `Merged polygon has ${pts.length} vertices; maximum is ${VERTEX_MAX}` };
+  }
+  // Larger area keeps its number.
+  const areaA = ringArea(rA);
+  const areaB = ringArea(rB);
+  const plotNumber = areaA >= areaB
+    ? (normalisePlotNumber(plotA.plotNumber ?? '') ?? '')
+    : (normalisePlotNumber(plotB.plotNumber ?? '') ?? '');
+  return { merged: { path: planeToPath(centre, pts), plotNumber } };
+}
+
+/**
+ * Find the two intersection points of a line with a closed polygon ring,
+ * returning their indices into the ring and the parameter t along each edge.
+ * Returns null when the line crosses the ring other than exactly twice.
+ * @param {[number,number][]} ring @param {[number,number]} L1 @param {[number,number]} L2
+ * @returns {{ idx: number; t: number; pt: [number,number] }[] | null}
+ */
+function findRingCrossings(ring, L1, L2) {
+  const crossings = [];
+  const dx = L2[0] - L1[0];
+  const dy = L2[1] - L1[1];
+  for (let i = 0; i < ring.length; i++) {
+    const A = ring[i];
+    const B = ring[(i + 1) % ring.length];
+    const ex = B[0] - A[0];
+    const ey = B[1] - A[1];
+    const denom = dx * ey - dy * ex;
+    if (Math.abs(denom) < 1e-12) continue; // parallel
+    const t = ((A[0] - L1[0]) * ey - (A[1] - L1[1]) * ex) / denom;
+    const s = ((A[0] - L1[0]) * dy - (A[1] - L1[1]) * dx) / denom;
+    if (s >= 0 && s <= 1) { // intersection is on the ring edge
+      crossings.push({ idx: i, t: s, pt: /** @type {[number,number]} */ ([A[0] + s * ex, A[1] + s * ey]) });
+    }
+  }
+  if (crossings.length !== 2) return null;
+  return crossings;
+}
+
+/**
+ * Split a plot along a line (R16.4). Requirements:
+ *   - `splitLine` must cross the boundary exactly twice.
+ *   - Both parts must have VERTEX_MIN–VERTEX_MAX vertices.
+ *   - The larger part keeps the original plotNumber; the smaller gets ''.
+ * @param {{ id: string; path: LatLngLit[]; plotNumber?: string | null; [k: string]: any }} plot
+ * @param {[LatLngLit, LatLngLit]} splitLine
+ * @param {{ center: LatLngLit } | null} [transformOrNull]
+ * @returns {{ parts: [{ path: LatLngLit[]; plotNumber: string }, { path: LatLngLit[]; plotNumber: string }] } | { error: string }}
+ */
+export function splitPlot(plot, splitLine, transformOrNull) {
+  const pc = getPC();
+  if (!pc) {
+    return { error: 'polygon-clipping is not available in this environment (browser). Use the server-side split action.' };
+  }
+  const centre = (transformOrNull && transformOrNull.center) ? transformOrNull.center : plot.path[0];
+  const ring = pathToPlane(centre, plot.path);
+  const L1 = /** @type {[number,number]} */ ([toPlane(centre, splitLine[0]).x, toPlane(centre, splitLine[0]).y]);
+  const L2 = /** @type {[number,number]} */ ([toPlane(centre, splitLine[1]).x, toPlane(centre, splitLine[1]).y]);
+  const crossings = findRingCrossings(ring, L1, L2);
+  if (!crossings) {
+    return { error: 'Split line does not cross the plot boundary exactly twice' };
+  }
+  // Sort crossings by ring index so part A is always "first" around the ring.
+  const [c1, c2] = crossings[0].idx <= crossings[1].idx
+    ? [crossings[0], crossings[1]]
+    : [crossings[1], crossings[0]];
+
+  // Part A: ring[0..c1.idx] + c1.pt + c2.pt + ring[c2.idx+1..]
+  const ptA = /** @type {[number,number][]} */ ([
+    ...ring.slice(0, c1.idx + 1),
+    c1.pt,
+    c2.pt,
+    ...ring.slice(c2.idx + 1),
+  ]);
+  // Part B: ring[c1.idx+1..c2.idx] + c2.pt + c1.pt
+  const ptB = /** @type {[number,number][]} */ ([
+    ...ring.slice(c1.idx + 1, c2.idx + 1),
+    c2.pt,
+    c1.pt,
+  ]);
+
+  for (const [name, pts] of [['Part A', ptA], ['Part B', ptB]]) {
+    if (pts.length < VERTEX_MIN) return { error: `${name} would have only ${pts.length} vertices (minimum ${VERTEX_MIN})` };
+    if (pts.length > VERTEX_MAX) return { error: `${name} would have ${pts.length} vertices (maximum ${VERTEX_MAX})` };
+  }
+
+  const areaA = ringArea(ptA);
+  const areaB = ringArea(ptB);
+  const origNumber = normalisePlotNumber(plot.plotNumber ?? '') ?? '';
+  const [largerPts, smallerPts] = areaA >= areaB ? [ptA, ptB] : [ptB, ptA];
+  return {
+    parts: [
+      { path: planeToPath(centre, largerPts), plotNumber: origNumber },
+      { path: planeToPath(centre, smallerPts), plotNumber: '' },
+    ],
+  };
+}

@@ -1,5 +1,10 @@
 // Shapes of GET /api/public/projects/:slug/layout (design A6, R10.2) as the
 // Public_Plot_Page reads them. Read-only: nothing here describes a write.
+//
+// Finding 9 (design-review MEDIUM): the backend `toPublicPlot` in
+// PlotLayoutService.js renames the internal `e.area` field to `areaSqm` in
+// the public response. So all client code must read `plot.areaSqm` (m²).
+// The old draft type had `area` as primary — that was wrong and is now fixed.
 
 export interface LatLngLit { lat: number; lng: number }
 export type PlotStatus = 'available' | 'booked' | 'sold' | 'on-hold';
@@ -11,9 +16,14 @@ export interface LayoutPlot {
   plotNumber: string;
   path: LatLngLit[];
   status: PlotStatus;
+  /** Area in square metres. Backend public field name is 'areaSqm' (toPublicPlot). */
   areaSqm: number | null;
+  /** @deprecated Alias kept for backward compat — use `areaSqm`. */
+  area?: number | null;
   facing: string | null;
   label: string | null;
+  price?: number | null;
+  unit?: { corner?: string | null; dimensions?: string | null } | null;
 }
 
 /** corners = NW, NE, SE, SW. previewUrl / detailUrl / imageSize are null for overlays saved before v2. */
@@ -49,4 +59,6 @@ export interface PublicLayout {
   openSpaces: LayoutOpenSpace[];
   boundary: { id: string; path: LatLngLit[] }[];
   counts: LayoutCounts;
+  priceMode?: 'per-sqft' | 'per-plot' | 'hidden' | null;
+  pricePerSqFt?: number | null;
 }

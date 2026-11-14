@@ -3229,3 +3229,143 @@ export interface LeadConfirmResult {
   matches: ExtractedLeadMatch[];
   matchCount: number;
 }
+
+// ── Phase 2: Detection runs, review save, validate, price (B1-B9) ────────
+//
+// ROI format is an array [x, y, width, height] in image pixels (not an object).
+// Confirmed from HIT_Backend sockets/publicLayout.socket.js — the backend
+// parses Array.isArray(roi) and checks length 4.
+//
+// B8/B9 do NOT return or update layoutVersion — price changes are off the CAS
+// path and do not move layoutUpdatedAt. Never update the editor's layoutVersion
+// after these calls.
+
+export type DetectionRunState = 'queued' | 'processing' | 'done' | 'failed' | 'cancelled';
+
+export interface DetectionRun {
+  runId: string;
+  state: DetectionRunState;
+  startedAt: string;
+  endedAt?: string | null;
+  reason?: string | null;
+  plotCount?: number | null;
+}
+
+/** POST /api/projects/:id/detection-runs (B1). roi = [x, y, width, height] in image pixels. */
+export async function startDetectionRun(
+  projectId: string,
+  params: { roi?: [number, number, number, number]; minAreaPx?: number } = {},
+): Promise<{ run: DetectionRun }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/detection-runs`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(params),
+  });
+  return handleResponse<{ run: DetectionRun }>(res);
+}
+
+/** GET /api/projects/:id/detection-runs/:runId (B2). */
+export async function getDetectionRun(projectId: string, runId: string): Promise<{ run: DetectionRun }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/detection-runs/${encodeURIComponent(runId)}`, {
+    ...COMMON_FETCH_OPTIONS,
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<{ run: DetectionRun }>(res);
+}
+
+/** GET /api/projects/:id/detection-runs (B3). history is newest first. */
+export async function listDetectionRuns(projectId: string): Promise<{ active: DetectionRun | null; history: DetectionRun[] }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/detection-runs`, {
+    ...COMMON_FETCH_OPTIONS,
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<{ active: DetectionRun | null; history: DetectionRun[] }>(res);
+}
+
+/** POST /api/projects/:id/detection-runs/:runId/cancel (B4). */
+export async function cancelDetectionRun(projectId: string, runId: string): Promise<{ run: DetectionRun }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/detection-runs/${encodeURIComponent(runId)}/cancel`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  return handleResponse<{ run: DetectionRun }>(res);
+}
+
+export interface ReviewSavePlot {
+  id: string;
+  path: { lat: number; lng: number }[];
+  plotNumber: string;
+  status?: string;
+  facing?: string;
+  provenance?: { approved?: boolean } | null;
+  [k: string]: unknown;
+}
+
+export interface ReviewSaveResult {
+  layoutEntities: unknown[];
+  layoutVersion: string | null;
+  warnings: string[];
+}
+
+/**
+ * PUT /api/projects/:id/layout/review (B6). Requires layoutVersion (stale check).
+ * 409 `code: 'LAYOUT_STALE' | 'LAYOUT_CONFLICT'` → caller shows "Reload" button.
+ */
+export async function reviewSave(
+  projectId: string,
+  body: { layoutVersion: string | null; plots: ReviewSavePlot[]; [k: string]: unknown },
+): Promise<ReviewSaveResult> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout/review`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify(body),
+  });
+  return handleResponse<ReviewSaveResult>(res);
+}
+
+export interface ValidateResult {
+  results: { id: string; errors: string[]; warnings: string[]; areaSqm: number }[];
+}
+
+/** POST /api/projects/:id/layout/validate (B7). Dry-run validation. */
+export async function validateDryRun(projectId: string, plots: ReviewSavePlot[]): Promise<ValidateResult> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/layout/validate`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ plots }),
+  });
+  return handleResponse<ValidateResult>(res);
+}
+
+/** PUT /api/projects/:id/price-settings (B8). Does NOT update layoutVersion. */
+export async function updatePriceSettings(
+  projectId: string,
+  priceMode: 'per-sqft' | 'per-plot' | 'hidden',
+): Promise<{ priceMode: string }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/price-settings`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'PUT',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ priceMode }),
+  });
+  return handleResponse<{ priceMode: string }>(res);
+}
+
+/** PATCH /api/projects/:id/plots/:entityId/price (B9). Does NOT update layoutVersion. */
+export async function updatePlotPrice(
+  projectId: string,
+  entityId: string,
+  price: number | null,
+): Promise<{ id: string; price: number | null }> {
+  const res = await fetch(`${API_URL}/projects/${encodeURIComponent(projectId)}/plots/${encodeURIComponent(entityId)}/price`, {
+    ...COMMON_FETCH_OPTIONS,
+    method: 'PATCH',
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ price }),
+  });
+  return handleResponse<{ id: string; price: number | null }>(res);
+}

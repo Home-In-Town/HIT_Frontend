@@ -21,6 +21,7 @@
     "next": "16.1.4",
     "pdfjs-dist": "5.4.296",
     "phosphor-icons": "^1.4.2",
+    "polygon-clipping": "^0.15.7",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hot-toast": "^2.6.0",
