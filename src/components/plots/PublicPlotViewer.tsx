@@ -336,8 +336,8 @@ function ViewerMap({ layout, variant, wrap, slug }: { layout: PublicLayout; vari
         </div>
       )}
 
-      {/* Header */}
-      <div className="absolute left-3 top-3 z-10 max-w-[calc(100%-6rem)] rounded-xl border border-gray-200 bg-white/95 px-4 py-2 shadow sm:max-w-xs">
+      {/* Header. max-w reserves 11rem for the Map/Satellite buttons: it was 6rem, which at 320 px let the title card run under them. */}
+      <div className="absolute left-3 top-3 z-10 max-w-[calc(100%-11rem)] rounded-xl border border-gray-200 bg-white/95 px-4 py-2 shadow sm:max-w-xs">
         <p className="truncate text-base font-bold text-gray-900">{layout.projectName}</p>
         {where && <p className="truncate text-xs text-gray-700">{where}</p>}
         <p className="text-[11px] text-gray-600">Powered by HomeInTown</p>
@@ -349,7 +349,8 @@ function ViewerMap({ layout, variant, wrap, slug }: { layout: PublicLayout; vari
           <button type="button" aria-pressed={mapType === 'roadmap'} onClick={() => setMapType('roadmap')} className={`${btn} rounded-r-none ${mapType === 'roadmap' ? btnOn : ''}`}>Map</button>
           <button type="button" aria-pressed={mapType === 'satellite'} onClick={() => setMapType('satellite')} className={`${btn} rounded-l-none border-l-0 ${mapType === 'satellite' ? btnOn : ''}`}>Satellite</button>
         </div>
-        <button type="button" onClick={toggleFullscreen} aria-pressed={fullscreen} className={btn}>{fullscreen ? 'Exit fullscreen' : 'Fullscreen'}</button>
+        {/* Fixed label + aria-pressed: the label used to flip to "Exit fullscreen" as well, so a screen reader heard the state twice. */}
+        <button type="button" onClick={toggleFullscreen} aria-pressed={fullscreen} className={btn}>Fullscreen</button>
         {variant === 'compact' && <Link href={`/plots/${encodeURIComponent(layout.slug)}`} className={`${btn} inline-flex items-center justify-center`}>View Plot Layout</Link>}
       </div>
 
@@ -455,7 +456,7 @@ function ViewerMap({ layout, variant, wrap, slug }: { layout: PublicLayout; vari
             value={opacity}
             aria-valuetext={`${Math.round(opacity * 100)} percent`}
             onChange={(e) => setOpacity(Number(e.target.value))}
-            className="h-11 w-full accent-orange-700"
+            className="h-11 w-full accent-orange-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
           />
           {/* Legend: counts recomputed from live plots state after socket updates (R19.9) */}
           <ul className="mt-1 grid grid-cols-2 gap-x-2 text-xs text-gray-800" role="list" aria-label="Plot status counts">
@@ -475,7 +476,7 @@ function ViewerMap({ layout, variant, wrap, slug }: { layout: PublicLayout; vari
               inputMode="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="mt-1 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900"
+              className="mt-1 h-11 w-full rounded-lg border border-gray-300 px-3 text-sm text-gray-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-600"
             />
             {/* No-match message: only shown when query is non-empty (R19.5, Finding 5) */}
             {query.trim() !== '' && matches.length === 0 && (

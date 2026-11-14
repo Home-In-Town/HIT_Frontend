@@ -15,13 +15,13 @@
 // handle and keyboard nudges, and Reset PUT the old image back. Now an upload
 // writes nothing until Save (R7.8), so Reset is local.
 
-import { useCallback, useEffect, useId, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { MarkerF, OverlayView, useGoogleMap } from '@react-google-maps/api';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { ApiError, layoutConflictCode, saveLayoutOverlayVersioned } from '@/lib/api';
 import type { LayoutOverlay } from '@/types/project';
 import {
-  overlayGeometry, moveOverlay, resizeFromCorner, rotateByHandle, pinchTwist, pointerAngleDeg,
+  overlayGeometry, cornersToMatrix, matrixToCss, moveOverlay, resizeFromCorner, rotateByHandle, pinchTwist, pointerAngleDeg,
   nudgeOverlay, firstPlacement, overlaySavePayloadV2, normalizeBearing, clampOpacity, clampDraft,
   toOverlayViewBounds, parseRotationInput, isNullIsland, outsideIndia, IMAGE_MAX_BYTES, OVERLAY_MIN_M, OVERLAY_MAX_M,
 } from '@/lib/layoutTools.mjs';
@@ -97,8 +97,51 @@ export function OverlayAlignLayer({
   const mapWasDraggable = useRef(true);
   const raf = useRef<number | null>(null);
   const pending = useRef<OverlayDraft | null>(null);
+  const viewRef = useRef<google.maps.OverlayView | null>(null);
+  const [viewTick, setViewTick] = useState(0);
   const g = overlayGeometry(draft);
   const active = editable && !locked;
+
+  // Place the image with a CSS matrix() from the projected NW/NE/SW corners
+  // (design 7.2). Before: `rotate(bearing)` on the unrotated lat/lng box, which
+  // only matched the saved corners while a pixel was the same size east and
+  // north, so the editor could drift from what the server and the public page
+  // draw. The element is laid out at the projected size of the unrotated box
+  // and mapped onto the corners relative to that box's NW, so only `transform`
+  // changes per frame while dragging. Without a projection yet it falls back to
+  // the old rotate() until the next redraw.
+  const geoKey = `${draft.center.lat},${draft.center.lng},${draft.widthM},${draft.heightM},${draft.rotationDeg}`;
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const fallback = () => { el.style.width = '100%'; el.style.height = '100%'; el.style.transformOrigin = '50% 50%'; el.style.transform = `rotate(${g.bearing}deg)`; };
+    const proj = viewRef.current?.getProjection?.();
+    if (!proj) { fallback(); return; }
+    const px = (c: LatLng) => proj.fromLatLngToDivPixel(new google.maps.LatLng(c.lat, c.lng));
+    const origin = px({ lat: g.bounds.north, lng: g.bounds.west });
+    const east = px({ lat: g.bounds.north, lng: g.bounds.east });
+    const south = px({ lat: g.bounds.south, lng: g.bounds.west });
+    const [nw, ne, , sw] = g.corners.map(px);
+    if (!origin || !east || !south || !nw || !ne || !sw) { fallback(); return; }
+    const w = Math.hypot(east.x - origin.x, east.y - origin.y);
+    const h = Math.hypot(south.x - origin.x, south.y - origin.y);
+    const m = cornersToMatrix(
+      { x: nw.x - origin.x, y: nw.y - origin.y }, { x: ne.x - origin.x, y: ne.y - origin.y }, { x: sw.x - origin.x, y: sw.y - origin.y }, w, h,
+    );
+    if (!m) { fallback(); return; }
+    el.style.width = `${w}px`;
+    el.style.height = `${h}px`;
+    el.style.transformOrigin = '0 0';
+    el.style.transform = matrixToCss(m);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- geoKey stands for the draft geometry; viewTick for zoom/projection changes
+  }, [geoKey, viewTick]);
+
+  // A zoom or projection change moves the pixels but not the draft, so redraw.
+  useEffect(() => {
+    if (!map) return;
+    const ls = ['zoom_changed', 'projection_changed', 'idle'].map((ev) => map.addListener(ev, () => setViewTick((t) => t + 1)));
+    return () => ls.forEach((l) => l.remove());
+  }, [map]);
 
   // One redraw per animation frame: pointer events only record the latest
   // draft, so a 120 Hz pointer cannot queue more React renders than frames.
@@ -189,6 +232,8 @@ export function OverlayAlignLayer({
         // understands a LatLngBounds or {ne, sw}, so it read `ne.lat` on undefined
         // and threw a TypeError on every draw for any project with a saved overlay.
         bounds={toOverlayViewBounds(g.bounds) as unknown as google.maps.LatLngBounds}
+        // The projection exists only once the view is added to the map.
+        onLoad={(v) => { viewRef.current = v; setViewTick((t) => t + 1); }}
         // Mouse-target pane only while aligning; otherwise the image sits under
         // the plots and lets every click through to them.
         mapPaneName={active ? OverlayView.OVERLAY_MOUSE_TARGET : OverlayView.OVERLAY_LAYER}
@@ -216,10 +261,7 @@ export function OverlayAlignLayer({
           }}
           style={{
             position: 'relative',
-            width: '100%',
-            height: '100%',
-            transform: `rotate(${g.bearing}deg)`,
-            transformOrigin: '50% 50%',
+            // width/height/transform are written by the layout effect (matrix()).
             pointerEvents: active ? 'auto' : 'none',
             cursor: active ? 'move' : undefined,
             outline: active ? '2px dashed #f97316' : 'none',
