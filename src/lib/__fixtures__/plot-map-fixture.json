@@ -1,0 +1,3452 @@
+﻿{
+  "fixtureVersion": 4,
+  "contract": "plotmap/1",
+  "note": "Master copy. Backend, web and mobile each keep a byte-identical copy in their own repo (paths in docs/PLOT-BOOKING-PLAN-ADDENDUM.md section 12). Never edit a copy; edit this file and re-copy. fixtureVersion 2 = addendum revision 2 (poll contract, error table, normalise cases, owner draft review, reconcile cases). fixtureVersion 3 adds project {name,city} to every payload, publicAllowlist.project and publicMeta (addendum 7.2). fixtureVersion 4 (errata to revision 3) adds the isPlotProject section and the normalise case 12.5 -> null.",
+  "ids": {
+    "project": "64f000000000000000000001",
+    "slug": "green-valley-plots",
+    "layout": "64f0000000000000000000a1",
+    "ownerUser": "64f0000000000000000000b1",
+    "coCaptain": "64f0000000000000000000b2",
+    "assignedAgent": "64f0000000000000000000b4",
+    "agentA": "64f0000000000000000000c1",
+    "agentB": "64f0000000000000000000c2",
+    "agentC_unverified": "64f0000000000000000000c3"
+  },
+  "wireStatus": {
+    "public": [
+      "available",
+      "booked"
+    ],
+    "ownerSide": [
+      "available",
+      "booked",
+      "sold",
+      "on-hold"
+    ],
+    "bookingStatuses": [
+      "pending",
+      "approved",
+      "rejected",
+      "cancelled",
+      "expired",
+      "released"
+    ]
+  },
+  "publicAllowlist": {
+    "topLevel": [
+      "layoutId",
+      "version",
+      "seq",
+      "project",
+      "image",
+      "plots",
+      "counts"
+    ],
+    "project": [
+      "name",
+      "city"
+    ],
+    "image": [
+      "url",
+      "w",
+      "h"
+    ],
+    "plot": [
+      "id",
+      "key",
+      "number",
+      "kind",
+      "poly",
+      "labelAt",
+      "area",
+      "areaUnit",
+      "areaApprox",
+      "label",
+      "status"
+    ],
+    "counts": [
+      "plots",
+      "available",
+      "booked"
+    ],
+    "forbiddenKeysAnywhere": [
+      "bookedBy",
+      "bookingId",
+      "requester",
+      "requesterSnapshot",
+      "phone",
+      "email",
+      "mpin",
+      "note",
+      "price",
+      "flags",
+      "conf",
+      "provenance",
+      "statusVersion",
+      "pendingCount",
+      "booking",
+      "myRequests",
+      "viewer",
+      "projectId",
+      "createdBy",
+      "statusChangedBy",
+      "deleted",
+      "numberNorm"
+    ]
+  },
+  "storedPlots": [
+    {
+      "_id": "64f000000000000000001001",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p1",
+      "number": "1",
+      "numberNorm": "1",
+      "kind": "plot",
+      "label": null,
+      "poly": [
+        [
+          0.05,
+          0.1
+        ],
+        [
+          0.2,
+          0.1
+        ],
+        [
+          0.2,
+          0.3
+        ],
+        [
+          0.05,
+          0.3
+        ]
+      ],
+      "labelAt": [
+        0.125,
+        0.2
+      ],
+      "area": 450.5,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "available",
+      "statusVersion": 0,
+      "bookingId": null,
+      "bookedBy": null,
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001002",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p2",
+      "number": "2",
+      "numberNorm": "2",
+      "kind": "plot",
+      "label": null,
+      "poly": [
+        [
+          0.22,
+          0.1
+        ],
+        [
+          0.37,
+          0.1
+        ],
+        [
+          0.37,
+          0.3
+        ],
+        [
+          0.22,
+          0.3
+        ]
+      ],
+      "labelAt": [
+        0.295,
+        0.2
+      ],
+      "area": 388,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "available",
+      "statusVersion": 0,
+      "bookingId": null,
+      "bookedBy": null,
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001003",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p3",
+      "number": "3",
+      "numberNorm": "3",
+      "kind": "plot",
+      "label": null,
+      "poly": [
+        [
+          0.39,
+          0.1
+        ],
+        [
+          0.54,
+          0.1
+        ],
+        [
+          0.54,
+          0.3
+        ],
+        [
+          0.39,
+          0.3
+        ]
+      ],
+      "labelAt": [
+        0.465,
+        0.2
+      ],
+      "area": 400,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "booked",
+      "statusVersion": 1,
+      "bookingId": "64f000000000000000000203",
+      "bookedBy": "64f0000000000000000000c1",
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001004",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p4",
+      "number": "4",
+      "numberNorm": "4",
+      "kind": "plot",
+      "label": null,
+      "poly": [
+        [
+          0.56,
+          0.1
+        ],
+        [
+          0.71,
+          0.1
+        ],
+        [
+          0.71,
+          0.3
+        ],
+        [
+          0.56,
+          0.3
+        ]
+      ],
+      "labelAt": [
+        0.635,
+        0.2
+      ],
+      "area": 410.25,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "sold",
+      "statusVersion": 1,
+      "bookingId": "64f000000000000000000204",
+      "bookedBy": "64f0000000000000000000c2",
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001005",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p5",
+      "number": "12A",
+      "numberNorm": "12A",
+      "kind": "plot",
+      "label": null,
+      "poly": [
+        [
+          0.73,
+          0.1
+        ],
+        [
+          0.88,
+          0.1
+        ],
+        [
+          0.88,
+          0.3
+        ],
+        [
+          0.73,
+          0.3
+        ]
+      ],
+      "labelAt": [
+        0.805,
+        0.2
+      ],
+      "area": 376,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "on-hold",
+      "statusVersion": 1,
+      "bookingId": null,
+      "bookedBy": null,
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001006",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p6",
+      "number": "6",
+      "numberNorm": "6",
+      "kind": "plot",
+      "label": null,
+      "poly": [
+        [
+          0.05,
+          0.4
+        ],
+        [
+          0.2,
+          0.4
+        ],
+        [
+          0.2,
+          0.6
+        ],
+        [
+          0.05,
+          0.6
+        ]
+      ],
+      "labelAt": [
+        0.125,
+        0.5
+      ],
+      "area": 360,
+      "areaUnit": "sqm",
+      "areaApprox": true,
+      "status": "available",
+      "statusVersion": 0,
+      "bookingId": null,
+      "bookedBy": null,
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001007",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p7",
+      "number": null,
+      "numberNorm": null,
+      "kind": "cp",
+      "label": "C.P.",
+      "poly": [
+        [
+          0.22,
+          0.4
+        ],
+        [
+          0.37,
+          0.4
+        ],
+        [
+          0.37,
+          0.6
+        ],
+        [
+          0.22,
+          0.6
+        ]
+      ],
+      "labelAt": [
+        0.295,
+        0.5
+      ],
+      "area": 1333.27,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "available",
+      "statusVersion": 0,
+      "bookingId": null,
+      "bookedBy": null,
+      "deleted": false,
+      "flags": []
+    },
+    {
+      "_id": "64f000000000000000001008",
+      "layoutId": "64f0000000000000000000a1",
+      "projectId": "64f000000000000000000001",
+      "key": "p8",
+      "number": null,
+      "numberNorm": null,
+      "kind": "road",
+      "label": "30 Mt Wide Road",
+      "poly": [
+        [
+          0.05,
+          0.7
+        ],
+        [
+          0.95,
+          0.7
+        ],
+        [
+          0.95,
+          0.8
+        ],
+        [
+          0.05,
+          0.8
+        ]
+      ],
+      "labelAt": [
+        0.5,
+        0.75
+      ],
+      "area": null,
+      "areaUnit": "sqm",
+      "areaApprox": false,
+      "status": "available",
+      "statusVersion": 0,
+      "bookingId": null,
+      "bookedBy": null,
+      "deleted": false,
+      "flags": []
+    }
+  ],
+  "bookings": [
+    {
+      "id": "64f000000000000000000201",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001002",
+      "plotNumber": "2",
+      "plotArea": 388,
+      "requester": "64f0000000000000000000c1",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c1",
+        "name": "Rahul Shah",
+        "phone": "9876543210",
+        "role": "captain",
+        "companyName": "ABC Realty",
+        "designation": "Sales Associate",
+        "reraAgentNo": "A51700012345",
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "builder_flag"
+      },
+      "note": "Client ready hai",
+      "status": "pending",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": null,
+      "decidedBy": null,
+      "decisionReason": null,
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a961",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c1",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000202",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001002",
+      "plotNumber": "2",
+      "plotArea": 388,
+      "requester": "64f0000000000000000000c2",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c2",
+        "name": "Neha Patel",
+        "phone": "9123456780",
+        "role": "agent",
+        "companyName": "Patel Estates",
+        "designation": "Sales Associate",
+        "reraAgentNo": null,
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "employer"
+      },
+      "note": "Client ready hai",
+      "status": "pending",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": null,
+      "decidedBy": null,
+      "decisionReason": null,
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a962",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c2",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000203",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001003",
+      "plotNumber": "3",
+      "plotArea": 400,
+      "requester": "64f0000000000000000000c1",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c1",
+        "name": "Rahul Shah",
+        "phone": "9876543210",
+        "role": "captain",
+        "companyName": "ABC Realty",
+        "designation": "Sales Associate",
+        "reraAgentNo": "A51700012345",
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "builder_flag"
+      },
+      "note": "Client ready hai",
+      "status": "approved",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-20T12:00:00.000Z",
+      "decidedBy": "64f0000000000000000000b1",
+      "decisionReason": null,
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a963",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c1",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000204",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001004",
+      "plotNumber": "4",
+      "plotArea": 410.25,
+      "requester": "64f0000000000000000000c2",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c2",
+        "name": "Neha Patel",
+        "phone": "9123456780",
+        "role": "agent",
+        "companyName": "Patel Estates",
+        "designation": "Sales Associate",
+        "reraAgentNo": null,
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "employer"
+      },
+      "note": "Client ready hai",
+      "status": "approved",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-19T12:00:00.000Z",
+      "decidedBy": "64f0000000000000000000b1",
+      "decisionReason": null,
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a964",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c2",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000205",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001001",
+      "plotNumber": "1",
+      "plotArea": 450.5,
+      "requester": "64f0000000000000000000c1",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c1",
+        "name": "Rahul Shah",
+        "phone": "9876543210",
+        "role": "captain",
+        "companyName": "ABC Realty",
+        "designation": "Sales Associate",
+        "reraAgentNo": "A51700012345",
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "builder_flag"
+      },
+      "note": "Client ready hai",
+      "status": "rejected",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-18T12:00:00.000Z",
+      "decidedBy": "64f0000000000000000000b2",
+      "decisionReason": "Client se baat ho chuki hai",
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a965",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c1",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000206",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001001",
+      "plotNumber": "1",
+      "plotArea": 450.5,
+      "requester": "64f0000000000000000000c2",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c2",
+        "name": "Neha Patel",
+        "phone": "9123456780",
+        "role": "agent",
+        "companyName": "Patel Estates",
+        "designation": "Sales Associate",
+        "reraAgentNo": null,
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "employer"
+      },
+      "note": "Client ready hai",
+      "status": "cancelled",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-18T13:00:00.000Z",
+      "decidedBy": "64f0000000000000000000c2",
+      "decisionReason": "CANCELLED_BY_REQUESTER",
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a966",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c2",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000207",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001006",
+      "plotNumber": "6",
+      "plotArea": 360,
+      "requester": "64f0000000000000000000c1",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c1",
+        "name": "Rahul Shah",
+        "phone": "9876543210",
+        "role": "captain",
+        "companyName": "ABC Realty",
+        "designation": "Sales Associate",
+        "reraAgentNo": "A51700012345",
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "builder_flag"
+      },
+      "note": "Client ready hai",
+      "status": "expired",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-17T10:00:00.000Z",
+      "decidedBy": null,
+      "decisionReason": "EXPIRED",
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a967",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c1",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000208",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001006",
+      "plotNumber": "6",
+      "plotArea": 360,
+      "requester": "64f0000000000000000000c2",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c2",
+        "name": "Neha Patel",
+        "phone": "9123456780",
+        "role": "agent",
+        "companyName": "Patel Estates",
+        "designation": "Sales Associate",
+        "reraAgentNo": null,
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "employer"
+      },
+      "note": "Client ready hai",
+      "status": "released",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-16T10:00:00.000Z",
+      "decidedBy": "64f0000000000000000000b1",
+      "decisionReason": "RELEASED_BY_OWNER",
+      "autoRejected": false,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a968",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c2",
+          "type": "created"
+        }
+      ]
+    },
+    {
+      "id": "64f000000000000000000209",
+      "projectId": "64f000000000000000000001",
+      "layoutId": "64f0000000000000000000a1",
+      "plotId": "64f000000000000000001001",
+      "plotNumber": "1",
+      "plotArea": 450.5,
+      "requester": "64f0000000000000000000c2",
+      "requesterSnapshot": {
+        "id": "64f0000000000000000000c2",
+        "name": "Neha Patel",
+        "phone": "9123456780",
+        "role": "agent",
+        "companyName": "Patel Estates",
+        "designation": "Sales Associate",
+        "reraAgentNo": null,
+        "profilePictureUrl": null,
+        "businessCity": "Ahmedabad",
+        "verified": true,
+        "verifiedVia": "employer"
+      },
+      "note": "Client ready hai",
+      "status": "rejected",
+      "createdAt": "2026-11-20T10:00:00.000Z",
+      "expiresAt": "2026-11-23T10:00:00.000Z",
+      "decidedAt": "2026-11-15T10:00:00.000Z",
+      "decidedBy": "64f0000000000000000000b1",
+      "decisionReason": "AUTO_PLOT_ALLOTTED",
+      "autoRejected": true,
+      "idempotencyKey": "3b241101-e2bb-4255-8caf-4136c566a969",
+      "events": [
+        {
+          "at": "2026-11-20T10:00:00.000Z",
+          "by": "64f0000000000000000000c2",
+          "type": "created"
+        }
+      ]
+    }
+  ],
+  "payloads": {
+    "public": {
+      "layoutId": "64f0000000000000000000a1",
+      "version": 3,
+      "seq": 7,
+      "project": {
+        "name": "Green Valley Plots",
+        "city": "Nagpur"
+      },
+      "image": {
+        "url": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+        "w": 2000,
+        "h": 1400
+      },
+      "plots": [
+        {
+          "id": "64f000000000000000001001",
+          "key": "p1",
+          "number": "1",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.1
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.05,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.2
+          ],
+          "area": 450.5,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001002",
+          "key": "p2",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.22,
+              0.1
+            ],
+            [
+              0.37,
+              0.1
+            ],
+            [
+              0.37,
+              0.3
+            ],
+            [
+              0.22,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.2
+          ],
+          "area": 388,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001003",
+          "key": "p3",
+          "number": "3",
+          "kind": "plot",
+          "poly": [
+            [
+              0.39,
+              0.1
+            ],
+            [
+              0.54,
+              0.1
+            ],
+            [
+              0.54,
+              0.3
+            ],
+            [
+              0.39,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.465,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001004",
+          "key": "p4",
+          "number": "4",
+          "kind": "plot",
+          "poly": [
+            [
+              0.56,
+              0.1
+            ],
+            [
+              0.71,
+              0.1
+            ],
+            [
+              0.71,
+              0.3
+            ],
+            [
+              0.56,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.635,
+            0.2
+          ],
+          "area": 410.25,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001005",
+          "key": "p5",
+          "number": "12A",
+          "kind": "plot",
+          "poly": [
+            [
+              0.73,
+              0.1
+            ],
+            [
+              0.88,
+              0.1
+            ],
+            [
+              0.88,
+              0.3
+            ],
+            [
+              0.73,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.805,
+            0.2
+          ],
+          "area": 376,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001006",
+          "key": "p6",
+          "number": "6",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.4
+            ],
+            [
+              0.2,
+              0.4
+            ],
+            [
+              0.2,
+              0.6
+            ],
+            [
+              0.05,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.5
+          ],
+          "area": 360,
+          "areaUnit": "sqm",
+          "areaApprox": true,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001007",
+          "key": "p7",
+          "number": null,
+          "kind": "cp",
+          "poly": [
+            [
+              0.22,
+              0.4
+            ],
+            [
+              0.37,
+              0.4
+            ],
+            [
+              0.37,
+              0.6
+            ],
+            [
+              0.22,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.5
+          ],
+          "area": 1333.27,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "C.P."
+        },
+        {
+          "id": "64f000000000000000001008",
+          "key": "p8",
+          "number": null,
+          "kind": "road",
+          "poly": [
+            [
+              0.05,
+              0.7
+            ],
+            [
+              0.95,
+              0.7
+            ],
+            [
+              0.95,
+              0.8
+            ],
+            [
+              0.05,
+              0.8
+            ]
+          ],
+          "labelAt": [
+            0.5,
+            0.75
+          ],
+          "area": null,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "30 Mt Wide Road"
+        }
+      ],
+      "counts": {
+        "plots": 6,
+        "available": 3,
+        "booked": 3
+      }
+    },
+    "broker_agentA": {
+      "layoutId": "64f0000000000000000000a1",
+      "version": 3,
+      "seq": 7,
+      "project": {
+        "name": "Green Valley Plots",
+        "city": "Nagpur"
+      },
+      "image": {
+        "url": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+        "w": 2000,
+        "h": 1400
+      },
+      "plots": [
+        {
+          "id": "64f000000000000000001001",
+          "key": "p1",
+          "number": "1",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.1
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.05,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.2
+          ],
+          "area": 450.5,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001002",
+          "key": "p2",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.22,
+              0.1
+            ],
+            [
+              0.37,
+              0.1
+            ],
+            [
+              0.37,
+              0.3
+            ],
+            [
+              0.22,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.2
+          ],
+          "area": 388,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001003",
+          "key": "p3",
+          "number": "3",
+          "kind": "plot",
+          "poly": [
+            [
+              0.39,
+              0.1
+            ],
+            [
+              0.54,
+              0.1
+            ],
+            [
+              0.54,
+              0.3
+            ],
+            [
+              0.39,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.465,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001004",
+          "key": "p4",
+          "number": "4",
+          "kind": "plot",
+          "poly": [
+            [
+              0.56,
+              0.1
+            ],
+            [
+              0.71,
+              0.1
+            ],
+            [
+              0.71,
+              0.3
+            ],
+            [
+              0.56,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.635,
+            0.2
+          ],
+          "area": 410.25,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001005",
+          "key": "p5",
+          "number": "12A",
+          "kind": "plot",
+          "poly": [
+            [
+              0.73,
+              0.1
+            ],
+            [
+              0.88,
+              0.1
+            ],
+            [
+              0.88,
+              0.3
+            ],
+            [
+              0.73,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.805,
+            0.2
+          ],
+          "area": 376,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001006",
+          "key": "p6",
+          "number": "6",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.4
+            ],
+            [
+              0.2,
+              0.4
+            ],
+            [
+              0.2,
+              0.6
+            ],
+            [
+              0.05,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.5
+          ],
+          "area": 360,
+          "areaUnit": "sqm",
+          "areaApprox": true,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001007",
+          "key": "p7",
+          "number": null,
+          "kind": "cp",
+          "poly": [
+            [
+              0.22,
+              0.4
+            ],
+            [
+              0.37,
+              0.4
+            ],
+            [
+              0.37,
+              0.6
+            ],
+            [
+              0.22,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.5
+          ],
+          "area": 1333.27,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "C.P."
+        },
+        {
+          "id": "64f000000000000000001008",
+          "key": "p8",
+          "number": null,
+          "kind": "road",
+          "poly": [
+            [
+              0.05,
+              0.7
+            ],
+            [
+              0.95,
+              0.7
+            ],
+            [
+              0.95,
+              0.8
+            ],
+            [
+              0.05,
+              0.8
+            ]
+          ],
+          "labelAt": [
+            0.5,
+            0.75
+          ],
+          "area": null,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "30 Mt Wide Road"
+        }
+      ],
+      "counts": {
+        "plots": 6,
+        "available": 3,
+        "booked": 3
+      },
+      "viewer": {
+        "role": "broker",
+        "canRequest": true,
+        "reason": null
+      },
+      "myRequests": [
+        {
+          "bookingId": "64f000000000000000000201",
+          "plotId": "64f000000000000000001002",
+          "status": "pending",
+          "createdAt": "2026-11-20T10:00:00.000Z",
+          "expiresAt": "2026-11-23T10:00:00.000Z"
+        },
+        {
+          "bookingId": "64f000000000000000000203",
+          "plotId": "64f000000000000000001003",
+          "status": "approved",
+          "createdAt": "2026-11-20T10:00:00.000Z",
+          "expiresAt": "2026-11-23T10:00:00.000Z"
+        }
+      ]
+    },
+    "broker_agentB": {
+      "layoutId": "64f0000000000000000000a1",
+      "version": 3,
+      "seq": 7,
+      "project": {
+        "name": "Green Valley Plots",
+        "city": "Nagpur"
+      },
+      "image": {
+        "url": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+        "w": 2000,
+        "h": 1400
+      },
+      "plots": [
+        {
+          "id": "64f000000000000000001001",
+          "key": "p1",
+          "number": "1",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.1
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.05,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.2
+          ],
+          "area": 450.5,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001002",
+          "key": "p2",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.22,
+              0.1
+            ],
+            [
+              0.37,
+              0.1
+            ],
+            [
+              0.37,
+              0.3
+            ],
+            [
+              0.22,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.2
+          ],
+          "area": 388,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001003",
+          "key": "p3",
+          "number": "3",
+          "kind": "plot",
+          "poly": [
+            [
+              0.39,
+              0.1
+            ],
+            [
+              0.54,
+              0.1
+            ],
+            [
+              0.54,
+              0.3
+            ],
+            [
+              0.39,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.465,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001004",
+          "key": "p4",
+          "number": "4",
+          "kind": "plot",
+          "poly": [
+            [
+              0.56,
+              0.1
+            ],
+            [
+              0.71,
+              0.1
+            ],
+            [
+              0.71,
+              0.3
+            ],
+            [
+              0.56,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.635,
+            0.2
+          ],
+          "area": 410.25,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001005",
+          "key": "p5",
+          "number": "12A",
+          "kind": "plot",
+          "poly": [
+            [
+              0.73,
+              0.1
+            ],
+            [
+              0.88,
+              0.1
+            ],
+            [
+              0.88,
+              0.3
+            ],
+            [
+              0.73,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.805,
+            0.2
+          ],
+          "area": 376,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001006",
+          "key": "p6",
+          "number": "6",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.4
+            ],
+            [
+              0.2,
+              0.4
+            ],
+            [
+              0.2,
+              0.6
+            ],
+            [
+              0.05,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.5
+          ],
+          "area": 360,
+          "areaUnit": "sqm",
+          "areaApprox": true,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001007",
+          "key": "p7",
+          "number": null,
+          "kind": "cp",
+          "poly": [
+            [
+              0.22,
+              0.4
+            ],
+            [
+              0.37,
+              0.4
+            ],
+            [
+              0.37,
+              0.6
+            ],
+            [
+              0.22,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.5
+          ],
+          "area": 1333.27,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "C.P."
+        },
+        {
+          "id": "64f000000000000000001008",
+          "key": "p8",
+          "number": null,
+          "kind": "road",
+          "poly": [
+            [
+              0.05,
+              0.7
+            ],
+            [
+              0.95,
+              0.7
+            ],
+            [
+              0.95,
+              0.8
+            ],
+            [
+              0.05,
+              0.8
+            ]
+          ],
+          "labelAt": [
+            0.5,
+            0.75
+          ],
+          "area": null,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "30 Mt Wide Road"
+        }
+      ],
+      "counts": {
+        "plots": 6,
+        "available": 3,
+        "booked": 3
+      },
+      "viewer": {
+        "role": "broker",
+        "canRequest": true,
+        "reason": null
+      },
+      "myRequests": [
+        {
+          "bookingId": "64f000000000000000000202",
+          "plotId": "64f000000000000000001002",
+          "status": "pending",
+          "createdAt": "2026-11-20T10:00:00.000Z",
+          "expiresAt": "2026-11-23T10:00:00.000Z"
+        },
+        {
+          "bookingId": "64f000000000000000000204",
+          "plotId": "64f000000000000000001004",
+          "status": "approved",
+          "createdAt": "2026-11-20T10:00:00.000Z",
+          "expiresAt": "2026-11-23T10:00:00.000Z"
+        }
+      ]
+    },
+    "broker_agentC_unverified": {
+      "layoutId": "64f0000000000000000000a1",
+      "version": 3,
+      "seq": 7,
+      "project": {
+        "name": "Green Valley Plots",
+        "city": "Nagpur"
+      },
+      "image": {
+        "url": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+        "w": 2000,
+        "h": 1400
+      },
+      "plots": [
+        {
+          "id": "64f000000000000000001001",
+          "key": "p1",
+          "number": "1",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.1
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.05,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.2
+          ],
+          "area": 450.5,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001002",
+          "key": "p2",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.22,
+              0.1
+            ],
+            [
+              0.37,
+              0.1
+            ],
+            [
+              0.37,
+              0.3
+            ],
+            [
+              0.22,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.2
+          ],
+          "area": 388,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001003",
+          "key": "p3",
+          "number": "3",
+          "kind": "plot",
+          "poly": [
+            [
+              0.39,
+              0.1
+            ],
+            [
+              0.54,
+              0.1
+            ],
+            [
+              0.54,
+              0.3
+            ],
+            [
+              0.39,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.465,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001004",
+          "key": "p4",
+          "number": "4",
+          "kind": "plot",
+          "poly": [
+            [
+              0.56,
+              0.1
+            ],
+            [
+              0.71,
+              0.1
+            ],
+            [
+              0.71,
+              0.3
+            ],
+            [
+              0.56,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.635,
+            0.2
+          ],
+          "area": 410.25,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001005",
+          "key": "p5",
+          "number": "12A",
+          "kind": "plot",
+          "poly": [
+            [
+              0.73,
+              0.1
+            ],
+            [
+              0.88,
+              0.1
+            ],
+            [
+              0.88,
+              0.3
+            ],
+            [
+              0.73,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.805,
+            0.2
+          ],
+          "area": 376,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked"
+        },
+        {
+          "id": "64f000000000000000001006",
+          "key": "p6",
+          "number": "6",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.4
+            ],
+            [
+              0.2,
+              0.4
+            ],
+            [
+              0.2,
+              0.6
+            ],
+            [
+              0.05,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.5
+          ],
+          "area": 360,
+          "areaUnit": "sqm",
+          "areaApprox": true,
+          "status": "available"
+        },
+        {
+          "id": "64f000000000000000001007",
+          "key": "p7",
+          "number": null,
+          "kind": "cp",
+          "poly": [
+            [
+              0.22,
+              0.4
+            ],
+            [
+              0.37,
+              0.4
+            ],
+            [
+              0.37,
+              0.6
+            ],
+            [
+              0.22,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.5
+          ],
+          "area": 1333.27,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "C.P."
+        },
+        {
+          "id": "64f000000000000000001008",
+          "key": "p8",
+          "number": null,
+          "kind": "road",
+          "poly": [
+            [
+              0.05,
+              0.7
+            ],
+            [
+              0.95,
+              0.7
+            ],
+            [
+              0.95,
+              0.8
+            ],
+            [
+              0.05,
+              0.8
+            ]
+          ],
+          "labelAt": [
+            0.5,
+            0.75
+          ],
+          "area": null,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "30 Mt Wide Road"
+        }
+      ],
+      "counts": {
+        "plots": 6,
+        "available": 3,
+        "booked": 3
+      },
+      "viewer": {
+        "role": "broker",
+        "canRequest": false,
+        "reason": "NOT_VERIFIED_AGENT"
+      },
+      "myRequests": []
+    },
+    "ownerSide": {
+      "layoutId": "64f0000000000000000000a1",
+      "version": 3,
+      "seq": 7,
+      "project": {
+        "name": "Green Valley Plots",
+        "city": "Nagpur"
+      },
+      "image": {
+        "url": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+        "w": 2000,
+        "h": 1400
+      },
+      "plots": [
+        {
+          "id": "64f000000000000000001001",
+          "key": "p1",
+          "number": "1",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.1
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.2,
+              0.3
+            ],
+            [
+              0.05,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.2
+          ],
+          "area": 450.5,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available",
+          "statusVersion": 0,
+          "pendingCount": 0,
+          "booking": null
+        },
+        {
+          "id": "64f000000000000000001002",
+          "key": "p2",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.22,
+              0.1
+            ],
+            [
+              0.37,
+              0.1
+            ],
+            [
+              0.37,
+              0.3
+            ],
+            [
+              0.22,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.2
+          ],
+          "area": 388,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "available",
+          "statusVersion": 0,
+          "pendingCount": 2,
+          "booking": null
+        },
+        {
+          "id": "64f000000000000000001003",
+          "key": "p3",
+          "number": "3",
+          "kind": "plot",
+          "poly": [
+            [
+              0.39,
+              0.1
+            ],
+            [
+              0.54,
+              0.1
+            ],
+            [
+              0.54,
+              0.3
+            ],
+            [
+              0.39,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.465,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "booked",
+          "statusVersion": 1,
+          "pendingCount": 0,
+          "booking": {
+            "id": "64f000000000000000000203",
+            "status": "approved",
+            "since": "2026-11-20T12:00:00.000Z",
+            "requester": {
+              "id": "64f0000000000000000000c1",
+              "name": "Rahul Shah",
+              "companyName": "ABC Realty",
+              "phone": "9876543210"
+            }
+          }
+        },
+        {
+          "id": "64f000000000000000001004",
+          "key": "p4",
+          "number": "4",
+          "kind": "plot",
+          "poly": [
+            [
+              0.56,
+              0.1
+            ],
+            [
+              0.71,
+              0.1
+            ],
+            [
+              0.71,
+              0.3
+            ],
+            [
+              0.56,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.635,
+            0.2
+          ],
+          "area": 410.25,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "sold",
+          "statusVersion": 1,
+          "pendingCount": 0,
+          "booking": {
+            "id": "64f000000000000000000204",
+            "status": "approved",
+            "since": "2026-11-19T12:00:00.000Z",
+            "requester": {
+              "id": "64f0000000000000000000c2",
+              "name": "Neha Patel",
+              "companyName": "Patel Estates",
+              "phone": "9123456780"
+            }
+          }
+        },
+        {
+          "id": "64f000000000000000001005",
+          "key": "p5",
+          "number": "12A",
+          "kind": "plot",
+          "poly": [
+            [
+              0.73,
+              0.1
+            ],
+            [
+              0.88,
+              0.1
+            ],
+            [
+              0.88,
+              0.3
+            ],
+            [
+              0.73,
+              0.3
+            ]
+          ],
+          "labelAt": [
+            0.805,
+            0.2
+          ],
+          "area": 376,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "status": "on-hold",
+          "statusVersion": 1,
+          "pendingCount": 0,
+          "booking": null
+        },
+        {
+          "id": "64f000000000000000001006",
+          "key": "p6",
+          "number": "6",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.4
+            ],
+            [
+              0.2,
+              0.4
+            ],
+            [
+              0.2,
+              0.6
+            ],
+            [
+              0.05,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.5
+          ],
+          "area": 360,
+          "areaUnit": "sqm",
+          "areaApprox": true,
+          "status": "available",
+          "statusVersion": 0,
+          "pendingCount": 0,
+          "booking": null
+        },
+        {
+          "id": "64f000000000000000001007",
+          "key": "p7",
+          "number": null,
+          "kind": "cp",
+          "poly": [
+            [
+              0.22,
+              0.4
+            ],
+            [
+              0.37,
+              0.4
+            ],
+            [
+              0.37,
+              0.6
+            ],
+            [
+              0.22,
+              0.6
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.5
+          ],
+          "area": 1333.27,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "C.P."
+        },
+        {
+          "id": "64f000000000000000001008",
+          "key": "p8",
+          "number": null,
+          "kind": "road",
+          "poly": [
+            [
+              0.05,
+              0.7
+            ],
+            [
+              0.95,
+              0.7
+            ],
+            [
+              0.95,
+              0.8
+            ],
+            [
+              0.05,
+              0.8
+            ]
+          ],
+          "labelAt": [
+            0.5,
+            0.75
+          ],
+          "area": null,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": "30 Mt Wide Road"
+        }
+      ],
+      "counts": {
+        "plots": 6,
+        "available": 3,
+        "booked": 1,
+        "sold": 1,
+        "onHold": 1,
+        "pending": 2
+      },
+      "viewer": {
+        "role": "owner_side",
+        "canRequest": false,
+        "reason": "OWNER_SIDE"
+      }
+    }
+  },
+  "statusPoll": {
+    "contract": "A since request returns exactly one of: {layoutId,version,seq,changed:false} when since===seq, or {layoutId,version,seq,changed:true,statuses} otherwise (owner side adds pending). Never the full payload, never an image or poly. statuses covers every kind:plot plot, not a delta.",
+    "unchanged": {
+      "audience": "public|broker|owner_side",
+      "request": "?since=7",
+      "response": {
+        "layoutId": "64f0000000000000000000a1",
+        "version": 3,
+        "seq": 7,
+        "changed": false
+      }
+    },
+    "changedPublic": {
+      "audience": "public|broker",
+      "request": "?since=5",
+      "response": {
+        "layoutId": "64f0000000000000000000a1",
+        "version": 3,
+        "seq": 7,
+        "changed": true,
+        "statuses": {
+          "64f000000000000000001001": "available",
+          "64f000000000000000001002": "available",
+          "64f000000000000000001003": "booked",
+          "64f000000000000000001004": "booked",
+          "64f000000000000000001005": "booked",
+          "64f000000000000000001006": "available"
+        }
+      }
+    },
+    "changedOwner": {
+      "audience": "owner_side",
+      "request": "?since=5",
+      "response": {
+        "layoutId": "64f0000000000000000000a1",
+        "version": 3,
+        "seq": 7,
+        "changed": true,
+        "statuses": {
+          "64f000000000000000001001": "available",
+          "64f000000000000000001002": "available",
+          "64f000000000000000001003": "booked",
+          "64f000000000000000001004": "sold",
+          "64f000000000000000001005": "on-hold",
+          "64f000000000000000001006": "available"
+        },
+        "pending": {
+          "64f000000000000000001002": 2
+        }
+      }
+    },
+    "versionBump": {
+      "audience": "public|broker|owner_side",
+      "note": "After a publish the live layout is a new document and its seq is old seq + 1. The poll still answers changed:true with the new layoutId/version; the client sees the layoutId/version differ from what it holds, ignores statuses and fetches the full payload.",
+      "request": "?since=7",
+      "response": {
+        "layoutId": "64f0000000000000000000a3",
+        "version": 4,
+        "seq": 8,
+        "changed": true,
+        "statuses": {
+          "64f000000000000000001001": "available",
+          "64f000000000000000001002": "available",
+          "64f000000000000000001003": "booked",
+          "64f000000000000000001004": "booked",
+          "64f000000000000000001005": "booked",
+          "64f000000000000000001006": "available"
+        }
+      },
+      "clientHolds": {
+        "layoutId": "64f0000000000000000000a1",
+        "version": 3,
+        "seq": 7
+      },
+      "clientAction": "refetch_full_payload"
+    },
+    "clientRules": [
+      "Poll E1/E2 every 30 s with ?since=<seq of the last full payload or poll>.",
+      "If response.layoutId or response.version differs from the held values: discard local state, fetch the full payload (no since), ignore statuses.",
+      "Else if changed:true: repaint every plot from statuses and store seq. Owner side then also fetches the full payload once. A broker with at least one own pending request also fetches the full payload once.",
+      "Socket events only trigger the same actions earlier; polling alone is sufficient."
+    ]
+  },
+  "socketEvents": {
+    "plotmap_status": {
+      "namespace": "/public-layout",
+      "room": "plots:64f000000000000000000001",
+      "payload": {
+        "layoutId": "64f0000000000000000000a1",
+        "seq": 8,
+        "changes": [
+          {
+            "id": "64f000000000000000001002",
+            "status": "booked"
+          }
+        ]
+      }
+    },
+    "plotmap_layout": {
+      "namespace": "/public-layout",
+      "room": "plots:64f000000000000000000001",
+      "payload": {
+        "layoutId": "64f0000000000000000000a1",
+        "version": 4
+      }
+    },
+    "plotmap_booking": {
+      "namespace": "/",
+      "room": "64f0000000000000000000b1",
+      "payload": {
+        "projectId": "64f000000000000000000001",
+        "plotId": "64f000000000000000001002",
+        "bookingId": "64f000000000000000000201",
+        "status": "pending",
+        "seq": 7
+      }
+    }
+  },
+  "bookButtonCases": [
+    {
+      "viewer": "anonymous",
+      "plot": "64f000000000000000001001",
+      "expected": {
+        "action": "login_to_book",
+        "enabled": true,
+        "label": "Login karo"
+      }
+    },
+    {
+      "viewer": "broker_agentA",
+      "plot": "64f000000000000000001001",
+      "expected": {
+        "action": "request",
+        "enabled": true,
+        "label": "Book request bhejo"
+      }
+    },
+    {
+      "viewer": "broker_agentA",
+      "plot": "64f000000000000000001002",
+      "expected": {
+        "action": "cancel_request",
+        "enabled": true,
+        "label": "Request bhej di Ã‚Â· Cancel"
+      }
+    },
+    {
+      "viewer": "broker_agentA",
+      "plot": "64f000000000000000001003",
+      "expected": {
+        "action": "approved",
+        "enabled": false,
+        "label": "Approved ho gaya"
+      }
+    },
+    {
+      "viewer": "broker_agentA",
+      "plot": "64f000000000000000001004",
+      "expected": {
+        "action": "unavailable",
+        "enabled": false,
+        "label": "Booked / Sold"
+      }
+    },
+    {
+      "viewer": "broker_agentA",
+      "plot": "64f000000000000000001005",
+      "expected": {
+        "action": "unavailable",
+        "enabled": false,
+        "label": "Booked / Sold"
+      }
+    },
+    {
+      "viewer": "broker_agentB",
+      "plot": "64f000000000000000001002",
+      "expected": {
+        "action": "cancel_request",
+        "enabled": true,
+        "label": "Request bhej di Ã‚Â· Cancel"
+      }
+    },
+    {
+      "viewer": "broker_agentC_unverified",
+      "plot": "64f000000000000000001001",
+      "expected": {
+        "action": "not_eligible",
+        "enabled": false,
+        "label": "Sirf verified agent request bhej sakte hain"
+      }
+    },
+    {
+      "viewer": "ownerSide",
+      "plot": "64f000000000000000001001",
+      "expected": {
+        "action": "owner_actions",
+        "enabled": true,
+        "label": "Sold mark karo",
+        "ownerActions": [
+          "mark_sold"
+        ]
+      }
+    },
+    {
+      "viewer": "ownerSide",
+      "plot": "64f000000000000000001002",
+      "expected": {
+        "action": "owner_actions",
+        "enabled": true,
+        "label": "2 request pending",
+        "ownerActions": [
+          "review_requests",
+          "mark_sold"
+        ]
+      }
+    },
+    {
+      "viewer": "ownerSide",
+      "plot": "64f000000000000000001003",
+      "expected": {
+        "action": "owner_actions",
+        "enabled": true,
+        "label": "Booked",
+        "ownerActions": [
+          "release",
+          "mark_sold"
+        ]
+      }
+    },
+    {
+      "viewer": "ownerSide",
+      "plot": "64f000000000000000001004",
+      "expected": {
+        "action": "owner_actions",
+        "enabled": true,
+        "label": "Sold",
+        "ownerActions": [
+          "release"
+        ]
+      }
+    },
+    {
+      "viewer": "ownerSide",
+      "plot": "64f000000000000000001005",
+      "expected": {
+        "action": "owner_actions",
+        "enabled": true,
+        "label": "On hold",
+        "ownerActions": [
+          "release",
+          "mark_sold"
+        ]
+      }
+    },
+    {
+      "viewer": "public",
+      "plot": "64f000000000000000001007",
+      "expected": {
+        "action": "none",
+        "enabled": false,
+        "label": "C.P."
+      }
+    },
+    {
+      "viewer": "public",
+      "plot": "64f000000000000000001008",
+      "expected": {
+        "action": "none",
+        "enabled": false,
+        "label": "30 Mt Wide Road"
+      }
+    }
+  ],
+  "hitTest": {
+    "renderedWidthPx": 1000,
+    "renderedHeightPx": 700,
+    "slopPx": 12,
+    "rule": "point inside polygon wins; else nearest polygon by edge distance in rendered px if <= slopPx; else null",
+    "cases": [
+      {
+        "x": 0.1,
+        "y": 0.2,
+        "expected": "64f000000000000000001001"
+      },
+      {
+        "x": 0.205,
+        "y": 0.2,
+        "expected": "64f000000000000000001001"
+      },
+      {
+        "x": 0.3,
+        "y": 0.5,
+        "expected": "64f000000000000000001007"
+      },
+      {
+        "x": 0.5,
+        "y": 0.75,
+        "expected": "64f000000000000000001008"
+      },
+      {
+        "x": 0.5,
+        "y": 0.55,
+        "expected": null
+      }
+    ]
+  },
+  "search": {
+    "rule": "normalise query (trim, upper-case, drop chars outside A-Z 0-9 / -); empty => []; result = exact numberNorm matches then prefix matches, plots only, natural order",
+    "cases": [
+      {
+        "query": "1",
+        "expected": [
+          "64f000000000000000001001",
+          "64f000000000000000001005"
+        ]
+      },
+      {
+        "query": "12a",
+        "expected": [
+          "64f000000000000000001005"
+        ]
+      },
+      {
+        "query": " 3 ",
+        "expected": [
+          "64f000000000000000001003"
+        ]
+      },
+      {
+        "query": "",
+        "expected": []
+      },
+      {
+        "query": "zzz",
+        "expected": []
+      }
+    ]
+  },
+  "notifications": [
+    {
+      "event": "request_created",
+      "recipients": [
+        "64f0000000000000000000b1",
+        "64f0000000000000000000b2"
+      ],
+      "type": "plot_booking_request",
+      "title": "Plot 2 ke liye nayi booking request",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001002",
+        "plotNumber": "2",
+        "bookingId": "64f000000000000000000201"
+      }
+    },
+    {
+      "event": "approved",
+      "recipients": [
+        "64f0000000000000000000c1"
+      ],
+      "type": "plot_booking_approved",
+      "title": "Aapki request approve ho gayi",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001003",
+        "plotNumber": "3",
+        "bookingId": "64f000000000000000000203"
+      }
+    },
+    {
+      "event": "rejected_manual",
+      "recipients": [
+        "64f0000000000000000000c1"
+      ],
+      "type": "plot_booking_rejected",
+      "title": "Request reject hui",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001001",
+        "plotNumber": "1",
+        "bookingId": "64f000000000000000000205",
+        "reason": "MANUAL"
+      }
+    },
+    {
+      "event": "rejected_auto",
+      "recipients": [
+        "64f0000000000000000000c2"
+      ],
+      "type": "plot_booking_rejected",
+      "title": "Plot kisi aur ko allot ho gaya",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001001",
+        "plotNumber": "1",
+        "bookingId": "64f000000000000000000209",
+        "reason": "AUTO_PLOT_ALLOTTED"
+      }
+    },
+    {
+      "event": "cancelled_by_requester",
+      "recipients": [
+        "64f0000000000000000000b1",
+        "64f0000000000000000000b2"
+      ],
+      "type": "plot_booking_cancelled",
+      "title": "Broker ne request wapas li",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001001",
+        "plotNumber": "1",
+        "bookingId": "64f000000000000000000206"
+      }
+    },
+    {
+      "event": "expired",
+      "recipients": [
+        "64f0000000000000000000c1",
+        "64f0000000000000000000b1",
+        "64f0000000000000000000b2"
+      ],
+      "type": "plot_booking_expired",
+      "title": "Request expire ho gayi",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001006",
+        "plotNumber": "6",
+        "bookingId": "64f000000000000000000207"
+      }
+    },
+    {
+      "event": "reminder_24",
+      "recipients": [
+        "64f0000000000000000000b1",
+        "64f0000000000000000000b2"
+      ],
+      "type": "plot_booking_reminder",
+      "title": "Plot 2 ki request 24 ghante se pending hai",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001002",
+        "plotNumber": "2",
+        "bookingId": "64f000000000000000000201",
+        "reason": "REMINDER_24"
+      }
+    },
+    {
+      "event": "released",
+      "recipients": [
+        "64f0000000000000000000c2"
+      ],
+      "type": "plot_booking_released",
+      "title": "Plot 6 ab available hai",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001006",
+        "plotNumber": "6",
+        "bookingId": "64f000000000000000000208"
+      }
+    },
+    {
+      "event": "layout_replaced",
+      "recipients": [
+        "64f0000000000000000000c1",
+        "64f0000000000000000000b1",
+        "64f0000000000000000000b2"
+      ],
+      "type": "plot_booking_expired",
+      "title": "Layout badal gaya, Plot 2 ki request hat gayi",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001002",
+        "plotNumber": "2",
+        "bookingId": "64f000000000000000000201",
+        "reason": "LAYOUT_REPLACED"
+      }
+    },
+    {
+      "event": "layout_conflict",
+      "recipients": [
+        "64f0000000000000000000c1",
+        "64f0000000000000000000b1",
+        "64f0000000000000000000b2"
+      ],
+      "type": "plot_booking_expired",
+      "title": "Plot 2 do baar approve ho gaya",
+      "data": {
+        "projectId": "64f000000000000000000001",
+        "slug": "green-valley-plots",
+        "layoutId": "64f0000000000000000000a1",
+        "plotId": "64f000000000000000001002",
+        "plotNumber": "2",
+        "bookingId": "64f000000000000000000201",
+        "reason": "LAYOUT_CONFLICT"
+      }
+    }
+  ],
+  "notificationRules": {
+    "neverInclude": [
+      "phone",
+      "email"
+    ],
+    "recipientsExcludeActor": true,
+    "ownerSideRecipients": "project.owner + project.builder + project.coCaptains (unique, minus actor). Admin and assignedAgent are NOT notified."
+  },
+  "errorCodes": {
+    "400": [
+      "INVALID_PROJECT_ID",
+      "INVALID_BODY",
+      "INVALID_QUERY",
+      "INVALID_NOTE",
+      "INVALID_NUMBER",
+      "INVALID_IMAGE_KEY",
+      "IDEMPOTENCY_KEY_REQUIRED"
+    ],
+    "401": [
+      "UNAUTHENTICATED"
+    ],
+    "403": [
+      "FORBIDDEN",
+      "OWNER_SIDE_CANNOT_REQUEST",
+      "NOT_ELIGIBLE"
+    ],
+    "404": [
+      "PLOTMAP_NOT_AVAILABLE",
+      "PLOT_NOT_FOUND",
+      "BOOKING_NOT_FOUND",
+      "LAYOUT_NOT_FOUND",
+      "RUN_NOT_FOUND"
+    ],
+    "409": [
+      "PLOT_NOT_AVAILABLE",
+      "ALREADY_PENDING",
+      "NOT_PENDING",
+      "REQUEST_EXPIRED",
+      "LAYOUT_PUBLISHING",
+      "LAYOUT_VERSION",
+      "PUBLISH_BLOCKED",
+      "BOOKED_PLOTS_UNMATCHED",
+      "DUP_NUMBER",
+      "NOT_DRAFT",
+      "ALREADY_RUNNING",
+      "NOT_PLOT_PROJECT",
+      "STATUS_CONFLICT",
+      "TOO_MANY_PENDING_ON_PLOT",
+      "IDEMPOTENCY_KEY_REUSED"
+    ],
+    "413": [
+      "TOO_LARGE"
+    ],
+    "422": [
+      "IMAGE_TOO_SMALL",
+      "IMAGE_UNREADABLE"
+    ],
+    "429": [
+      "TOO_MANY_PENDING",
+      "DAILY_LIMIT",
+      "QUOTA"
+    ],
+    "500": [
+      "INTERNAL_ERROR",
+      "OIDC_NOT_CONFIGURED"
+    ],
+    "502": [
+      "JOB_START_FAILED"
+    ],
+    "503": [
+      "GENERATOR_NOT_CONFIGURED",
+      "NOT_CONFIGURED"
+    ]
+  },
+  "normalise": {
+    "contract": "normalisePlotNumber(raw): string | null. null = invalid, \"\" = absent, otherwise the normalised number. After toUpperCase and removing whitespace, any char outside A-Z 0-9 / - makes the result null (errata 6; \"12.5\" must not merge with plot 125); max 20.",
+    "cases": [
+      {
+        "input": " 12a ",
+        "expected": "12A"
+      },
+      {
+        "input": "12-A",
+        "expected": "12-A"
+      },
+      {
+        "input": "12 / A",
+        "expected": "12/A"
+      },
+      {
+        "input": "ab/12-c",
+        "expected": "AB/12-C"
+      },
+      {
+        "input": "#!",
+        "expected": null
+      },
+      {
+        "input": "à¥§à¥¨",
+        "expected": null
+      },
+      {
+        "input": "",
+        "expected": ""
+      },
+      {
+        "input": "   ",
+        "expected": ""
+      },
+      {
+        "input": null,
+        "expected": ""
+      },
+      {
+        "inputRepeat": {
+          "char": "1",
+          "count": 20
+        },
+        "expectedRepeat": {
+          "char": "1",
+          "count": 20
+        }
+      },
+      {
+        "inputRepeat": {
+          "char": "1",
+          "count": 21
+        },
+        "expected": null
+      },
+      {
+        "input": "a b c",
+        "expected": "ABC"
+      },
+      {
+        "input": "12.5",
+        "expected": null
+      }
+    ]
+  },
+  "ownerDraftReview": {
+    "note": "E6 GET :base/layouts/:layoutId for a draft in state review. plots hold only non-deleted plots (one road box was deleted in Check & fix, so layout.stats.roads is 0 while generation.stats.roads is still 1). generation.stats is frozen, layout.stats is live. flags/conf/provenance appear only in this draft shape. numberNorm and deleted never appear.",
+    "response": {
+      "layout": {
+        "id": "64f0000000000000000000a2",
+        "state": "review",
+        "isDraft": true,
+        "isLive": false,
+        "version": 2,
+        "seq": 0,
+        "image": {
+          "url": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/7d41-draft.png",
+          "w": 2000,
+          "h": 1400
+        },
+        "createdAt": "2026-11-20T09:00:00.000Z",
+        "stats": {
+          "plots": 4,
+          "cp": 1,
+          "roads": 0,
+          "flagged": 3
+        },
+        "generation": {
+          "startedAt": "2026-11-20T09:00:05.000Z",
+          "finishedAt": "2026-11-20T09:03:40.000Z",
+          "provider": "cv-ocr",
+          "model": null,
+          "warnings": [
+            {
+              "code": "LOW_RESOLUTION",
+              "message": "Image 1200 px hai, 1500 px se upar behtar rehta hai"
+            }
+          ],
+          "stats": {
+            "plots": 4,
+            "cp": 1,
+            "roads": 1,
+            "flagged": 3
+          },
+          "failure": null
+        }
+      },
+      "plots": [
+        {
+          "id": "64f000000000000000002001",
+          "key": "p1",
+          "number": "1",
+          "kind": "plot",
+          "poly": [
+            [
+              0.05,
+              0.1
+            ],
+            [
+              0.2,
+              0.1
+            ],
+            [
+              0.2,
+              0.30000000000000004
+            ],
+            [
+              0.05,
+              0.30000000000000004
+            ]
+          ],
+          "labelAt": [
+            0.125,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": null,
+          "status": "available",
+          "statusVersion": 0,
+          "flags": [],
+          "conf": {
+            "geometry": 0.97,
+            "number": 0.95,
+            "area": 0.9
+          },
+          "provenance": "ai"
+        },
+        {
+          "id": "64f000000000000000002002",
+          "key": "p2",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.22,
+              0.1
+            ],
+            [
+              0.37,
+              0.1
+            ],
+            [
+              0.37,
+              0.30000000000000004
+            ],
+            [
+              0.22,
+              0.30000000000000004
+            ]
+          ],
+          "labelAt": [
+            0.295,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": null,
+          "status": "available",
+          "statusVersion": 0,
+          "flags": [
+            "low_conf"
+          ],
+          "conf": {
+            "geometry": 0.9,
+            "number": 0.55,
+            "area": 0.9
+          },
+          "provenance": "ai"
+        },
+        {
+          "id": "64f000000000000000002003",
+          "key": "p3",
+          "number": null,
+          "kind": "plot",
+          "poly": [
+            [
+              0.39,
+              0.1
+            ],
+            [
+              0.54,
+              0.1
+            ],
+            [
+              0.54,
+              0.30000000000000004
+            ],
+            [
+              0.39,
+              0.30000000000000004
+            ]
+          ],
+          "labelAt": [
+            0.465,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": null,
+          "status": "available",
+          "statusVersion": 0,
+          "flags": [
+            "no_number"
+          ],
+          "conf": {
+            "geometry": 0.9,
+            "number": 0,
+            "area": 0.9
+          },
+          "provenance": "ai"
+        },
+        {
+          "id": "64f000000000000000002004",
+          "key": "p4",
+          "number": "2",
+          "kind": "plot",
+          "poly": [
+            [
+              0.56,
+              0.1
+            ],
+            [
+              0.7100000000000001,
+              0.1
+            ],
+            [
+              0.7100000000000001,
+              0.30000000000000004
+            ],
+            [
+              0.56,
+              0.30000000000000004
+            ]
+          ],
+          "labelAt": [
+            0.635,
+            0.2
+          ],
+          "area": 400,
+          "areaUnit": "sqm",
+          "areaApprox": false,
+          "label": null,
+          "status": "available",
+          "statusVersion": 0,
+          "flags": [
+            "dup_number"
+          ],
+          "conf": {
+            "geometry": 0.9,
+            "number": 0.8,
+            "area": 0.9
+          },
+          "provenance": "ai"
+        },
+        {
+          "id": "64f000000000000000002005",
+          "key": "p5",
+          "number": null,
+          "kind": "cp",
+          "poly": [
+            [
+              0.73,
+              0.1
+            ],
+            [
+              0.88,
+              0.1
+            ],
+            [
+              0.88,
+              0.30000000000000004
+            ],
+            [
+              0.73,
+              0.30000000000000004
+            ]
+          ],
+          "labelAt": [
+            0.805,
+            0.2
+          ],
+          "area": null,
+          "areaUnit": null,
+          "areaApprox": false,
+          "label": "C.P.",
+          "flags": [],
+          "conf": {
+            "geometry": 0.9,
+            "number": 0.9,
+            "area": 0
+          },
+          "provenance": "ai"
+        }
+      ],
+      "blockers": [
+        {
+          "code": "NO_NUMBER",
+          "plotIds": [
+            "64f000000000000000002003"
+          ],
+          "count": 1
+        },
+        {
+          "code": "DUP_NUMBER",
+          "plotIds": [
+            "64f000000000000000002004"
+          ],
+          "count": 1
+        }
+      ]
+    },
+    "publishBlocked": {
+      "httpStatus": 409,
+      "request": {
+        "expectedVersion": 2
+      },
+      "body": {
+        "error": "Publish se pehle plot numbers theek karein",
+        "code": "PUBLISH_BLOCKED",
+        "blockers": [
+          {
+            "code": "NO_NUMBER",
+            "plotIds": [
+              "64f000000000000000002003"
+            ],
+            "count": 1
+          },
+          {
+            "code": "DUP_NUMBER",
+            "plotIds": [
+              "64f000000000000000002004"
+            ],
+            "count": 1
+          }
+        ]
+      }
+    },
+    "bookedPlotsUnmatched": {
+      "httpStatus": 409,
+      "request": {
+        "expectedVersion": 3
+      },
+      "body": {
+        "error": "Booked plots naye layout mein nahi mil rahe",
+        "code": "BOOKED_PLOTS_UNMATCHED",
+        "unmatched": [
+          {
+            "number": "3",
+            "status": "booked",
+            "plotId": "64f000000000000000001003"
+          }
+        ]
+      }
+    },
+    "numberEdit": {
+      "request": {
+        "number": " 3 "
+      },
+      "response": {
+        "plot": {
+          "id": "64f000000000000000002003",
+          "number": "3",
+          "flags": [],
+          "provenance": "edited"
+        },
+        "reflagged": [],
+        "layout": {
+          "version": 3,
+          "blockers": [
+            {
+              "code": "DUP_NUMBER",
+              "plotIds": [
+                "64f000000000000000002004"
+              ],
+              "count": 1
+            }
+          ]
+        }
+      }
+    }
+  },
+  "reconcileCases": {
+    "note": "reconcileBooking(bookingId) after a publish switched Project.plotMap.layoutId from the old layout to the live one. approveStatus is booked. \"self\" = this booking, \"other\" = a different approved booking.",
+    "cases": [
+      {
+        "name": "approved booking on old plot, same number available in live layout: booking moves, live plot becomes booked",
+        "booking": {
+          "status": "approved",
+          "layout": "old",
+          "plotNumber": "3"
+        },
+        "livePlot": {
+          "numberNorm": "3",
+          "status": "available",
+          "bookingId": null
+        },
+        "expected": {
+          "bookingStatus": "approved",
+          "bookingLayout": "live",
+          "decisionReason": null,
+          "livePlotStatus": "booked",
+          "livePlotBookingId": "self",
+          "notify": []
+        }
+      },
+      {
+        "name": "approved booking already moved but plot still available (approve interleaved with publish): plot is claimed",
+        "booking": {
+          "status": "approved",
+          "layout": "live",
+          "plotNumber": "3"
+        },
+        "livePlot": {
+          "numberNorm": "3",
+          "status": "available",
+          "bookingId": null
+        },
+        "expected": {
+          "bookingStatus": "approved",
+          "bookingLayout": "live",
+          "decisionReason": null,
+          "livePlotStatus": "booked",
+          "livePlotBookingId": "self",
+          "notify": []
+        }
+      },
+      {
+        "name": "approved booking, number missing in live layout",
+        "booking": {
+          "status": "approved",
+          "layout": "old",
+          "plotNumber": "3"
+        },
+        "livePlot": null,
+        "expected": {
+          "bookingStatus": "expired",
+          "bookingLayout": "old",
+          "decisionReason": "LAYOUT_REPLACED",
+          "livePlotStatus": null,
+          "livePlotBookingId": null,
+          "notify": [
+            "requester",
+            "owner_side"
+          ]
+        }
+      },
+      {
+        "name": "pending booking, live plot already booked by someone else",
+        "booking": {
+          "status": "pending",
+          "layout": "old",
+          "plotNumber": "3"
+        },
+        "livePlot": {
+          "numberNorm": "3",
+          "status": "booked",
+          "bookingId": "other"
+        },
+        "expected": {
+          "bookingStatus": "rejected",
+          "bookingLayout": "live",
+          "decisionReason": "AUTO_PLOT_ALLOTTED",
+          "livePlotStatus": "booked",
+          "livePlotBookingId": "other",
+          "notify": [
+            "requester"
+          ]
+        }
+      },
+      {
+        "name": "approved booking, live plot already approved for another booking (two approvals across the switch)",
+        "booking": {
+          "status": "approved",
+          "layout": "old",
+          "plotNumber": "3"
+        },
+        "livePlot": {
+          "numberNorm": "3",
+          "status": "booked",
+          "bookingId": "other"
+        },
+        "expected": {
+          "bookingStatus": "expired",
+          "bookingLayout": "old",
+          "decisionReason": "LAYOUT_CONFLICT",
+          "livePlotStatus": "booked",
+          "livePlotBookingId": "other",
+          "notify": [
+            "requester",
+            "owner_side"
+          ]
+        }
+      },
+      {
+        "name": "pending booking, live plot available: booking moves and stays pending",
+        "booking": {
+          "status": "pending",
+          "layout": "old",
+          "plotNumber": "2"
+        },
+        "livePlot": {
+          "numberNorm": "2",
+          "status": "available",
+          "bookingId": null
+        },
+        "expected": {
+          "bookingStatus": "pending",
+          "bookingLayout": "live",
+          "decisionReason": null,
+          "livePlotStatus": "available",
+          "livePlotBookingId": null,
+          "notify": []
+        }
+      }
+    ]
+  },
+  "publicMeta": {
+    "note": "buildPlotMapMeta(payloads.public, slug) in web src/lib/plotMap.mjs; same output shape as buildPlotMeta in plotViewer.mjs minus canonical (built from plotPageUrl(slug), env dependent). Used by /plots/[slug] generateMetadata. A payload with an empty project.city gives description \"Plot layout of {name} on HomeInTown\".",
+    "cases": [
+      {
+        "input": {
+          "payload": "public",
+          "slug": "green-valley-plots"
+        },
+        "expected": {
+          "title": "Green Valley Plots plot layout | HomeInTown",
+          "description": "Nagpur",
+          "image": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+          "noindex": false,
+          "twitterCard": "summary_large_image"
+        }
+      },
+      {
+        "input": {
+          "payload": "public",
+          "slug": "green-valley-plots",
+          "projectOverride": {
+            "name": "Green Valley Plots",
+            "city": ""
+          }
+        },
+        "expected": {
+          "title": "Green Valley Plots plot layout | HomeInTown",
+          "description": "Plot layout of Green Valley Plots on HomeInTown",
+          "image": "https://cdn.example.test/projects/64f000000000000000000001/plotmap-image/9f2c-layout.png",
+          "noindex": false,
+          "twitterCard": "summary_large_image"
+        }
+      }
+    ]
+  },
+  "isPlotProject": {
+    "contract": "Server isPlotProject (4.2 rules 1-3) and the client-side mobile isPlotPropertyType(propertyType, projectType) (errata 2: rules 2 and 3 only, exact match) must agree on these cases.",
+    "cases": [
+      {
+        "propertyType": "Residential Plot",
+        "projectType": null,
+        "expected": true
+      },
+      {
+        "propertyType": "Commercial Plot / Land",
+        "projectType": null,
+        "expected": true
+      },
+      {
+        "propertyType": "Residential + Commercial Plot",
+        "projectType": null,
+        "expected": true
+      },
+      {
+        "propertyType": "Farm Land",
+        "projectType": null,
+        "expected": true
+      },
+      {
+        "propertyType": "",
+        "projectType": "plot",
+        "expected": true
+      },
+      {
+        "propertyType": "Landmark Tower",
+        "projectType": null,
+        "expected": false
+      }
+    ]
+  }
+}
