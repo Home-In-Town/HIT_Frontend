@@ -19,8 +19,12 @@ export interface OwnerHandlers {
   reviewRequests: (plot: PlotMapPlot) => void;
 }
 
+/** hitmobile:// is the app's scheme (app.json); the intent form lets Chrome fall back to the store. */
+export function appOpenHref(slug: string): string {
+  return `intent://plot-map?slug=${encodeURIComponent(slug)}#Intent;scheme=hitmobile;package=in.homeintown.mobile;end`;
+}
 export default function PlotSheet({
-  payload, plot, owner, busy, error, onClose,
+  payload, plot, owner, busy, error, onClose, appSlug,
 }: {
   payload: PlotMapPayload;
   plot: PlotMapPlot;
@@ -28,6 +32,8 @@ export default function PlotSheet({
   busy?: boolean;
   error?: string | null;
   onClose: () => void;
+  /** Project slug; when set, an available plot offers an open-in-app link. */
+  appSlug?: string;
 }) {
   const role = payload.viewer?.role;
   const state = bookButtonState(payload, plot.id);
@@ -133,12 +139,21 @@ export default function PlotSheet({
             {state.label}
           </p>
           <p className="text-gray-600">
-            {role === 'broker'
-              ? 'Plot request bhejne ya wapas lene ke liye HomeInTown mobile app use karein.'
-              : state.action === 'login_to_book'
-                ? 'Booking ke liye HomeInTown app mein login karein.'
+            {plot.status === 'available'
+              ? 'Book karne ke liye app kholo. Plot request sirf HomeInTown mobile app se jati hai.'
+              : role === 'broker'
+                ? 'Plot request bhejne ya wapas lene ke liye HomeInTown mobile app use karein.'
                 : 'Ye plot abhi available nahi hai.'}
           </p>
+          {plot.status === 'available' && appSlug && (
+            // Android intent link: opens the app on this project's map if installed, else Play Store.
+            <a
+              href={appOpenHref(appSlug)}
+              className={`${btn} inline-flex items-center justify-center bg-orange-600 text-white`}
+            >
+              App mein kholo
+            </a>
+          )}
         </div>
       )}
 

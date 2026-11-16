@@ -41,7 +41,7 @@ export default function PublicPlotMapViewer({ slug, initial }: { slug: string; i
         selectedId={selectedId}
         onSelect={setSelectedId}
       />
-      {selected && <PlotSheet payload={current} plot={selected} onClose={() => setSelectedId(null)} />}
+      {selected && <PlotSheet payload={current} plot={selected} appSlug={slug} onClose={() => setSelectedId(null)} />}
     </main>
   );
 }
