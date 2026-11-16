@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/authContext';
+import { useUnreadNotifications } from '@/lib/useUnreadNotifications';
 
 export default function DashboardLayout({
   children,
@@ -16,6 +17,9 @@ export default function DashboardLayout({
   // Ensure active state updates correctly on navigation
 
   const { user, logout } = useAuth();
+  // Polled every 30 s; plot-booking requests and decisions raise it (addendum 11.4).
+  const { unread } = useUnreadNotifications(!!user);
+  const unreadText = unread > 99 ? '99+' : String(unread);
 
   // Fix: Strictly match /dashboard to prevent it from being active on /dashboard/analytics
   const isActive = (path: string) => {
@@ -81,6 +85,18 @@ const orgPath = user
               </Link>
             )}
           </div>
+          <Link
+            href="/dashboard/notifications"
+            aria-label={unread > 0 ? `Notifications, ${unread} nayi` : 'Notifications'}
+            className="relative flex items-center justify-center w-11 h-11 text-gray-600 hover:text-gray-900"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0" />
+            </svg>
+            {unread > 0 && (
+              <span className="absolute top-1 right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-[18px] text-center">{unreadText}</span>
+            )}
+          </Link>
         </div>
       </header>
 
@@ -489,6 +505,28 @@ const orgPath = user
             </Link>
           )}
 
+          {/* Notifications — all roles: plot-booking requests and decisions land here */}
+          <Link
+            href="/dashboard/notifications"
+            onClick={() => setSidebarOpen(false)}
+            className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-xl transition-all ${
+              isActive('/dashboard/notifications')
+                ? 'bg-[#FAF7F2] text-[#B45309] border border-[#B45309]/10 shadow-sm'
+                : 'text-[#57534E] hover:bg-[#FAF7F2] hover:text-[#B45309]'
+            } ${isCollapsed ? 'justify-center px-0 mx-auto w-11' : ''}`}
+            title={isCollapsed ? "Notifications" : ""}
+            aria-label={unread > 0 ? `Notifications, ${unread} nayi` : 'Notifications'}
+          >
+            <span className="relative flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.4-1.4A2 2 0 0118 14.2V11a6 6 0 10-12 0v3.2a2 2 0 01-.6 1.4L4 17h5m6 0a3 3 0 11-6 0" />
+              </svg>
+              {unread > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold leading-[18px] text-center">{unreadText}</span>
+              )}
+            </span>
+            {!isCollapsed && <span className="whitespace-nowrap transition-all duration-200">Notifications</span>}
+          </Link>
           {/* Profile — all roles */}
           <Link
             href="/dashboard/profile"

@@ -448,3 +448,18 @@ export function generationFailureText(code, message) {
   if (code === 'CANCELLED') return 'Layout banana rok diya gaya.';
   return message || 'Layout nahi ban paya. Dobara try karein.';
 }
+
+// ── Notifications ───────────────────────────────────────────────────────────
+
+/**
+ * Where tapping a plot-booking notification goes (addendum 11.3); null for any
+ * other type or one without a project id.
+ * @param {{ type?: string; data?: { projectId?: string; plotId?: string; bookingId?: string } | null }} n
+ */
+export function plotNotificationHref(n) {
+  if (!String(n?.type ?? '').startsWith('plot_booking_') || !n?.data?.projectId) return null;
+  const q = [];
+  if (n.data.plotId) q.push('plot=' + encodeURIComponent(n.data.plotId));
+  if (n.data.bookingId) q.push('booking=' + encodeURIComponent(n.data.bookingId));
+  return '/dashboard/projects/' + encodeURIComponent(n.data.projectId) + '/plot-map' + (q.length ? '?' + q.join('&') : '');
+}

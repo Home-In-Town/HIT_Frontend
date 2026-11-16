@@ -171,11 +171,15 @@ export async function rasterisePage(
   doc: PdfDocument,
   pageNumber: number,
   extraRotationDeg = 0,
+  pixelCapOverride?: number,
 ): Promise<RasterisedPage> {
   const page = await doc.getPage(pageNumber);
   const rotation = (((page.rotate + extraRotationDeg) % 360) + 360) % 360;
   const base = page.getViewport({ scale: 1, rotation });
-  const cap = await getPixelCap();
+  // pixelCapOverride lets the plot-map import retry a page that came out too heavy to upload
+  // at a smaller size; it can only lower the cap, never raise it above what this browser can draw.
+  const deviceCap = await getPixelCap();
+  const cap = pixelCapOverride !== undefined ? Math.max(1, Math.min(pixelCapOverride, deviceCap)) : deviceCap;
   const { scale, reduced } = rasterScale(base.width, base.height, cap);
   if (!(scale > 0)) throw new PdfLayoutError('canvas', 'This page has no usable size.');
   const viewport = page.getViewport({ scale, rotation });

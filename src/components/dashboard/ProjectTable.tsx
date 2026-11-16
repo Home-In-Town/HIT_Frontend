@@ -359,6 +359,17 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
                           >
                             Layout Editor
                           </button>
+                          {project.plotMap?.enabled === true && (
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                router.push(`/dashboard/projects/${project.id}/plot-map`);
+                              }}
+                              className="text-[#57534E] block px-4 py-3 text-sm font-bold hover:bg-[#FAF7F2] hover:text-[#B45309] w-full text-left transition-colors"
+                            >
+                              Plot Map
+                            </button>
+                          )}
                           {project.isPublished && (
                             <button
                             onClick={() => {

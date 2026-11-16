@@ -8,7 +8,7 @@ import {
   normalisePlotNumber, searchPlots, hitTest, bookButtonState, statusLabel, publishBlockers, draftStats,
   orderForReview, countStatuses, buildPlotMapMeta, mapPlotMapField, decidePoll, applyStatuses, applyChanges,
   fitRect, clampTransform, zoomAround, screenToNorm, centerOn, naturalCompare, plotmapErrorText,
-  generationFailureText, flagText, styleForStatus,
+  generationFailureText, flagText, styleForStatus, plotNotificationHref,
 } from './plotMap.mjs';
 
 // The master fixture starts with a UTF-8 BOM (kept byte-identical across repos),
@@ -285,4 +285,18 @@ test('generationFailureText', () => {
   assert.match(generationFailureText('NO_PLOTS_FOUND'), /plots nahi mile/);
   assert.equal(generationFailureText('TOO_MANY_PLOTS', 'Phase-wise alag layout banao'), 'Phase-wise alag layout banao');
   assert.match(generationFailureText('SOMETHING', undefined), /Dobara try/);
+});
+
+// ── notifications ──
+test('plotNotificationHref deep-links every fixture notification to the plot map', () => {
+  for (const n of fx.notifications) {
+    const href = plotNotificationHref({ type: n.type, data: n.data });
+    assert.equal(href, '/dashboard/projects/' + n.data.projectId + '/plot-map?plot=' + n.data.plotId + '&booking=' + n.data.bookingId, n.event);
+  }
+});
+
+test('plotNotificationHref: other types and missing project have no link', () => {
+  assert.equal(plotNotificationHref({ type: 'system', data: { projectId: 'x' } }), null);
+  assert.equal(plotNotificationHref({ type: 'plot_booking_request', data: {} }), null);
+  assert.equal(plotNotificationHref({ type: 'plot_booking_request', data: null }), null);
 });

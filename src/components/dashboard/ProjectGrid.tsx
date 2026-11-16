@@ -96,6 +96,14 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
               >
                 Layout
               </button>
+              {project.plotMap?.enabled === true && (
+                <button
+                  onClick={() => router.push(`/dashboard/projects/${project.id}/plot-map`)}
+                  className="px-4 py-2 text-xs font-bold text-[#B45309] bg-white border border-[#B45309] rounded-xl hover:bg-[#FAF7F2] transition-all"
+                >
+                  Plot Map
+                </button>
+              )}
              {project.isPublished && (
                 <button
                 onClick={() => router.push(`/dashboard/analytics/${project.id}`)}
