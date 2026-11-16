@@ -42,7 +42,10 @@ export default function PlotSheet({
   const wa = whatsappHref(b?.requester.phone, `Plot ${plot.number} ke baare mein`);
 
   // Move focus into the sheet when a plot is picked so keyboard and screen-reader users land on it.
-  useEffect(() => { headingRef.current?.focus(); setConfirm(null); }, [plot.id]);
+  useEffect(() => { headingRef.current?.focus(); }, [plot.id]);
+  // Reset the confirm step when another plot is picked, during render (not in an effect).
+  const [confirmFor, setConfirmFor] = useState(plot.id);
+  if (confirmFor !== plot.id) { setConfirmFor(plot.id); setConfirm(null); }
 
   const btn = 'min-h-[44px] rounded-lg px-4 text-sm font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-500 disabled:opacity-50';
 

@@ -154,7 +154,7 @@ export default function PlotMapViewer({
     if (p) zp.focusOn({ x: p.labelAt[0], y: p.labelAt[1] }, 4);
   };
   const focusRef = useRef(focusOnPlot);
-  focusRef.current = focusOnPlot;
+  useEffect(() => { focusRef.current = focusOnPlot; });
   useEffect(() => { if (focusPlotId) focusRef.current(focusPlotId); }, [focusPlotId]);
 
   // Screen px per SVG unit, with the zoom rounded to half steps so labels re-render per step, not per frame.

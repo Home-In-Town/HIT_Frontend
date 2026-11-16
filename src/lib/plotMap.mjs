@@ -45,7 +45,11 @@ export function naturalCompare(a, b) {
 
 /**
  * Exact matches first, then prefix matches; plots only; natural order.
- * @param {{ number?: string | null; kind?: string }[]} plots @param {string} query
+ * Generic over the element type so a caller with `PlotMapPlot[]` gets
+ * `PlotMapPlot[]` back (not the narrow inferred `{ number, kind }` shape).
+ * @template {{ id: string; number?: string | null; kind?: string }} T
+ * @param {T[]} plots @param {string} query
+ * @returns {T[]}
  */
 export function searchPlots(plots, query) {
   const q = normalisePlotNumber(query);

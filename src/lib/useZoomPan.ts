@@ -16,16 +16,16 @@ export function useZoomPan(img: { w: number; h: number }, onTap?: (norm: { x: nu
   const [view, setView] = useState({ w: 0, h: 0 });
   const [t, setT] = useState<Transform>(IDENTITY);
   const tRef = useRef(t);
-  tRef.current = t;
+  useEffect(() => { tRef.current = t; }, [t]);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const press = useRef<{ id: number; x: number; y: number; moved: boolean; start: Transform } | null>(null);
   const pinch = useRef<{ dist: number; start: Transform; mid: { x: number; y: number } } | null>(null);
 
   const fit = useMemo(() => fitRect(view, img), [view, img]);
   const fitRef = useRef(fit);
-  fitRef.current = fit;
+  useEffect(() => { fitRef.current = fit; }, [fit]);
   const viewRef = useRef(view);
-  viewRef.current = view;
+  useEffect(() => { viewRef.current = view; }, [view]);
 
   useEffect(() => {
     const el = ref.current;
