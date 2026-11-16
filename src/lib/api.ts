@@ -7,9 +7,14 @@ export function getLeadGenUrl() {
 }
 
 import { Project, ProjectFormData, FileData, LayoutEntity, LayoutOverlay, PlotStatus, Landmark, Captain, Agent } from '@/types/project';
+import type { AppNotification } from '@/types/plotmap';
+import { mapPlotMapField } from '@/lib/plotMap.mjs';
 export type { Project, ProjectFormData, FileData, LayoutEntity, LayoutOverlay, PlotStatus, Captain, Agent };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+// Exported (with getAuthHeaders, COMMON_FETCH_OPTIONS and handleResponse below)
+// so plotmapApi.ts reuses the same cookie session and error shape instead of
+// copying them; nothing else about these four changed.
+export const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 // 'overlay' = the layout-plan image for the overlay align tool. Its own slot
 // (layoutOverlay.image) because 'layout' is the html2canvas screenshot and
 // replace-file deletes the old 'layout' key from R2.
@@ -17,14 +22,14 @@ type MediaType = "cover" | "gallery" | "video" | "brochure" | "layout" | "overla
 
 
 // Get headers with auth
-function getAuthHeaders(): HeadersInit {
+export function getAuthHeaders(): HeadersInit {
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
   };
   return headers;
 }
 
-const COMMON_FETCH_OPTIONS: RequestInit = {
+export const COMMON_FETCH_OPTIONS: RequestInit = {
   credentials: 'include'
 };
 
@@ -41,7 +46,7 @@ export class ApiError extends Error {
   }
 }
 
-async function handleResponse<T>(response: Response): Promise<T> {
+export async function handleResponse<T>(response: Response): Promise<T> {
   let body: any = null;
 
   try {
@@ -121,6 +126,10 @@ export function transformBackendToFrontend(backendProject: any): Project {
     landmarks: backendProject.landmarks || [],
     layoutEntities: backendProject.layoutEntities || [],
     layoutOverlay: backendProject.layoutOverlay ?? null,
+    // Kept (enabled + layoutId only) so the project list can show "Plot Map"
+    // only where E2 will answer 200. Before: this explicit field list dropped
+    // plotMap, so the action could never have known.
+    plotMap: mapPlotMapField(backendProject.plotMap),
     canEdit: typeof backendProject.canEdit === 'boolean' ? backendProject.canEdit : undefined,
     canEditStatus: typeof backendProject.canEditStatus === 'boolean' ? backendProject.canEditStatus : undefined,
     layoutVersion: typeof backendProject.layoutVersion === 'string' ? backendProject.layoutVersion : (backendProject.layoutVersion === null ? null : undefined),
@@ -715,7 +724,7 @@ export async function getSourcePdfUrl(projectId: string): Promise<{ url: string;
   return handleResponse<{ url: string; page: number; extraRotationDeg: number }>(res);
 }
 
-export type LayoutUploadType = 'overlay' | 'overlay-preview' | 'overlay-detail' | 'layout-source';
+export type LayoutUploadType = 'overlay' | 'overlay-preview' | 'overlay-detail' | 'layout-source' | 'plotmap-image';
 
 export type LayoutUploadFailureReason =
   | 'network' | 'stalled' | 'aborted' | 'unauthorized' | 'forbidden' | 'too-large' | 'rejected' | 'server';
@@ -724,10 +733,13 @@ export type LayoutUploadFailureReason =
 export class LayoutUploadError extends Error {
   reason: LayoutUploadFailureReason;
   status: number;
-  constructor(reason: LayoutUploadFailureReason, message: string, status = 0) {
+  /** Contract error code of the new plot-map upload type (TOO_LARGE, IMAGE_UNREADABLE, ...). */
+  code?: string;
+  constructor(reason: LayoutUploadFailureReason, message: string, status = 0, code?: string) {
     super(message);
     this.reason = reason;
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -805,7 +817,7 @@ export function uploadLayoutFile(
     xhr.onabort = () => fail(new LayoutUploadError('aborted', 'Upload cancelled'));
     xhr.onload = () => {
       if (settled) return;
-      let body: { message?: unknown; fileKey?: string; fileUrl?: string; width?: number; height?: number } | null = null;
+      let body: { message?: unknown; error?: unknown; code?: unknown; fileKey?: string; fileUrl?: string; width?: number; height?: number } | null = null;
       try { body = JSON.parse(xhr.responseText); } catch { body = null; }
       if (xhr.status >= 200 && xhr.status < 300 && body && typeof body.fileKey === 'string') {
         settled = true;
@@ -813,14 +825,19 @@ export function uploadLayoutFile(
         resolve({ fileKey: body.fileKey, fileUrl: body.fileUrl, width: body.width, height: body.height });
         return;
       }
-      const msg = typeof body?.message === 'string' ? body.message : `Upload failed (${xhr.status})`;
+      // The plot-map upload type answers { error, code } like every new route;
+      // the older layout types answer { message }. Read both.
+      const msg = typeof body?.message === 'string' ? body.message
+        : typeof body?.error === 'string' ? body.error
+        : `Upload failed (${xhr.status})`;
+      const code = typeof body?.code === 'string' ? body.code : undefined;
       const reason: LayoutUploadFailureReason =
         xhr.status === 401 ? 'unauthorized'
         : xhr.status === 403 ? 'forbidden'
         : xhr.status === 413 ? 'too-large'
         : xhr.status >= 400 && xhr.status < 500 ? 'rejected'
         : 'server';
-      fail(new LayoutUploadError(reason, msg, xhr.status));
+      fail(new LayoutUploadError(reason, msg, xhr.status, code));
     };
 
     armStall();
@@ -1954,33 +1971,56 @@ export const marketplaceApi = {
    Notification API
 -----------------------------------*/
 
-export interface AppNotification {
-  _id: string;
-  recipient: string;
-  type: 'lead_stage_change' | 'new_lead_assigned' | 'new_chat_message' | 'marketplace_action' | 'commission_update' | 'system';
-  title: string;
-  message: string;
-  data?: Record<string, unknown>;
-  isRead: boolean;
-  createdAt: string;
+export type { AppNotification };
+// Before: three bugs (addendum 11.4). markAsRead called PUT /notifications/read
+// with a body of ids, a route the backend never had (404; the real routes are
+// PUT /:id/read and PUT /read-all). getAll sent ?unread=true while the backend
+// reads `unreadOnly`. And it typed the answer as an array with `isRead`, but
+// the backend answers { notifications, unreadCount } with `read`. Nothing
+// called the old methods, so no caller changes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toAppNotification(n: any): AppNotification {
+  return {
+    id: String(n.id ?? n._id ?? ''),
+    type: String(n.type ?? 'system'),
+    title: String(n.title ?? ''),
+    message: String(n.message ?? ''),
+    read: n.read === true,
+    reference: n.reference ?? null,
+    data: n.data ?? null,
+    createdAt: String(n.createdAt ?? ''),
+  };
 }
-
 export const notificationsApi = {
-  async getAll(unreadOnly = false): Promise<AppNotification[]> {
-    const params = unreadOnly ? '?unread=true' : '';
-    const response = await fetch(`${API_URL}/notifications${params}`, {
+  async list(opts: { page?: number; limit?: number; unreadOnly?: boolean } = {}): Promise<{ notifications: AppNotification[]; unreadCount: number }> {
+    const q = new URLSearchParams();
+    if (opts.page) q.set('page', String(opts.page));
+    if (opts.limit) q.set('limit', String(opts.limit));
+    if (opts.unreadOnly) q.set('unreadOnly', 'true');
+    const qs = q.toString();
+    const response = await fetch(`${API_URL}/notifications${qs ? `?${qs}` : ''}`, {
       ...COMMON_FETCH_OPTIONS,
       headers: getAuthHeaders(),
     });
-    return handleResponse(response);
+    const body = await handleResponse<{ notifications?: unknown[]; unreadCount?: number }>(response);
+    return {
+      notifications: (body.notifications ?? []).map(toAppNotification),
+      unreadCount: typeof body.unreadCount === 'number' ? body.unreadCount : 0,
+    };
   },
-
-  async markAsRead(ids: string[]): Promise<void> {
-    const response = await fetch(`${API_URL}/notifications/read`, {
+  async markRead(id: string): Promise<void> {
+    const response = await fetch(`${API_URL}/notifications/${encodeURIComponent(id)}/read`, {
       ...COMMON_FETCH_OPTIONS,
       method: 'PUT',
-      headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ notificationIds: ids }),
+      headers: getAuthHeaders(),
+    });
+    await handleResponse(response);
+  },
+  async markAllRead(): Promise<void> {
+    const response = await fetch(`${API_URL}/notifications/read-all`, {
+      ...COMMON_FETCH_OPTIONS,
+      method: 'PUT',
+      headers: getAuthHeaders(),
     });
     await handleResponse(response);
   },
