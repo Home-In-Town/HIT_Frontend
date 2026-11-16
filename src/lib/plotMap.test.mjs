@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import {
   normalisePlotNumber, searchPlots, hitTest, bookButtonState, statusLabel, publishBlockers, draftStats,
   orderForReview, countStatuses, buildPlotMapMeta, mapPlotMapField, decidePoll, applyStatuses, applyChanges,
@@ -11,8 +12,8 @@ import {
   generationFailureText, flagText, styleForStatus, plotNotificationHref,
 } from './plotMap.mjs';
 
-// The master fixture starts with a UTF-8 BOM (kept byte-identical across repos),
-// and JSON.parse rejects a BOM, so strip it. JSON import needs import
+// The master fixture is kept byte-identical across repos (sha256 pinned below).
+// The BOM strip is only a guard for a copy saved by a Windows editor. JSON import needs import
 // attributes, which this repo's node does not need to depend on.
 const fx = JSON.parse(readFileSync(new URL('./__fixtures__/plot-map-fixture.json', import.meta.url), 'utf8').replace(/^\uFEFF/, ''));
 const P = fx.payloads;
@@ -299,4 +300,17 @@ test('plotNotificationHref: other types and missing project have no link', () =>
   assert.equal(plotNotificationHref({ type: 'system', data: { projectId: 'x' } }), null);
   assert.equal(plotNotificationHref({ type: 'plot_booking_request', data: {} }), null);
   assert.equal(plotNotificationHref({ type: 'plot_booking_request', data: null }), null);
+});
+
+// Cross-repo drift guard: backend, web and mobile pin the same sha256. Edit the
+// master fixture, copy it to all three repos and update the three hashes together.
+test('shared fixture is the byte-identical master copy', () => {
+  assert.equal(createHash('sha256').update(readFileSync(new URL('./__fixtures__/plot-map-fixture.json', import.meta.url))).digest('hex'), '9031b7a31a98504c579ea70bc211b252859328fa7c58564efc719a66801c5fb3');
+});
+// Rendering side of the leak check: the anonymous page never reads a private field.
+test('public viewer sources do not reference private booking fields', () => {
+  for (const f of ['../components/plotmap/PublicPlotMapViewer.tsx', '../lib/plotmapPublic.ts']) {
+    const src = readFileSync(new URL(f, import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /\b(bookedBy|requesterSnapshot|requester|phone|email|companyName)\b\s*[:?.]/, f);
+  }
 });

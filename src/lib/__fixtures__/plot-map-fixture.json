@@ -1,4 +1,4 @@
-﻿{
+{
   "fixtureVersion": 4,
   "contract": "plotmap/1",
   "note": "Master copy. Backend, web and mobile each keep a byte-identical copy in their own repo (paths in docs/PLOT-BOOKING-PLAN-ADDENDUM.md section 12). Never edit a copy; edit this file and re-copy. fixtureVersion 2 = addendum revision 2 (poll contract, error table, normalise cases, owner draft review, reconcile cases). fixtureVersion 3 adds project {name,city} to every payload, publicAllowlist.project and publicMeta (addendum 7.2). fixtureVersion 4 (errata to revision 3) adds the isPlotProject section and the normalise case 12.5 -> null.",
