@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
 import {
   familyOf, isPlotFamily, categoryForPlotType, validateProjectBody, deriveProjectFields, toSqft, fromSqft,
   parsePlotSizeRange, summaryLine, plotDetailRows, showsField, FAMILY_FIELDS, PLOT_AMENITY_OPTIONS,
-  LAYOUT_TYPE_SUGGESTIONS, DEVELOPMENT_STATUSES,
+  LAYOUT_TYPE_SUGGESTIONS, DEVELOPMENT_STATUSES, shapeProjectPayload, cleanPlotDetails,
 } from './propertySchema.mjs';
 
 const fx = JSON.parse(readFileSync(new URL('./__fixtures__/property-schema-fixture.json', import.meta.url), 'utf8').replace(/^\uFEFF/, ''));
@@ -84,6 +84,37 @@ test('units, display, parse and summary follow the fixture', () => {
   for (const c of fx.displayCases) assert.equal(fromSqft(c.sqft, c.unit), c.expected);
   for (const c of fx.parseCases) assert.deepEqual(parsePlotSizeRange(c.input), c.expected, c.input);
   for (const c of fx.summaryCases) assert.equal(summaryLine(c.project), c.line, c.name);
+});
+
+const FORM = {
+  name: 'A', type: 'flat', category: 'Residential', propertyType: 'Apartment / Flat', startingPrice: 1,
+  bhkOptions: ['2BHK'], carpetAreaRange: '800 - 900 sqft', floorRange: '1-5', plotSizeRange: '1000 - 1200 sqft', facingOptions: ['East'],
+  plotDetails: { totalPlots: 4 },
+};
+
+test('shapeProjectPayload: plot save leaves out bhk / carpet / floor / projectType so stored residential values survive', () => {
+  const out = shapeProjectPayload({ ...FORM, propertyType: 'Residential Plot', plotDetails: { totalPlots: 40, plotSize: { minSqft: 1000, maxSqft: 2400 } } });
+  for (const k of ['bhkOptions', 'carpetAreaRange', 'floorRange', 'type']) assert.equal(Object.prototype.hasOwnProperty.call(out, k), false, k);
+  assert.equal(out.plotSizeRange, '1000 - 2400 sqft');
+  assert.deepEqual(out.plotDetails, { totalPlots: 40, plotSize: { minSqft: 1000, maxSqft: 2400 } });
+  assert.deepEqual(out.facingOptions, ['East']);
+});
+
+test('shapeProjectPayload: residential save carries no plot fields, mixed use keeps its plot size', () => {
+  const res = shapeProjectPayload(FORM);
+  assert.equal('plotDetails' in res, false);
+  assert.equal('plotSizeRange' in res, false);
+  assert.deepEqual(res.bhkOptions, ['2BHK']);
+  const mixed = shapeProjectPayload({ ...FORM, category: 'Mixed Use', propertyType: 'Mixed-Use Tower' });
+  assert.equal(mixed.plotSizeRange, '1000 - 1200 sqft');
+  assert.equal('plotDetails' in mixed, false);
+});
+
+test('cleanPlotDetails: empty values are left out, an emptied stored value is sent as null', () => {
+  const stored = { roadWidthsFt: [30], naOrderNumber: 'NA/1', totalPlots: 5 };
+  const out = cleanPlotDetails({ roadWidthsFt: [], naOrderNumber: '', totalPlots: 5, tpApproval: '', landAreaSqft: 99 }, stored);
+  assert.deepEqual(out, { roadWidthsFt: null, naOrderNumber: null, totalPlots: 5 });
+  assert.deepEqual(cleanPlotDetails({ totalPlots: undefined }, undefined), {});
 });
 
 test('plotDetailRows lists the plot facts and nothing for a project without them', () => {

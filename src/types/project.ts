@@ -64,6 +64,23 @@ export type FileData = {
   key: string;
 };
 
+// Plot / land project facts (contract "property-schema/1"). Sizes are stored in sq ft only;
+// sq yd / sq m are display conversions. `landAreaSqft` is written by the server.
+export type DevelopmentStatus = 'plotting-open' | 'roads-done' | 'fully-developed' | 'ready-possession';
+export interface PlotDetails {
+  landArea?: { value: number; unit: 'acre' | 'sqft' } | null;
+  landAreaSqft?: number | null;
+  totalPlots?: number | null;
+  plotSize?: { minSqft: number; maxSqft: number } | null;
+  plotPrice?: { minRupees: number; maxRupees: number } | null;
+  pricePerSqFtRange?: { min: number; max: number } | null;
+  roadWidthsFt?: number[] | null;
+  layoutTypes?: string[] | null;
+  naOrderNumber?: string | null;
+  tpApproval?: string | null;
+  developmentStatus?: DevelopmentStatus | null;
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -103,6 +120,7 @@ export interface Project {
   floorRange?: string;
 
   // Plot-specific fields
+  plotDetails?: PlotDetails;
   plotSizeRange?: string;
   facingOptions?: string[];
   gatedCommunity?: boolean;

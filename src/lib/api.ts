@@ -109,6 +109,8 @@ export function transformBackendToFrontend(backendProject: any): Project {
     carpetAreaRange: backendProject.configuration?.carpetAreaRange ?? backendProject.carpetAreaRange ?? '',
     floorRange: backendProject.configuration?.floorRange ?? backendProject.floorRange ?? '',
     plotSizeRange: backendProject.configuration?.plotSizeRange ?? backendProject.plotSizeRange ?? '',
+    // Absent on every project saved before plot details existed; the cards then fall back to plotSizeRange.
+    plotDetails: backendProject.plotDetails ?? undefined,
     facingOptions: backendProject.configuration?.facingOptions ?? backendProject.facingOptions ?? [],
     gatedCommunity: backendProject.configuration?.gatedCommunity ?? backendProject.gatedCommunity ?? false,
     amenities: backendProject.amenities || [],
@@ -163,6 +165,9 @@ function transformFrontendToBackend(project: Partial<ProjectFormData>): Record<s
     // Classification
     category: project.category,
     propertyType: project.propertyType,
+
+    // Plot / land facts. Left undefined (so not sent) for every other family, see shapeProjectPayload.
+    plotDetails: project.plotDetails,
 
     reraApproved: project.reraApproved,
     reraNumber: project.reraNumber,

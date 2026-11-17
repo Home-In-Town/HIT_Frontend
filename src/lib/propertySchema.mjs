@@ -255,6 +255,58 @@ export function deriveProjectFields(body, { stored = null, isCreate = false } = 
   return { body: out, familyChange };
 }
 
+// ── form payload ────────────────────────────────────────────────────────────
+const PLOT_DETAIL_KEYS = ['landArea', 'totalPlots', 'plotSize', 'plotPrice', 'pricePerSqFtRange', 'roadWidthsFt', 'layoutTypes', 'naOrderNumber', 'tpApproval', 'developmentStatus'];
+const isEmptyValue = (v) => v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+
+/**
+ * plotDetails as the form should send it: only known keys, empty values left out.
+ * A leaf that has a stored value and was emptied in the form is sent as null, which is
+ * the contract's way to clear it (an omitted key would keep the old value).
+ * `landAreaSqft` is server-derived and never sent.
+ */
+export function cleanPlotDetails(current, stored) {
+  const out = {};
+  for (const k of PLOT_DETAIL_KEYS) {
+    const v = current?.[k];
+    if (isEmptyValue(v)) {
+      if (stored && stored[k] !== undefined && stored[k] !== null) out[k] = null;
+    } else out[k] = v;
+  }
+  return out;
+}
+
+/**
+ * The form data as it goes to the API. Only the field groups the family shows are sent;
+ * hidden groups are left OUT (not blanked), so the server keeps the stored values and a
+ * later switch back to the old category finds them. Previous behaviour: every save sent
+ * bhk / carpet / floor / plot size from the whole form, so a plot save overwrote the
+ * residential values with the form's empty defaults.
+ *  - plot        : no bhk / carpet / floor, no client projectType (the server decides it),
+ *                  plotDetails cleaned; plotSizeRange is mirrored for backends that predate plotDetails.
+ *  - mixed use   : unchanged (both groups are optional there).
+ *  - everything else: no plot fields.
+ */
+/** @param {any} data @param {{ stored?: any }} [o] @returns {any} */
+export function shapeProjectPayload(data, { stored = null } = {}) {
+  const family = familyOf(data);
+  const out = { ...data };
+  if (family === 'plot') {
+    delete out.bhkOptions;
+    delete out.carpetAreaRange;
+    delete out.floorRange;
+    delete out.type;
+    const pd = cleanPlotDetails(data.plotDetails, stored?.plotDetails);
+    out.plotDetails = pd;
+    if (isObj(pd.plotSize)) out.plotSizeRange = `${rangeText(pd.plotSize.minSqft, pd.plotSize.maxSqft)} sqft`;
+    else delete out.plotSizeRange;
+    return out;
+  }
+  delete out.plotDetails;
+  if (family !== 'mixed_use') delete out.plotSizeRange;
+  return out;
+}
+
 // ── display ─────────────────────────────────────────────────────────────────
 /**
  * One-line card summary. Plot: "N plots · min - max sqft · land · facing".

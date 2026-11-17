@@ -566,6 +566,7 @@ const ERROR_TEXT = {
   GENERATOR_NOT_CONFIGURED: 'Layout generator abhi ready nahi hai',
   JOB_START_FAILED: 'Layout shuru nahi ho paya, dobara try karein',
   NOT_PLOT_PROJECT: 'Ye project plot type ka nahi hai',
+  FAMILY_CHANGE_BLOCKED: 'Is project ka plot map live hai aur bookings hain, isliye plot se doosri category mein nahi badal sakte.',
   // Callers that know the limit use tooManySheetsText(max) instead.
   TOO_MANY_SHEETS: 'Ek project mein itni zyada sheets nahi ho sakti',
   SHEET_NOT_FOUND: 'Ye sheet ab nahi mili, page refresh karo',

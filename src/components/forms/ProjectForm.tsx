@@ -4,7 +4,13 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Project, ProjectFormData, AMENITIES, ProjectStatus } from '@/types/project';
 import { projectsApi, mediaApi} from '@/lib/api';
-import { PROPERTY_CATEGORIES, CATEGORY_PROPERTY_TYPES, PropertyCategory } from '@/lib/propertyConfig';
+import { FAMILY_CHOICES, PLOT_PROPERTY_TYPES, nonPlotTypesFor, PropertyCategory, PropertyFamilyChoice } from '@/lib/propertyConfig';
+import {
+  PLOT_AMENITY_OPTIONS, categoryForPlotType, familyOf, parsePlotSizeRange, rangeText, shapeProjectPayload, validateProjectBody,
+} from '@/lib/propertySchema.mjs';
+import { apiBody, apiCode } from '@/lib/plotmapApi';
+import { plotmapErrorText } from '@/lib/plotMap.mjs';
+import PlotDetailsSection from '@/components/forms/PlotDetailsSection';
 import toast from 'react-hot-toast';
 import { useRef, useEffect } from 'react';
 import { derivePricePerSqFt, formatDerivedPricePerSqFt, parseAreaLowerBoundSqFt, normalizeAreaRangeToSqFt, AREA_UNIT_OPTIONS, AreaUnit } from '@/utils/pricePerSqFt';
@@ -57,6 +63,18 @@ const DEFAULT_FORM_DATA: ProjectFormData = {
   callNumber: '',
   isPublished: false,
 };
+
+/**
+ * A plot project saved before plot details existed only has the free-text `configuration.plotSizeRange`.
+ * Parse it into plotDetails.plotSize so the edit form shows the size instead of an empty required field.
+ */
+function withLegacyPlotSize(data: ProjectFormData): ProjectFormData {
+  if (familyOf(data) !== 'plot' || data.plotDetails?.plotSize) return data;
+  const parsed = parsePlotSizeRange(data.plotSizeRange);
+  return parsed ? { ...data, plotDetails: { ...data.plotDetails, plotSize: parsed } } : data;
+}
+
+type Family = PropertyFamilyChoice | '';
 
 const InputField = ({
   label,
@@ -134,10 +152,18 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   const [showCustomPropertyInput, setShowCustomPropertyInput] = useState(false);
 
   const router = useRouter();
-  const [formData, setFormData] = useState<ProjectFormData>({
+  const [formData, setFormData] = useState<ProjectFormData>(() => withLegacyPlotSize({
     ...DEFAULT_FORM_DATA,
     ...initialData,
+  }));
+  // The family chip row. Once a property type is chosen the family comes from the type itself (so an edit
+  // opens on the right family); before that it is whatever chip was tapped.
+  const [familyChoice, setFamilyChoice] = useState<Family>(() => {
+    if (initialData?.propertyType) return familyOf(initialData) as Family;
+    return initialData?.category ? (familyOf({ category: initialData.category }) as Family) : '';
   });
+  const initialFamily: Family = initialData?.propertyType ? (familyOf(initialData) as Family) : '';
+  const family: Family = formData.propertyType ? (familyOf(formData) as Family) : familyChoice;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [publishedLink, setPublishedLink] = useState<string | null>(
@@ -172,9 +198,14 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   // Auto-derive price-per-sqft from starting price and area so the stored value
   // always agrees with the price and area shown on cards. The field is no longer
   // hand-entered — see src/utils/pricePerSqFt.ts.
+  // A plot project has no carpet area: a stale carpetAreaRange left from an earlier flat category must not
+  // decide its rate, so the plot size (min) is the area there.
+  const plotSizeNow = formData.plotDetails?.plotSize;
+  const plotAreaText = plotSizeNow && Number.isFinite(plotSizeNow.minSqft) && Number.isFinite(plotSizeNow.maxSqft)
+    ? `${rangeText(plotSizeNow.minSqft, plotSizeNow.maxSqft)} sqft` : '';
   const derivedPricePerSqFt = derivePricePerSqFt(
     formData.startingPrice,
-    formData.carpetAreaRange || formData.plotSizeRange
+    family === 'plot' ? plotAreaText : (formData.carpetAreaRange || formData.plotSizeRange)
   );
 
   useEffect(() => {
@@ -187,7 +218,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
   // Section 1
   if (!formData.name?.trim()) errors.name = 'Project name is required';
-  if (!formData.category) errors.category = 'Category is required';
+  if (!formData.category && family !== 'plot') errors.category = 'Category is required';
   if (!formData.propertyType) errors.propertyType = 'Property type is required';
   if (!formData.city?.trim()) errors.city = 'City is required';
   if (!formData.location?.trim()) errors.location = 'Location is required';
@@ -206,10 +237,10 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
   // Section 4 - only validate BHK for Residential/Commercial non-plot types
   // Mixed Use category never requires BHK since projects can be a combination
-  const isPlotType = formData.propertyType?.toLowerCase().includes('plot') || 
-    formData.propertyType?.toLowerCase().includes('land') ||
-    ['Residential Plot', 'Commercial Plot / Land', 'Farm Land'].includes(formData.propertyType || '');
-  const isMixedUse = formData.category === 'Mixed Use';
+  // Previous behaviour: any label containing "plot" or "land" counted as a plot ("Landmark Office" too).
+  // Now the family comes from the exact property type (propertySchema.mjs), the same rule the server uses.
+  const isPlotType = family === 'plot';
+  const isMixedUse = family === 'mixed_use';
   
   if (formData.propertyType && !isPlotType && !isMixedUse && (!formData.bhkOptions || formData.bhkOptions.length === 0)) {
     errors.bhkOptions = 'Select at least one BHK option';
@@ -220,13 +251,9 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
   // carpetAreaRange. Mixed Use may carry either.
   if (formData.propertyType) {
     if (isPlotType) {
-      // plotSizeRange is always normalized to sqft (see handlePlotSizeChange),
-      // so validation stays on the stored sqft value regardless of the unit used.
-      if (!formData.plotSizeRange?.trim()) {
-        errors.plotSizeRange = 'Plot size is required';
-      } else if (parseAreaLowerBoundSqFt(formData.plotSizeRange) === null) {
-        errors.plotSizeRange = 'Enter a valid plot size (e.g., 1000 - 2500)';
-      }
+      // Same rules as the server: plot size is required, BHK / carpet / floor never are.
+      const v = validateProjectBody({ propertyType: formData.propertyType, plotDetails: formData.plotDetails ?? {} }, { isCreate: true });
+      Object.assign(errors, v.fields);
     } else if (isMixedUse) {
       const area = formData.carpetAreaRange || formData.plotSizeRange;
       if (!area?.trim()) {
@@ -311,7 +338,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
     if (mode === 'create') {
       // Step 1: Initial Create with text metadata to get a valid ID
       const initialPayload = {
-        ...formData,
+        ...shapeProjectPayload(formData, { stored: initialData }),
         slug,
         coverImage: '',
         galleryImages: [],
@@ -364,7 +391,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
       // Step 3: Final synchronization to link media to project
       project = await projectsApi.update(projectId, {
-        ...formData, // Ensures price/name stay consistent
+        ...shapeProjectPayload(formData, { stored: initialData }), // Ensures price/name stay consistent
         coverImage: coverObj as any,
         galleryImages: galleryObjs as any,
         videos: videoObjs as any,
@@ -372,7 +399,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
       });
     } else {
       const projectId = initialData!.id!;
-      const updateData = { ...formData };
+      const updateData: ProjectFormData = { ...shapeProjectPayload(formData, { stored: initialData }) };
       
       setUploading(true);
 
@@ -462,8 +489,17 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
     router.push('/dashboard/projects');
   } catch (err: any) {
     console.error('API error:', err);
+    const code = apiCode(err);
     // Friendly fallback for duplicate key error
-    if (err.message?.includes('duplicate key')) {
+    const fields = apiBody<{ fields?: Record<string, string> }>(err)?.fields;
+    if (code === 'FAMILY_CHANGE_BLOCKED') {
+      // Plot -> another category while a live plot map has bookings: the server refuses, nothing was saved.
+      toast.error(plotmapErrorText(code));
+    } else if (fields && Object.keys(fields).length > 0) {
+      // Server validation (400 with `fields`): show each message under its input.
+      setFormErrors(fields);
+      toast.error('Kuch fields theek karne hain, laal message dekho.');
+    } else if (err.message?.includes('duplicate key')) {
       toast.error(
         `Project with name "${formData.name}" already exists. Please choose another name.`
       );
@@ -556,6 +592,49 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
   
 
+  // Amenity chips. A plot project is offered the plot list (compound wall, internal roads, ...), not the
+  // apartment one (lift, gym, ...). Amenities already selected stay visible as chips so none is hidden.
+  const amenityOptions: readonly string[] = family === 'plot'
+    ? [...PLOT_AMENITY_OPTIONS, ...formData.amenities.filter((a) => !PLOT_AMENITY_OPTIONS.includes(a) && !customAmenities.includes(a))]
+    : (showAllAmenities ? AMENITIES : AMENITIES.slice(0, 10));
+
+  // Shared by the plot family and the Mixed Use plot-size block.
+  const gatedField = (
+    <div>
+      <label className="block text-sm font-medium text-[#57534E] mb-1.5">
+        Gated Community
+      </label>
+      <div className="flex gap-4">
+        {[true, false].map((val) => (
+          <label
+            key={String(val)}
+            className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
+              formData.gatedCommunity === val
+                ? 'border-green-600 bg-green-50 text-green-700 font-medium'
+                : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
+            }`}
+          >
+            <input
+              type="radio"
+              name="gatedCommunity"
+              checked={formData.gatedCommunity === val}
+              onChange={() => updateField('gatedCommunity', val)}
+              className="sr-only"
+            />
+            {val ? '✓ Yes' : '✗ No'}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+
+  // Type chips of the open family. Plot / Land has its own list; the other families keep their old list
+  // without the plot labels (those moved under Plot / Land).
+  const CATEGORY_OF_FAMILY: Record<string, PropertyCategory> = { residential: 'Residential', commercial: 'Commercial', mixed_use: 'Mixed Use' };
+  const typeOptions: readonly string[] = family === 'plot'
+    ? PLOT_PROPERTY_TYPES
+    : family ? nonPlotTypesFor(CATEGORY_OF_FAMILY[family] ?? 'Residential') : [];
+
   const removeVideo = (index: number) => {
     setFormData((prev) => ({
       ...prev,
@@ -604,40 +683,47 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             onChange={(v) => updateField('name', v)}
           />
 
-          {/* Category Dropdown */}
-          <div>
-            <label className="block text-sm font-medium text-[#57534E] mb-1.5 font-sans">
-              Category <span className="text-red-500">*</span>
+          {/* Family chips. Previous behaviour: a Category dropdown (Residential / Commercial / Mixed Use) and
+              plot types hidden inside those lists. Plot / Land is now its own family with its own fields;
+              the stored category of a plot type is derived from the type. */}
+          <div className="md:col-span-2" ref={(el) => { fieldRefs.current.category = el }}>
+            <label className="block text-sm font-medium text-[#57534E] mb-2 font-sans">
+              Property Category <span className="text-red-500">*</span>
             </label>
-            <select
-              name="category"
-              value={formData.category}
-              onChange={(e) => {
-                const newCategory = e.target.value;
-                setFormData((prev) => ({
-                  ...prev,
-                  category: newCategory,
-                  propertyType: '',
-                }));
-              }}
-              ref={(el) => { fieldRefs.current.category = el }}
-              className={`w-full px-4 py-2.5 bg-white rounded-lg text-[#2A2A2A] placeholder-[#A8A29E] transition-shadow
-                focus:outline-none focus:ring-2 focus:border-transparent
-                ${
-                  formErrors.category
-                    ? 'border border-red-500 ring-1 ring-red-500 focus:ring-red-500'
-                    : 'border border-[#D6D3D1] focus:ring-[#B45309]'
-                }
-              `}
-            >
-              <option value="" disabled>Select category</option>
-              {PROPERTY_CATEGORIES.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Property category">
+              {FAMILY_CHOICES.map((fc) => (
+                <button
+                  key={fc.key}
+                  type="button"
+                  role="radio"
+                  aria-checked={family === fc.key}
+                  onClick={() => {
+                    if (family === fc.key) return;
+                    setFamilyChoice(fc.key);
+                    setShowCustomPropertyInput(false);
+                    // The old type belongs to the old family: ask for a new one. Values of the other
+                    // family's fields stay in the form state and are not overwritten on save.
+                    // `type` only mirrors the family for the form state; for a plot it is never sent (the server decides it).
+                    setFormData((prev) => ({ ...prev, category: fc.category ?? '', propertyType: '', type: fc.key === 'plot' ? 'plot' : 'flat' }));
+                  }}
+                  className={`px-4 py-2 border rounded-lg text-sm transition-all ${
+                    family === fc.key
+                      ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
+                      : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
+                  }`}
+                >
+                  {family === fc.key ? '✓ ' : ''}{fc.label}
+                </button>
               ))}
-            </select>
+            </div>
             {formErrors.category && (
               <p className="mt-1 text-sm text-red-600">
                 {formErrors.category}
+              </p>
+            )}
+            {mode === 'edit' && initialFamily && family && family !== initialFamily && (
+              <p className="mt-2 text-sm text-[#57534E]" role="status">
+                Category badal rahe ho. Purani category ke values delete nahi honge, safe rahenge.
               </p>
             )}
           </div>
@@ -647,16 +733,17 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
             <label className="block text-sm font-medium text-[#57534E] mb-2 font-sans">
               Property Type <span className="text-red-500">*</span>
             </label>
-            {!formData.category ? (
-              <p className="text-sm text-[#A8A29E] italic">Select a category first</p>
+            {!family ? (
+              <p className="text-sm text-[#A8A29E] italic">Pehle category chuno</p>
             ) : (
               <div className="flex flex-wrap gap-2">
-                {CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.map((pType) => (
+                {typeOptions.map((pType) => (
                   <button
                     key={pType}
                     type="button"
                     onClick={() => {
-                      updateField('propertyType', pType);
+                      // A plot type decides the stored category (fixture `types`); other families keep theirs.
+                      setFormData((prev) => ({ ...prev, propertyType: pType, category: categoryForPlotType(pType) ?? prev.category }));
                       setShowCustomPropertyInput(false);
                     }}
                     className={`px-4 py-2 border rounded-lg text-sm transition-all ${
@@ -669,14 +756,15 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
                   </button>
                 ))}
 
-                {/* Custom Property Type Button */}
-                {!showCustomPropertyInput ? (
+                {/* Custom Property Type Button. Not offered for Plot / Land: a free-text type would not be
+                    recognised as a plot and the form would flip to the flat fields. */}
+                {family === 'plot' ? null : !showCustomPropertyInput ? (
                   <button
                     type="button"
                     onClick={() => setShowCustomPropertyInput(true)}
                     className={`px-4 py-2 border border-dashed rounded-lg text-sm transition-all ${
                       formData.propertyType &&
-                      !CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.includes(formData.propertyType as any)
+                      !typeOptions.includes(formData.propertyType)
                         ? 'border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309]'
                         : 'border-[#D6D3D1] text-[#57534E] hover:border-[#A8A29E] bg-white'
                     }`}
@@ -721,7 +809,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
 
                 {/* Show the custom property type as a selected chip if it doesn't match predefined */}
                 {formData.propertyType &&
-                  !CATEGORY_PROPERTY_TYPES[formData.category as PropertyCategory]?.includes(formData.propertyType as any) &&
+                  !typeOptions.includes(formData.propertyType) &&
                   !showCustomPropertyInput && (
                     <span className="px-4 py-2 border border-[#B45309] bg-orange-50 text-[#B45309] font-medium ring-1 ring-[#B45309] rounded-lg text-sm">
                       ✓ {formData.propertyType}
@@ -879,7 +967,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           Amenities
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          {(showAllAmenities ? AMENITIES : AMENITIES.slice(0, 10)).map((amenity) => (
+          {amenityOptions.map((amenity) => (
             <button
               key={amenity}
               type="button"
@@ -911,7 +999,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           ))}
         </div>
 
-        {AMENITIES.length > 10 && (
+        {family !== 'plot' && AMENITIES.length > 10 && (
           <button
             type="button"
             onClick={() => setShowAllAmenities(!showAllAmenities)}
@@ -962,8 +1050,10 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
         </h2>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Apartment-specific fields - show for non-plot types OR Mixed Use (optional for Mixed Use) */}
-          {(formData.category === 'Mixed Use' || (!['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) && !formData.propertyType.toLowerCase().includes('plot') && !formData.propertyType.toLowerCase().includes('land'))) && (
+          {/* Flat-style fields (BHK / carpet / floor) - every family except Plot / Land (optional for Mixed Use).
+              Previous behaviour: the "is it a plot?" test here was a list of three labels plus "plot" / "land"
+              substrings, so "NA Plot" / "Industrial Plot" and any type with "land" in its name were guessed. */}
+          {family !== 'plot' && (
           <>
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-[#57534E] mb-2">
@@ -1013,8 +1103,22 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
           </>
           )}
 
-          {/* Plot/Land-specific fields - show for plot types OR Mixed Use (optional for Mixed Use) */}
-          {(formData.category === 'Mixed Use' || ['Residential Plot', 'Commercial Plot / Land', 'Residential + Commercial Plot'].includes(formData.propertyType) || formData.propertyType.toLowerCase().includes('plot') || formData.propertyType.toLowerCase().includes('land')) && (
+          {/* Plot / Land family: its own fields, no BHK / carpet / floor. Old values of the flat fields stay in
+              the form state and are not sent, so the stored ones survive a category switch. */}
+          {family === 'plot' && (
+          <>
+            <PlotDetailsSection
+              value={formData.plotDetails}
+              onChange={(next) => updateField('plotDetails', next)}
+              errors={formErrors}
+              fieldRefs={fieldRefs}
+            />
+            {gatedField}
+          </>
+          )}
+
+          {/* Mixed Use keeps the single plot-size field (optional there). */}
+          {family === 'mixed_use' && (
           <>
             <div>
               <label className="block text-sm font-medium text-[#57534E] mb-1.5">
@@ -1064,32 +1168,7 @@ export default function ProjectForm({ initialData, mode }: ProjectFormProps) {
               ) : null}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-[#57534E] mb-1.5">
-                Gated Community
-              </label>
-              <div className="flex gap-4">
-                {[true, false].map((val) => (
-                  <label
-                    key={String(val)}
-                    className={`flex-1 p-3 border rounded-lg cursor-pointer transition-all text-center ${
-                      formData.gatedCommunity === val
-                        ? 'border-green-600 bg-green-50 text-green-700 font-medium'
-                        : 'border-[#D6D3D1] text-[#78716C] hover:border-[#A8A29E] bg-white'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="gatedCommunity"
-                      checked={formData.gatedCommunity === val}
-                      onChange={() => updateField('gatedCommunity', val)}
-                      className="sr-only"
-                    />
-                    {val ? '✓ Yes' : '✗ No'}
-                  </label>
-                ))}
-              </div>
-            </div>
+            {gatedField}
           </>
           )}
 
