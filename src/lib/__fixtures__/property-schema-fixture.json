@@ -1,0 +1,1175 @@
+{
+  "fixtureVersion": 1,
+  "contract": "property-schema/1",
+  "note": "Pure-logic contract for project categories. Server decides projectType (plot family -> \"plot\") with the same rule as isPlotProject(). Plot values live in plotDetails; residential values stay in configuration.* and are never cleared by a plot save.",
+  "conversions": {
+    "acreSqft": 43560,
+    "sqydSqft": 9,
+    "sqmSqft": 10.7639,
+    "display": "sqft 0 decimals; sqyd, sqm, acre 1 decimal; stored values are always sqft (land area keeps its own unit plus landAreaSqft)"
+  },
+  "types": [
+    {
+      "label": "Residential Plot",
+      "family": "plot",
+      "category": "Residential",
+      "projectType": "plot"
+    },
+    {
+      "label": "NA Plot",
+      "family": "plot",
+      "category": "Residential",
+      "projectType": "plot"
+    },
+    {
+      "label": "Farm Land",
+      "family": "plot",
+      "category": "Residential",
+      "projectType": "plot"
+    },
+    {
+      "label": "Commercial Plot / Land",
+      "family": "plot",
+      "category": "Commercial",
+      "projectType": "plot"
+    },
+    {
+      "label": "Industrial Plot",
+      "family": "plot",
+      "category": "Commercial",
+      "projectType": "plot"
+    },
+    {
+      "label": "Residential + Commercial Plot",
+      "family": "plot",
+      "category": "Mixed Use",
+      "projectType": "plot"
+    },
+    {
+      "label": "Apartment / Flat",
+      "family": "residential",
+      "category": null,
+      "projectType": null
+    },
+    {
+      "label": "Villa",
+      "family": "residential",
+      "category": null,
+      "projectType": null
+    },
+    {
+      "label": "Row House",
+      "family": "residential",
+      "category": null,
+      "projectType": null
+    },
+    {
+      "label": "Independent House",
+      "family": "residential",
+      "category": null,
+      "projectType": null
+    },
+    {
+      "label": "Farm House",
+      "family": "residential",
+      "category": null,
+      "projectType": null
+    },
+    {
+      "label": "Penthouse",
+      "family": "residential",
+      "category": null,
+      "projectType": null
+    }
+  ],
+  "familyCases": [
+    {
+      "propertyType": "Residential Plot",
+      "projectType": null,
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": "NA Plot",
+      "projectType": null,
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": "Farm Land",
+      "projectType": null,
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": "Commercial Plot / Land",
+      "projectType": null,
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": "Industrial Plot",
+      "projectType": null,
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": "Residential + Commercial Plot",
+      "projectType": null,
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": "Apartment / Flat",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Villa",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Row House",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Independent House",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Farm House",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Penthouse",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Landmark Tower",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Plotted Development",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": "Island Villas",
+      "projectType": null,
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    },
+    {
+      "propertyType": null,
+      "projectType": "plot",
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": null,
+      "projectType": "PLOT",
+      "family": "plot",
+      "isPlot": true,
+      "serverIsPlotProject": true
+    },
+    {
+      "propertyType": null,
+      "projectType": "flat",
+      "family": "residential",
+      "isPlot": false,
+      "serverIsPlotProject": false
+    }
+  ],
+  "fieldsByFamily": {
+    "plot": {
+      "show": [
+        "landArea",
+        "totalPlots",
+        "plotSize",
+        "pricePerSqFtRange",
+        "plotPrice",
+        "facing",
+        "roadWidthsFt",
+        "layoutTypes",
+        "reraNumber",
+        "naOrderNumber",
+        "tpApproval",
+        "plotAmenities",
+        "developmentStatus",
+        "projectStatus",
+        "gatedCommunity"
+      ],
+      "hide": [
+        "bhkOptions",
+        "carpetAreaRange",
+        "floorRange",
+        "unitSetup"
+      ],
+      "required": [
+        "plotDetails.plotSize.minSqft"
+      ]
+    },
+    "residential": {
+      "show": [
+        "bhkOptions",
+        "carpetAreaRange",
+        "floorRange",
+        "facing",
+        "gatedCommunity",
+        "unitSetup",
+        "amenities"
+      ],
+      "hide": [
+        "plotDetails"
+      ],
+      "required": []
+    },
+    "commercial": {
+      "show": [
+        "carpetAreaRange",
+        "floorRange",
+        "facing",
+        "amenities"
+      ],
+      "hide": [
+        "plotDetails"
+      ],
+      "required": []
+    },
+    "mixed_use": {
+      "show": [
+        "bhkOptions",
+        "carpetAreaRange",
+        "floorRange",
+        "facing",
+        "amenities"
+      ],
+      "hide": [],
+      "required": []
+    }
+  },
+  "plotAmenityOptions": [
+    "Compound Wall",
+    "Internal Roads",
+    "Street Lights",
+    "Water Supply",
+    "Drainage",
+    "Garden",
+    "Temple",
+    "Club House",
+    "Security"
+  ],
+  "layoutTypeSuggestions": [
+    "NA",
+    "RERA",
+    "Gunthewari",
+    "TP Approved",
+    "DTCP",
+    "Other"
+  ],
+  "developmentStatuses": [
+    "plotting-open",
+    "roads-done",
+    "fully-developed",
+    "ready-possession"
+  ],
+  "validationCases": [
+    {
+      "name": "plot create ok, no BHK or carpet",
+      "isCreate": true,
+      "body": {
+        "projectName": "A",
+        "propertyType": "Residential Plot",
+        "plotDetails": {
+          "landArea": {
+            "value": 2,
+            "unit": "acre"
+          },
+          "totalPlots": 40,
+          "plotSize": {
+            "minSqft": 1000,
+            "maxSqft": 2400
+          },
+          "plotPrice": {
+            "minRupees": 1500000,
+            "maxRupees": 4200000
+          },
+          "pricePerSqFtRange": {
+            "min": 1500,
+            "max": 1750
+          },
+          "roadWidthsFt": [
+            30,
+            40
+          ],
+          "layoutTypes": [
+            "NA",
+            "RERA"
+          ],
+          "naOrderNumber": "NA/12/2024",
+          "tpApproval": "TP-77",
+          "developmentStatus": "roads-done"
+        }
+      },
+      "expectedPaths": []
+    },
+    {
+      "name": "plot create without plot size",
+      "isCreate": true,
+      "body": {
+        "projectName": "A",
+        "propertyType": "NA Plot",
+        "plotDetails": {
+          "totalPlots": 10
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.plotSize.minSqft"
+      ]
+    },
+    {
+      "name": "plot create with legacy plotSizeRange only",
+      "isCreate": true,
+      "body": {
+        "projectName": "A",
+        "propertyType": "Residential Plot",
+        "configuration": {
+          "plotSizeRange": "1200 - 2000 sqft"
+        }
+      },
+      "expectedPaths": []
+    },
+    {
+      "name": "plot create with unparseable legacy size",
+      "isCreate": true,
+      "body": {
+        "projectName": "A",
+        "propertyType": "Residential Plot",
+        "configuration": {
+          "plotSizeRange": "big"
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.plotSize.minSqft"
+      ]
+    },
+    {
+      "name": "residential create unchanged (nothing new required)",
+      "isCreate": true,
+      "body": {
+        "projectName": "A",
+        "propertyType": "Apartment / Flat"
+      },
+      "expectedPaths": []
+    },
+    {
+      "name": "update name only never fails",
+      "isCreate": false,
+      "body": {
+        "projectName": "B"
+      },
+      "expectedPaths": []
+    },
+    {
+      "name": "update legacy plot project with odd stored data",
+      "isCreate": false,
+      "body": {
+        "propertyType": "Residential Plot",
+        "configuration": {
+          "bhkOptions": [
+            "2BHK"
+          ]
+        }
+      },
+      "expectedPaths": []
+    },
+    {
+      "name": "max below min",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "plotSize": {
+            "minSqft": 2000,
+            "maxSqft": 1000
+          }
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.plotSize.maxSqft"
+      ]
+    },
+    {
+      "name": "range half missing",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "plotPrice": {
+            "minRupees": 100
+          }
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.plotPrice.maxRupees"
+      ]
+    },
+    {
+      "name": "land area needs unit",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "landArea": {
+            "value": 3
+          }
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.landArea.unit"
+      ]
+    },
+    {
+      "name": "land area unit not allowed",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "landArea": {
+            "value": 3,
+            "unit": "sqyd"
+          }
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.landArea.unit"
+      ]
+    },
+    {
+      "name": "total plots must be integer",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "totalPlots": 2.5
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.totalPlots"
+      ]
+    },
+    {
+      "name": "total plots upper bound",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "totalPlots": 100001
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.totalPlots"
+      ]
+    },
+    {
+      "name": "road widths out of range",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "roadWidthsFt": [
+            30,
+            0
+          ]
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.roadWidthsFt"
+      ]
+    },
+    {
+      "name": "too many layout types",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "layoutTypes": [
+            "a",
+            "b",
+            "c",
+            "d",
+            "e",
+            "f"
+          ]
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.layoutTypes"
+      ]
+    },
+    {
+      "name": "unknown development status",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "developmentStatus": "done"
+        }
+      },
+      "expectedPaths": [
+        "plotDetails.developmentStatus"
+      ]
+    },
+    {
+      "name": "null clears a leaf",
+      "isCreate": false,
+      "body": {
+        "plotDetails": {
+          "totalPlots": null,
+          "plotSize": null,
+          "landArea": null
+        }
+      },
+      "expectedPaths": []
+    },
+    {
+      "name": "plotDetails must be an object",
+      "isCreate": false,
+      "body": {
+        "plotDetails": "x"
+      },
+      "expectedPaths": [
+        "plotDetails"
+      ]
+    }
+  ],
+  "derivationCases": [
+    {
+      "name": "create residential plot sets projectType plot",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "Residential Plot",
+        "projectType": "flat"
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Residential",
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "create commercial plot derives category",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "Commercial Plot / Land",
+        "category": "Residential"
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Commercial",
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "create apartment drops a client plot projectType",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "Apartment / Flat",
+        "projectType": "plot"
+      },
+      "expected": {
+        "projectType": "flat",
+        "projectTypeSent": true,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "create villa keeps client projectType",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "Villa",
+        "projectType": "villa"
+      },
+      "expected": {
+        "projectType": "villa",
+        "projectTypeSent": true,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "edit apartment -> plot with stale flat projectType",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Apartment / Flat",
+        "projectType": "flat"
+      },
+      "body": {
+        "propertyType": "Residential Plot",
+        "projectType": "flat"
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Residential",
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": {
+          "from": "other",
+          "to": "plot"
+        }
+      }
+    },
+    {
+      "name": "edit plot -> apartment resets projectType",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Residential Plot",
+        "projectType": "plot"
+      },
+      "body": {
+        "propertyType": "Apartment / Flat"
+      },
+      "expected": {
+        "projectType": "flat",
+        "projectTypeSent": true,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": {
+          "from": "plot",
+          "to": "other"
+        }
+      }
+    },
+    {
+      "name": "edit plot -> villa with client projectType villa",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "NA Plot",
+        "projectType": "plot"
+      },
+      "body": {
+        "propertyType": "Villa",
+        "projectType": "villa"
+      },
+      "expected": {
+        "projectType": "villa",
+        "projectTypeSent": true,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": {
+          "from": "plot",
+          "to": "other"
+        }
+      }
+    },
+    {
+      "name": "edit name only leaves projectType alone",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Residential Plot",
+        "projectType": "plot"
+      },
+      "body": {
+        "projectName": "X"
+      },
+      "expected": {
+        "projectType": null,
+        "projectTypeSent": false,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "edit plot same type cannot downgrade projectType",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Residential Plot",
+        "projectType": "plot"
+      },
+      "body": {
+        "propertyType": "Residential Plot",
+        "projectType": "flat"
+      },
+      "expected": {
+        "projectType": null,
+        "projectTypeSent": false,
+        "category": "Residential",
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "edit apartment same type cannot force plot",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Apartment / Flat",
+        "projectType": "flat"
+      },
+      "body": {
+        "propertyType": "Apartment / Flat",
+        "projectType": "plot"
+      },
+      "expected": {
+        "projectType": null,
+        "projectTypeSent": false,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "edit legacy plot (projectType plot, odd propertyType) body without propertyType",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Plots",
+        "projectType": "plot"
+      },
+      "body": {
+        "projectName": "Y"
+      },
+      "expected": {
+        "projectType": null,
+        "projectTypeSent": false,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "edit residential keeps legacy villa projectType",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "Villa",
+        "projectType": "villa"
+      },
+      "body": {
+        "propertyType": "Villa",
+        "projectType": "villa"
+      },
+      "expected": {
+        "projectType": "villa",
+        "projectTypeSent": true,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "derived fields from plotDetails",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "Residential Plot",
+        "plotDetails": {
+          "landArea": {
+            "value": 2,
+            "unit": "acre"
+          },
+          "totalPlots": 40,
+          "plotSize": {
+            "minSqft": 1000,
+            "maxSqft": 2400
+          },
+          "plotPrice": {
+            "minRupees": 1500000,
+            "maxRupees": 4200000
+          },
+          "pricePerSqFtRange": {
+            "min": 1500,
+            "max": 1750
+          },
+          "roadWidthsFt": [
+            30,
+            40
+          ],
+          "layoutTypes": [
+            "NA",
+            "RERA"
+          ],
+          "naOrderNumber": "NA/12/2024",
+          "tpApproval": "TP-77",
+          "developmentStatus": "roads-done"
+        }
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Residential",
+        "plotSizeRange": "1000 - 2400 sqft",
+        "pricePerSqFt": 1500,
+        "landAreaSqft": 87120,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "client price per sq ft is kept",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "Residential Plot",
+        "pricing": {
+          "pricePerSqFt": 1600
+        },
+        "plotDetails": {
+          "landArea": {
+            "value": 2,
+            "unit": "acre"
+          },
+          "totalPlots": 40,
+          "plotSize": {
+            "minSqft": 1000,
+            "maxSqft": 2400
+          },
+          "plotPrice": {
+            "minRupees": 1500000,
+            "maxRupees": 4200000
+          },
+          "pricePerSqFtRange": {
+            "min": 1500,
+            "max": 1750
+          },
+          "roadWidthsFt": [
+            30,
+            40
+          ],
+          "layoutTypes": [
+            "NA",
+            "RERA"
+          ],
+          "naOrderNumber": "NA/12/2024",
+          "tpApproval": "TP-77",
+          "developmentStatus": "roads-done"
+        }
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Residential",
+        "plotSizeRange": "1000 - 2400 sqft",
+        "pricePerSqFt": 1600,
+        "landAreaSqft": 87120,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "land area in sqft",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "NA Plot",
+        "plotDetails": {
+          "landArea": {
+            "value": 87120,
+            "unit": "sqft"
+          },
+          "plotSize": {
+            "minSqft": 1500,
+            "maxSqft": 1500
+          }
+        }
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Residential",
+        "plotSizeRange": "1500 sqft",
+        "pricePerSqFt": null,
+        "landAreaSqft": 87120,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "clearing land area clears the derived value",
+      "isCreate": false,
+      "stored": {
+        "propertyType": "NA Plot",
+        "projectType": "plot"
+      },
+      "body": {
+        "plotDetails": {
+          "landArea": null
+        }
+      },
+      "expected": {
+        "projectType": null,
+        "projectTypeSent": false,
+        "category": null,
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    },
+    {
+      "name": "client landAreaSqft is ignored",
+      "isCreate": true,
+      "stored": null,
+      "body": {
+        "propertyType": "NA Plot",
+        "plotDetails": {
+          "landAreaSqft": 1,
+          "totalPlots": 5
+        }
+      },
+      "expected": {
+        "projectType": "plot",
+        "projectTypeSent": true,
+        "category": "Residential",
+        "plotSizeRange": null,
+        "pricePerSqFt": null,
+        "landAreaSqft": null,
+        "familyChange": null
+      }
+    }
+  ],
+  "unitCases": [
+    {
+      "value": 1,
+      "from": "acre",
+      "toSqft": 43560
+    },
+    {
+      "value": 2.5,
+      "from": "acre",
+      "toSqft": 108900
+    },
+    {
+      "value": 100,
+      "from": "sqyd",
+      "toSqft": 900
+    },
+    {
+      "value": 100,
+      "from": "sqm",
+      "toSqft": 1076.39
+    },
+    {
+      "value": 1000,
+      "from": "sqft",
+      "toSqft": 1000
+    }
+  ],
+  "displayCases": [
+    {
+      "sqft": 1000,
+      "unit": "sqyd",
+      "expected": 111.1
+    },
+    {
+      "sqft": 1000,
+      "unit": "sqm",
+      "expected": 92.9
+    },
+    {
+      "sqft": 1000.6,
+      "unit": "sqft",
+      "expected": 1001
+    },
+    {
+      "sqft": 43560,
+      "unit": "acre",
+      "expected": 1
+    }
+  ],
+  "parseCases": [
+    {
+      "input": "1200 - 2000 sqft",
+      "expected": {
+        "minSqft": 1200,
+        "maxSqft": 2000
+      }
+    },
+    {
+      "input": "1,200 to 2,400",
+      "expected": {
+        "minSqft": 1200,
+        "maxSqft": 2400
+      }
+    },
+    {
+      "input": "1500",
+      "expected": {
+        "minSqft": 1500,
+        "maxSqft": 1500
+      }
+    },
+    {
+      "input": "big",
+      "expected": null
+    },
+    {
+      "input": "",
+      "expected": null
+    },
+    {
+      "input": "2000-1000",
+      "expected": {
+        "minSqft": 1000,
+        "maxSqft": 2000
+      }
+    }
+  ],
+  "summaryCases": [
+    {
+      "name": "new plot project",
+      "project": {
+        "propertyType": "Residential Plot",
+        "projectType": "plot",
+        "plotDetails": {
+          "landArea": {
+            "value": 2,
+            "unit": "acre"
+          },
+          "totalPlots": 40,
+          "plotSize": {
+            "minSqft": 1000,
+            "maxSqft": 2400
+          },
+          "plotPrice": {
+            "minRupees": 1500000,
+            "maxRupees": 4200000
+          },
+          "pricePerSqFtRange": {
+            "min": 1500,
+            "max": 1750
+          },
+          "roadWidthsFt": [
+            30,
+            40
+          ],
+          "layoutTypes": [
+            "NA",
+            "RERA"
+          ],
+          "naOrderNumber": "NA/12/2024",
+          "tpApproval": "TP-77",
+          "developmentStatus": "roads-done"
+        },
+        "configuration": {
+          "facingOptions": [
+            "East",
+            "North"
+          ]
+        }
+      },
+      "line": "40 plots · 1000 - 2400 sqft · 2 acre · East/North"
+    },
+    {
+      "name": "legacy plot (only plotSizeRange)",
+      "project": {
+        "propertyType": "Residential Plot",
+        "projectType": "plot",
+        "configuration": {
+          "plotSizeRange": "1200 - 2000 sqft"
+        }
+      },
+      "line": "1200 - 2000 sqft"
+    },
+    {
+      "name": "plot with stale BHK is not shown",
+      "project": {
+        "propertyType": "Farm Land",
+        "projectType": "plot",
+        "plotDetails": {
+          "totalPlots": 12
+        },
+        "configuration": {
+          "bhkOptions": [
+            "2BHK"
+          ],
+          "carpetAreaRange": "800"
+        }
+      },
+      "line": "12 plots"
+    },
+    {
+      "name": "plot with nothing",
+      "project": {
+        "propertyType": "Residential Plot",
+        "projectType": "plot"
+      },
+      "line": ""
+    },
+    {
+      "name": "residential",
+      "project": {
+        "propertyType": "Apartment / Flat",
+        "configuration": {
+          "bhkOptions": [
+            "2BHK",
+            "3BHK"
+          ],
+          "carpetAreaRange": "850 - 1200 sqft"
+        }
+      },
+      "line": "2BHK, 3BHK · 850 - 1200 sqft"
+    },
+    {
+      "name": "residential empty bhk",
+      "project": {
+        "propertyType": "Apartment / Flat",
+        "configuration": {
+          "bhkOptions": []
+        }
+      },
+      "line": ""
+    }
+  ]
+}

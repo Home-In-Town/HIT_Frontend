@@ -10,6 +10,8 @@ import {
   orderForReview, countStatuses, buildPlotMapMeta, mapPlotMapField, showPlotMapAction, decidePoll, applyStatuses, applyChanges,
   fitRect, clampTransform, zoomAround, screenToNorm, centerOn, naturalCompare, plotmapErrorText,
   generationFailureText, flagText, styleForStatus, plotNotificationHref,
+  sheetsOf, plotsForSheet, sheetOfPlot, searchAcrossSheets, duplicateMessage, failedSheetsText, tooManySheetsText,
+  sheetStateText, crossSheetDuplicates,
 } from './plotMap.mjs';
 
 // The master fixture is kept byte-identical across repos (sha256 pinned below).
@@ -314,10 +316,92 @@ test('plotNotificationHref: other types and missing project have no link', () =>
   assert.equal(plotNotificationHref({ type: 'plot_booking_request', data: null }), null);
 });
 
+// ── sheets (fixtureVersion 5) ──
+const SP = fx.sheetPayloads;
+
+test('sheetsOf reads the sheets array, orders by idx, and falls back to one virtual sheet', () => {
+  assert.deepEqual(sheetsOf(SP.public).map((s) => [s.idx, s.name]), [[0, 'Sheet 1'], [1, 'Phase 2'], [2, 'Phase 3']]);
+  assert.equal(sheetsOf({ ...SP.public, sheets: [{ idx: 2, name: 'b' }, { idx: 0, name: 'a' }] })[0].name, 'a');
+  // legacy layout / old payload without ?sheets=1: exactly one sheet with the top-level image
+  const legacy = sheetsOf(P.public);
+  assert.equal(legacy.length, 1);
+  assert.equal(legacy[0].idx, 0);
+  assert.deepEqual(legacy[0].image, P.public.image);
+  assert.equal(sheetsOf(null).length, 1);
+});
+
+test('plotsForSheet / sheetOfPlot split the multi-sheet fixture', () => {
+  const plots = SP.public.plots;
+  assert.equal(plotsForSheet(plots, 0).length, 8);
+  assert.equal(plotsForSheet(plots, 1).length, 3);
+  assert.equal(plotsForSheet(plots, 2).length, 1);
+  // a legacy plot without `sheet` is on sheet 0
+  assert.equal(plotsForSheet([{ id: 'x' }], 0).length, 1);
+  assert.equal(sheetOfPlot(plots, '64f000000000000000001111'), 2);
+  assert.equal(sheetOfPlot(plots, 'nope'), null);
+  // per-sheet plot counts equal the fixture sheet counts
+  for (const s of SP.public.sheets) assert.equal(countStatuses(plotsForSheet(plots, s.idx)).plots, s.counts.plots);
+});
+
+test('searchAcrossSheets follows the fixture sheetSearch cases', () => {
+  for (const c of fx.sheetSearch.cases) {
+    const got = searchAcrossSheets(SP.public.plots, c.query).map((h) => ({ plotId: h.plotId, sheet: h.sheet }));
+    assert.deepEqual(got, c.expected, `query ${JSON.stringify(c.query)}`);
+  }
+});
+
+test('Hinglish sheet copy equals the fixture', () => {
+  const c = fx.sheetCopy;
+  for (const k of c.duplicateCases) assert.equal(duplicateMessage(k.n, k.sheetA, k.sheetB), k.text);
+  for (const k of c.failedBlockerCases) assert.equal(failedSheetsText(k.count), k.text);
+  for (const k of c.tooManyCases) assert.equal(tooManySheetsText(k.max), k.text);
+  for (const [state, text] of Object.entries(c.state)) assert.equal(sheetStateText(state), text);
+});
+
+test('publishBlockers with sheets reproduces the fixture sheetBlockers', () => {
+  for (const c of fx.sheetBlockers.cases) assert.deepEqual(publishBlockers(c.plots.map((p) => ({ ...p, number: '1' })), c.sheets), c.expected, c.name);
+});
+
+test('publishBlockers: a failed sheet blocks even when the other sheets are clean', () => {
+  const out = publishBlockers([{ id: 'a', kind: 'plot', number: '1', flags: [] }], [{ idx: 0, state: 'done' }, { idx: 3, state: 'failed' }]);
+  assert.deepEqual(out, [{ code: 'SHEET_FAILED', plotIds: [], count: 1, sheets: [3] }]);
+});
+
+test('crossSheetDuplicates names both sheets; an in-sheet clash is not reported', () => {
+  const sheets = [{ idx: 0, name: 'Sheet 1' }, { idx: 1, name: 'Phase 2' }];
+  const plots = [
+    { id: 'a', kind: 'plot', number: '12', sheet: 0, flags: [] },
+    { id: 'b', kind: 'plot', number: '12', sheet: 1, flags: ['dup_number'] },
+    { id: 'c', kind: 'plot', number: '7', sheet: 1, flags: [] },
+    { id: 'd', kind: 'plot', number: '7', sheet: 1, flags: ['dup_number'] },
+  ];
+  const out = crossSheetDuplicates(plots, sheets);
+  assert.deepEqual(out.map((o) => o.plotId), ['b']);
+  assert.equal(out[0].text, fx.sheetCopy.duplicateCases[0].text);
+  assert.equal(out[0].otherSheet, 0);
+});
+
+test('new error codes have Hinglish text', () => {
+  assert.notEqual(plotmapErrorText('TOO_MANY_SHEETS'), plotmapErrorText('X'));
+  assert.notEqual(plotmapErrorText('SHEET_NOT_FOUND'), plotmapErrorText('X'));
+});
+
+test('the multi-sheet public payload carries no forbidden key anywhere and only allowlisted sheet keys', () => {
+  const forbidden = new Set(fx.publicAllowlist.forbiddenKeysAnywhere);
+  const bad = [];
+  const walk = (v, path) => {
+    if (Array.isArray(v)) v.forEach((x, i) => walk(x, `${path}[${i}]`));
+    else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { if (forbidden.has(k)) bad.push(`${path}.${k}`); walk(x, `${path}.${k}`); }
+  };
+  walk(SP.public, 'public');
+  assert.deepEqual(bad, []);
+  for (const s of SP.public.sheets) assert.deepEqual(Object.keys(s).sort(), [...fx.publicAllowlist.sheetsMode.sheet].sort());
+});
+
 // Cross-repo drift guard: backend, web and mobile pin the same sha256. Edit the
 // master fixture, copy it to all three repos and update the three hashes together.
 test('shared fixture is the byte-identical master copy', () => {
-  assert.equal(createHash('sha256').update(readFileSync(new URL('./__fixtures__/plot-map-fixture.json', import.meta.url))).digest('hex'), '9031b7a31a98504c579ea70bc211b252859328fa7c58564efc719a66801c5fb3');
+  assert.equal(createHash('sha256').update(readFileSync(new URL('./__fixtures__/plot-map-fixture.json', import.meta.url))).digest('hex'), '8c8699a54b553c9b440ad14c28d29f095ee7c77aa504358ab05faee1d563a4ff');
 });
 // Rendering side of the leak check: the anonymous page never reads a private field.
 test('public viewer sources do not reference private booking fields', () => {

@@ -67,6 +67,107 @@ export function searchPlots(plots, query) {
   return [...exact.sort(byNumber), ...prefix.sort(byNumber)].map((x) => x.p);
 }
 
+// ── Sheets (multi-sheet layouts, fixtureVersion 5) ──────────────────────────
+// Previous behaviour: a layout was one image with every plot drawn on it. Now a
+// layout has 1..N sheets and each plot carries `sheet` (its idx). A payload
+// fetched without `?sheets=1`, or a legacy layout, has no `sheets` array: it is
+// read as one virtual sheet 0 so single-sheet screens look exactly as before.
+
+/**
+ * Sheets of a payload, ordered by idx. Always at least one.
+ * @param {{ sheets?: any[]; image?: any; counts?: any } | null | undefined} payload
+ * @returns {{ idx: number; name: string; image: any; counts?: any }[]}
+ */
+export function sheetsOf(payload) {
+  if (Array.isArray(payload?.sheets) && payload.sheets.length > 0) {
+    return [...payload.sheets].sort((a, b) => a.idx - b.idx);
+  }
+  return [{ idx: 0, name: 'Sheet 1', image: payload?.image, counts: payload?.counts }];
+}
+
+/** Plots drawn on one sheet; a plot without `sheet` is on sheet 0. @template {{ sheet?: number }} T @param {T[]} plots @param {number} idx @returns {T[]} */
+export function plotsForSheet(plots, idx) {
+  return (plots || []).filter((p) => (p.sheet ?? 0) === idx);
+}
+
+/** Sheet idx of a plot id, or null when unknown. @param {{ id: string; sheet?: number }[]} plots @param {string} plotId */
+export function sheetOfPlot(plots, plotId) {
+  const p = (plots || []).find((x) => x.id === plotId);
+  return p ? (p.sheet ?? 0) : null;
+}
+
+/**
+ * Search across ALL sheets: exact number matches first, then prefix matches,
+ * plots only; each group ordered by (sheet, natural number). A hit carries the
+ * sheet so the viewer switches tab before focusing the plot.
+ * @param {{ id: string; kind?: string; number?: string | null; sheet?: number }[]} plots
+ * @param {string} query
+ * @returns {{ plotId: string; sheet: number }[]}
+ */
+export function searchAcrossSheets(plots, query) {
+  const q = normalisePlotNumber(query);
+  if (!q) return [];
+  const exact = [];
+  const prefix = [];
+  for (const p of plots) {
+    if (p.kind !== 'plot') continue;
+    const n = normalisePlotNumber(p.number);
+    if (!n) continue;
+    const hit = { plotId: p.id, sheet: p.sheet ?? 0, n };
+    if (n === q) exact.push(hit);
+    else if (n.startsWith(q)) prefix.push(hit);
+  }
+  const order = (a, b) => a.sheet - b.sheet || naturalCompare(a.n, b.n);
+  return [...exact.sort(order), ...prefix.sort(order)].map(({ plotId, sheet }) => ({ plotId, sheet }));
+}
+
+const SHEET_COPY = {
+  duplicate: 'Plot {n} do sheet mein hai ({sheetA}, {sheetB}). Ek ka number badlo.',
+  failedBlocker: '{count} sheet nahi ban payi. Dobara try karo ya us sheet ko hata do.',
+  tooMany: 'Ek project mein {max} se zyada sheets nahi ho sakti.',
+  state: { queued: 'Line mein hai', generating: 'Ban rahi hai', done: 'Taiyaar', failed: 'Nahi ban payi' },
+};
+const fill = (tpl, vars) => tpl.replace(/\{(\w+)\}/g, (_m, k) => String(vars[k]));
+
+/** @param {string} n @param {string} sheetA @param {string} sheetB */
+export function duplicateMessage(n, sheetA, sheetB) { return fill(SHEET_COPY.duplicate, { n, sheetA, sheetB }); }
+/** @param {number} count */
+export function failedSheetsText(count) { return fill(SHEET_COPY.failedBlocker, { count }); }
+/** @param {number} max */
+export function tooManySheetsText(max) { return fill(SHEET_COPY.tooMany, { max }); }
+/** @param {string} state */
+export function sheetStateText(state) { return SHEET_COPY.state[/** @type {keyof typeof SHEET_COPY.state} */ (state)] || String(state); }
+
+/**
+ * For each plot flagged dup_number, the sheet that holds the same number, so
+ * the owner sees "Plot 12 do sheet mein hai (Sheet 1, Phase 2)" and can rename.
+ * Only a cross-sheet clash is returned: an in-sheet clash keeps the existing
+ * "Number do baar aaya" flag text.
+ * @param {{ id: string; kind?: string; number?: string | null; sheet?: number; flags?: string[] }[]} plots
+ * @param {{ idx: number; name: string }[]} sheets
+ * @returns {{ plotId: string; number: string; sheet: number; otherSheet: number; text: string }[]}
+ */
+export function crossSheetDuplicates(plots, sheets) {
+  const nameOf = (idx) => (sheets || []).find((s) => s.idx === idx)?.name ?? `Sheet ${idx + 1}`;
+  const holders = new Map();
+  for (const p of plots) {
+    if (p.kind !== 'plot' || (p.flags || []).includes('dup_number')) continue;
+    const n = normalisePlotNumber(p.number);
+    if (n && !holders.has(n)) holders.set(n, p.sheet ?? 0);
+  }
+  const out = [];
+  for (const p of plots) {
+    if (p.kind !== 'plot' || !(p.flags || []).includes('dup_number')) continue;
+    const n = normalisePlotNumber(p.number);
+    if (!n || !holders.has(n)) continue;
+    const mine = p.sheet ?? 0;
+    const other = holders.get(n);
+    if (other === mine) continue;
+    out.push({ plotId: p.id, number: n, sheet: mine, otherSheet: other, text: duplicateMessage(n, nameOf(other), nameOf(mine)) });
+  }
+  return out;
+}
+
 // ── Status text and colour ──────────────────────────────────────────────────
 
 /** Public/broker see two values, the owner side sees four. @param {string} status @param {string} [role] */
@@ -292,15 +393,20 @@ export function bookButtonState(payload, plotId) {
  * local edit without a round trip.
  * @param {{ id: string; kind?: string; number?: string | null; flags?: string[] }[]} plots
  */
-export function publishBlockers(plots) {
+export function publishBlockers(plots, sheets = []) {
   const real = plots.filter((p) => p.kind === 'plot');
-  if (real.length === 0) return [{ code: 'NO_PLOTS', plotIds: [], count: 0 }];
+  // A failed sheet has no plots, so without SHEET_FAILED a layout with part of
+  // the site missing would look publishable (previous single-sheet code had no
+  // such state). Order matches the server: plot blockers, then SHEET_FAILED.
+  const failed = (sheets || []).filter((s) => s.state === 'failed').map((s) => s.idx).sort((a, b) => a - b);
+  const sheetBlock = failed.length ? [{ code: 'SHEET_FAILED', plotIds: [], count: failed.length, sheets: failed }] : [];
+  if (real.length === 0) return [{ code: 'NO_PLOTS', plotIds: [], count: 0 }, ...sheetBlock];
   const noNumber = real.filter((p) => !p.number || (p.flags || []).includes('no_number')).map((p) => p.id);
   const dup = real.filter((p) => (p.flags || []).includes('dup_number')).map((p) => p.id);
   const out = [];
   if (noNumber.length) out.push({ code: 'NO_NUMBER', plotIds: noNumber, count: noNumber.length });
   if (dup.length) out.push({ code: 'DUP_NUMBER', plotIds: dup, count: dup.length });
-  return out;
+  return [...out, ...sheetBlock];
 }
 
 /** LayoutStats from the non-deleted plots of a draft. @param {{ kind?: string; flags?: string[] }[]} plots */
@@ -460,6 +566,9 @@ const ERROR_TEXT = {
   GENERATOR_NOT_CONFIGURED: 'Layout generator abhi ready nahi hai',
   JOB_START_FAILED: 'Layout shuru nahi ho paya, dobara try karein',
   NOT_PLOT_PROJECT: 'Ye project plot type ka nahi hai',
+  // Callers that know the limit use tooManySheetsText(max) instead.
+  TOO_MANY_SHEETS: 'Ek project mein itni zyada sheets nahi ho sakti',
+  SHEET_NOT_FOUND: 'Ye sheet ab nahi mili, page refresh karo',
 };
 
 /** @param {string | null | undefined} code @param {string} [fallback] */
