@@ -62,6 +62,7 @@ export default function PdfPagePicker({
   notice,
   onConfirm,
   onCancel,
+  multi,
 }: {
   doc: PDFDocumentProxy;
   busy: boolean;
@@ -69,16 +70,92 @@ export default function PdfPagePicker({
   notice: string | null;
   onConfirm: (page: number, extraRotationDeg: 0 | 90 | 180 | 270) => void;
   onCancel: () => void;
+  /**
+   * Plot-map import: every selected page becomes one sheet. Previous behaviour (the default, used by the
+   * overlay tool): exactly one page. All pages start selected, up to `maxSelect` (the free sheet slots).
+   */
+  multi?: { maxSelect: number; onConfirmPages: (pages: number[], extraRotationDeg: 0 | 90 | 180 | 270) => void };
 }) {
   const total = doc.numPages;
   const [page, setPage] = useState(1);
   const [rotation, setRotation] = useState<0 | 90 | 180 | 270>(0);
   const [pageText, setPageText] = useState('1');
+  const cap = multi ? Math.max(0, multi.maxSelect) : 1;
+  const [picked, setPicked] = useState<number[]>(() => Array.from({ length: Math.min(total, cap) }, (_, i) => i + 1));
   const shown = Math.min(total, THUMBNAIL_PAGE_LIMIT);
 
   const selectPage = (p: number) => { setPage(p); setPageText(String(p)); };
+  const togglePage = (p: number) => {
+    setPicked((cur) => (cur.includes(p) ? cur.filter((x) => x !== p) : (cur.length < cap ? [...cur, p].sort((a, b) => a - b) : cur)));
+  };
   const typed = Number(pageText);
   const typedValid = Number.isInteger(typed) && typed >= 1 && typed <= total;
+
+  if (multi) {
+    return (
+      <div className="flex flex-col gap-2">
+        <p className="text-gray-700">
+          Is PDF mein {total} page hain. Har chuna hua page ek sheet banega.
+          {total > cap && ` Sirf ${cap} aur sheet jod sakte ho, isliye ${cap} page tak chun sakte ho.`}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" disabled={busy} onClick={() => setPicked(Array.from({ length: Math.min(total, cap) }, (_, i) => i + 1))} className="min-h-[44px] border rounded-lg px-3 disabled:opacity-40">Sab pages</button>
+          <button type="button" disabled={busy} onClick={() => setPicked([])} className="min-h-[44px] border rounded-lg px-3 disabled:opacity-40">Koi nahi</button>
+          <span className="text-gray-600" aria-live="polite">Chune hue: {picked.length} / {cap}</span>
+        </div>
+        <div className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto">
+          {Array.from({ length: shown }, (_, i) => (
+            <Thumb key={i + 1} doc={doc} page={i + 1} selected={picked.includes(i + 1)} onSelect={togglePage} />
+          ))}
+        </div>
+        {total > THUMBNAIL_PAGE_LIMIT && (
+          <div>
+            <label htmlFor="pdf-page-number" className="text-gray-500">Page {THUMBNAIL_PAGE_LIMIT} ke aage ka page number (1-{total})</label>
+            <div className="mt-1 flex gap-2">
+              <input
+                id="pdf-page-number"
+                type="number"
+                min={1}
+                max={total}
+                value={pageText}
+                onChange={(e) => setPageText(e.target.value)}
+                className="border p-2 w-full rounded min-h-[44px]"
+              />
+              <button type="button" disabled={busy || !typedValid || picked.includes(typed) || picked.length >= cap} onClick={() => togglePage(typed)} className="min-h-[44px] border rounded-lg px-3 disabled:opacity-40">Jodo</button>
+            </div>
+            {!typedValid && <p className="text-red-700">1 se {total} ke beech ka page likho.</p>}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => setRotation(((rotation + 90) % 360) as 0 | 90 | 180 | 270)}
+            className="min-h-[44px] border rounded-lg px-3 disabled:opacity-40"
+          >
+            Pages 90° ghumao
+          </button>
+          <span className="text-gray-500">Rotation {rotation}° (sab chune hue pages par)</span>
+        </div>
+        <div role="status" aria-live="polite" className="min-h-[1rem]">
+          {notice && <p className="text-gray-700">{notice}</p>}
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <button type="button" disabled={busy} onClick={onCancel} className="min-h-[44px] border rounded-lg py-2 disabled:opacity-40">
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy || picked.length === 0}
+            onClick={() => multi.onConfirmPages(picked, rotation)}
+            className="min-h-[44px] bg-orange-600 text-white rounded-lg py-2 disabled:opacity-40"
+          >
+            {picked.length} page chune
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">

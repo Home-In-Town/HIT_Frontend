@@ -9,8 +9,8 @@ import {
   API_URL, ApiError, COMMON_FETCH_OPTIONS, getAuthHeaders, handleResponse,
 } from '@/lib/api';
 import type {
-  BookingForOwner, BookingStatus, LayoutDetailResponse, LayoutListItem, PlotEditResponse, PlotMapPayload, PlotRef,
-  PollResponse, PublishResponse,
+  Blocker, BookingForOwner, BookingStatus, GenerateResponse, GenerateSheetInput, LayoutDetailResponse, LayoutListItem, PlotEditResponse,
+  PlotMapPayload, PlotRef, PollResponse, PublishResponse,
 } from '@/types/plotmap';
 
 export { getPlotMap, pollPublicPlotMap } from '@/lib/plotmapPublic';
@@ -47,17 +47,38 @@ async function send<T>(url: string, method: 'GET' | 'POST' | 'PATCH' | 'PUT' | '
 export const plotmapApi = {
   /** E2: caller's view. Without `since` the full payload, with it the poll answer. */
   getMap(projectId: string): Promise<PlotMapPayload> {
-    return send(base(projectId), 'GET');
+    // ?sheets=1 opts in to `sheets` and `plot.sheet`. Without it the backend answers the old
+    // single-image shape (sheet 0 only), which would hide every plot of sheets 2..N.
+    return send(`${base(projectId)}?sheets=1`, 'GET');
   },
   poll(projectId: string, since: number): Promise<PollResponse> {
     return send(`${base(projectId)}?since=${since}`, 'GET');
   },
 
   // generation (E4-E10)
-  generate(projectId: string, imageKey: string, pdfPage?: number): Promise<{ layoutId: string; runId: string; state: 'generating'; warnings: { code: string; message: string }[] }> {
-    return send(`${base(projectId)}/generate`, 'POST', pdfPage ? { imageKey, pdfPage } : { imageKey });
+  /**
+   * E4. A list starts one detector run per sheet in one request (one image or one PDF page each).
+   * Previous behaviour: exactly one { imageKey, pdfPage } per call.
+   */
+  generate(projectId: string, sheets: GenerateSheetInput[]): Promise<GenerateResponse> {
+    return send(`${base(projectId)}/generate`, 'POST', {
+      sheets: sheets.map((s) => (s.pdfPage ? { imageKey: s.imageKey, pdfPage: s.pdfPage } : { imageKey: s.imageKey })),
+    });
   },
-  listLayouts(projectId: string): Promise<{ layouts: LayoutListItem[] }> {
+  /** E24: rename a sheet (public tab text, never a file name). */
+  renameSheet(projectId: string, layoutId: string, idx: number, name: string, expectedVersion?: number): Promise<{ sheet: { idx: number; name: string }; layout: { version: number } }> {
+    return send(`${base(projectId)}/layouts/${encodeURIComponent(layoutId)}/sheets/${idx}`, 'PATCH',
+      expectedVersion === undefined ? { name } : { name, expectedVersion });
+  },
+  /** E25: run a failed sheet again. */
+  retrySheet(projectId: string, layoutId: string, idx: number): Promise<{ sheet: { idx: number; state: 'generating' | 'queued' }; runId: string }> {
+    return send(`${base(projectId)}/layouts/${encodeURIComponent(layoutId)}/sheets/${idx}/retry`, 'POST', {});
+  },
+  /** E26: drop a sheet and its plots from the draft. No undo. */
+  removeSheet(projectId: string, layoutId: string, idx: number): Promise<{ removed: true; layout: { version: number; blockers: Blocker[] } }> {
+    return send(`${base(projectId)}/layouts/${encodeURIComponent(layoutId)}/sheets/${idx}`, 'DELETE');
+  },
+  listLayouts(projectId: string): Promise<{ layouts: LayoutListItem[]; limits?: { maxSheets: number; maxPlotsPerSheet: number } }> {
     return send(`${base(projectId)}/layouts`, 'GET');
   },
   getLayout(projectId: string, layoutId: string): Promise<LayoutDetailResponse> {

@@ -25,25 +25,40 @@ export default function OverlayFilePicker({
   disabled,
   hasImage,
   onPicked,
+  multiple = false,
+  label,
 }: {
   disabled?: boolean;
   hasImage: boolean;
   onPicked: (file: File, kind: 'image' | 'pdf') => void;
+  /**
+   * Plot-map import: several files at once. `onPicked` runs once per accepted file, in the order picked,
+   * and a refused file does not stop the others (the first refusal is shown with its file name).
+   * Previous behaviour, still the default and used by the overlay tool: one file per pick.
+   */
+  multiple?: boolean;
+  /** Button text; defaults to the overlay tool's wording. */
+  label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
 
-  const handle = (file: File | undefined) => {
-    if (!file) return;
-    const result = checkLayoutFile(file);
-    const msg = layoutFileProblem(result);
+  const handle = (files: FileList | null) => {
+    // Copy the files out before clearing the input, which empties the live FileList.
+    const list = Array.from(files ?? []);
     if (inputRef.current) inputRef.current.value = '';
-    if (msg || !result.ok) {
-      setProblem(msg);
-      return;
+    if (list.length === 0) return;
+    let firstProblem: string | null = null;
+    for (const file of multiple ? list : list.slice(0, 1)) {
+      const result = checkLayoutFile(file);
+      const msg = layoutFileProblem(result);
+      if (msg || !result.ok) {
+        firstProblem = firstProblem ?? (multiple ? `${file.name}: ${msg}` : msg);
+        continue;
+      }
+      onPicked(file, result.kind);
     }
-    setProblem(null);
-    onPicked(file, result.kind);
+    setProblem(firstProblem);
   };
 
   return (
@@ -57,10 +72,11 @@ export default function OverlayFilePicker({
           type="file"
           accept={LAYOUT_ACCEPT}
           className="sr-only"
+          multiple={multiple}
           disabled={disabled}
-          onChange={(e) => handle(e.target.files?.[0])}
+          onChange={(e) => handle(e.target.files)}
         />
-        {hasImage ? 'Replace layout image or PDF' : 'Upload layout image or PDF'}
+        {label ?? (hasImage ? 'Replace layout image or PDF' : 'Upload layout image or PDF')}
       </label>
       <p className="text-[11px] text-gray-500">PNG, JPG, WEBP up to {mb(IMAGE_MAX_BYTES)}, or PDF up to {mb(PDF_MAX_BYTES)}.</p>
       <div role="alert" className="min-h-[1rem]">

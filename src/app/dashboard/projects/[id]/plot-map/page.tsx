@@ -12,11 +12,13 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { ApiError } from '@/lib/api';
 import { apiCode, plotmapApi } from '@/lib/plotmapApi';
 import { usePlotMapLive } from '@/lib/usePlotMapLive';
-import { plotmapErrorText } from '@/lib/plotMap.mjs';
+import { useActiveSheet } from '@/lib/useActiveSheet';
+import { plotmapErrorText, sheetOfPlot } from '@/lib/plotMap.mjs';
 import type { PlotMapPayload, PlotMapPlot } from '@/types/plotmap';
 import PlotMapViewer from '@/components/plotmap/PlotMapViewer';
 import PlotSheet from '@/components/plotmap/PlotSheet';
 import RequestsPanel from '@/components/plotmap/RequestsPanel';
+import SheetTabs from '@/components/plotmap/SheetTabs';
 
 type Load =
   | { state: 'loading' }
@@ -36,7 +38,9 @@ function Screen({ projectId, initial }: { projectId: string; initial: PlotMapPay
   const { payload, refreshFull, offline } = usePlotMapLive({ initial, loadFull, loadPoll, fullOnChange: ownerSide || hasOwnPending });
   const current = payload ?? initial;
 
+  const sheet = useActiveSheet(current, deepPlot);
   const [selectedId, setSelectedId] = useState<string | null>(deepPlot);
+  const [focusId, setFocusId] = useState<string | null>(deepPlot);
   const [requestPlotId, setRequestPlotId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sheetError, setSheetError] = useState<string | null>(null);
@@ -46,7 +50,14 @@ function Screen({ projectId, initial }: { projectId: string; initial: PlotMapPay
   const requestPlot = useMemo(() => current.plots.find((p) => p.id === requestPlotId) ?? null, [current.plots, requestPlotId]);
   const mineIds = useMemo(() => new Set((current.myRequests ?? []).map((r) => r.plotId)), [current.myRequests]);
 
-  const select = (id: string | null) => { setSelectedId(id); setSheetError(null); };
+  // A request row or a notification may point at a plot on another sheet: open that sheet too.
+  const select = (id: string | null) => {
+    setSelectedId(id);
+    setSheetError(null);
+    if (id) sheet.showPlot(id);
+  };
+  const changeSheet = (idx: number) => { sheet.setActive(idx); setSelectedId(null); setFocusId(null); };
+  const jumpTo = (hit: { plotId: string; sheet: number }) => { sheet.setActive(hit.sheet); setSelectedId(hit.plotId); setFocusId(hit.plotId); };
 
   const run = async (fn: () => Promise<unknown>, okText: string) => {
     setBusy(true);
@@ -90,18 +101,20 @@ function Screen({ projectId, initial }: { projectId: string; initial: PlotMapPay
 
       <div className={`grid gap-4 ${ownerSide ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : ''}`}>
         <div className="flex min-w-0 flex-col gap-3">
+          <SheetTabs tabs={sheet.tabs} activeIdx={sheet.activeIdx} onChange={changeSheet} />
           <PlotMapViewer
-            image={current.image}
-            plots={current.plots}
+            image={sheet.image}
+            plots={sheet.plots}
             role={ownerSide ? 'owner_side' : 'broker'}
             selectedId={selectedId}
             onSelect={select}
-            focusPlotId={deepPlot}
+            focusPlotId={focusId}
             mineIds={mineIds}
             heightClass="h-[65vh] min-h-[360px]"
+            {...(sheet.multi ? { searchAll: current.plots, currentSheet: sheet.activeIdx, sheetNameOf: sheet.nameOf, onSearchPick: jumpTo } : {})}
           />
           {selected && (
-            <PlotSheet payload={current} plot={selected} owner={owner} busy={busy} error={sheetError} onClose={() => select(null)} />
+            <PlotSheet payload={current} plot={selected} owner={owner} busy={busy} error={sheetError} sheetName={sheet.multi ? sheet.nameOf(sheetOfPlot(current.plots, selected.id) ?? 0) : undefined} onClose={() => select(null)} />
           )}
         </div>
         {ownerSide && (

@@ -11,7 +11,7 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useZoomPan } from '@/lib/useZoomPan';
 import {
-  countStatuses, hitTest, naturalCompare, NON_PLOT_STYLE, searchPlots, statusLabel, styleForStatus,
+  countStatuses, hitTest, naturalCompare, NON_PLOT_STYLE, searchAcrossSheets, searchPlots, statusLabel, styleForStatus,
 } from '@/lib/plotMap.mjs';
 import type { PlotMapImage, PlotMapPlot } from '@/types/plotmap';
 
@@ -106,9 +106,20 @@ const LEGEND: { status: string; role?: 'owner_side' }[] = [
 
 export default function PlotMapViewer({
   image, plots, role = 'public', selectedId = null, onSelect, flaggedIds, mineIds, focusPlotId, heightClass = 'h-[60vh] min-h-[320px]',
+  searchAll, currentSheet = 0, sheetNameOf, onSearchPick,
 }: {
   image: PlotMapImage;
   plots: ShapePlot[];
+  /**
+   * Multi-sheet layouts: the plots of EVERY sheet (`plots` is only the visible sheet). Search then
+   * looks in all of them and a hit on another sheet is reported through `onSearchPick`, so the page
+   * can switch the tab. Previous behaviour: search only saw the drawn sheet, so a plot on sheet 2 was
+   * "not found" while sheet 1 was open. Leave unset for a single-sheet layout (nothing changes).
+   */
+  searchAll?: ShapePlot[];
+  currentSheet?: number;
+  sheetNameOf?: (idx: number) => string;
+  onSearchPick?: (hit: { plotId: string; sheet: number }) => void;
   role?: ViewerRole;
   selectedId?: string | null;
   onSelect: (id: string | null) => void;
@@ -128,6 +139,9 @@ export default function PlotMapViewer({
   const byId = useMemo(() => new Map(plots.map((p) => [p.id, p])), [plots]);
   const matches = useMemo(() => searchPlots(plots, query), [plots, query]);
   const matchIds = useMemo(() => new Set(matches.map((m) => m.id)), [matches]);
+  const crossHits = useMemo(() => (searchAll ? searchAcrossSheets(searchAll, query) : null), [searchAll, query]);
+  const otherSheetHits = useMemo(() => (crossHits ?? []).filter((h) => h.sheet !== currentSheet), [crossHits, currentSheet]);
+  const numberOf = useMemo(() => new Map((searchAll ?? []).map((p) => [p.id, p.number])), [searchAll]);
   const counts = useMemo(() => countStatuses(plots), [plots]);
   const plotsOnly = useMemo(() => plots.filter((p) => p.kind === 'plot'), [plots]);
   const imgSize = useMemo(() => ({ w: W, h: H }), [W, H]);
@@ -155,13 +169,25 @@ export default function PlotMapViewer({
   };
   const focusRef = useRef(focusOnPlot);
   useEffect(() => { focusRef.current = focusOnPlot; });
-  useEffect(() => { if (focusPlotId) focusRef.current(focusPlotId); }, [focusPlotId]);
+  // A different sheet is a different drawing: the old zoom and pan point at nothing. Declared before the
+  // focus effect so a jump to a plot on another sheet resets first, then centres on the plot.
+  useEffect(() => { zp.reset(); }, [image.url, zp.reset]);
+  useEffect(() => { if (focusPlotId) focusRef.current(focusPlotId); }, [focusPlotId, image.url]);
 
   // Screen px per SVG unit, with the zoom rounded to half steps so labels re-render per step, not per frame.
   const kBucket = Math.max(0.0001, (zp.fit.cw / W) * (Math.round(zp.transform.scale * 2) / 2));
   const labelScale = zp.fit.cw > 0 ? kBucket : 0;
 
+  const pickOtherSheet = (hit: { plotId: string; sheet: number }) => {
+    setHint(`Plot ${numberOf.get(hit.plotId) ?? ''} ${sheetNameOf?.(hit.sheet) ?? `Sheet ${hit.sheet + 1}`} par hai`);
+    onSearchPick?.(hit);
+  };
+
   const submitSearch = () => {
+    // Nothing on the open sheet: jump to the best hit elsewhere. A hit on the open sheet always wins over
+    // one on another sheet (the other-sheet hits stay listed under the search box for a manual pick).
+    const top = crossHits?.[0];
+    if (matches.length === 0 && top && top.sheet !== currentSheet && onSearchPick) { pickOtherSheet(top); return; }
     const first = matches[0];
     if (!first) { setHint(query.trim() ? 'Is number ka plot nahi mila' : ''); return; }
     setHint('');
@@ -239,6 +265,17 @@ export default function PlotMapViewer({
       <p role="status" aria-live="polite" className="min-h-[1.25rem] text-sm text-gray-700">
         {hint || (query && matches.length > 0 ? `${matches.length} plot mile` : '')}
       </p>
+      {onSearchPick && otherSheetHits.length > 0 && (
+        <ul className="flex flex-wrap gap-2" aria-label="Dusri sheet par mile plots">
+          {otherSheetHits.slice(0, 8).map((h) => (
+            <li key={h.plotId}>
+              <button type="button" className={btn} onClick={() => pickOtherSheet(h)}>
+                Plot {numberOf.get(h.plotId) ?? '?'} · {sheetNameOf?.(h.sheet) ?? `Sheet ${h.sheet + 1}`}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {mode === 'map' ? (
         <div

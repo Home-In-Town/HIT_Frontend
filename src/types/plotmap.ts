@@ -30,6 +30,8 @@ export interface BookingSummary {
 
 export interface PlotMapPlot {
   id: string;
+  /** Sheet idx the plot is drawn on. Only sent with `?sheets=1`; absent = sheet 0 (legacy). */
+  sheet?: number;
   key: string;
   number: string | null;
   kind: PlotKind;
@@ -72,12 +74,22 @@ export interface ViewerInfo {
   reason: string | null;
 }
 
+/** One drawing of a multi-sheet layout (viewer side). Public sheets carry only these keys. */
+export interface PlotMapSheet {
+  idx: number;
+  name: string;
+  image: PlotMapImage;
+  counts: PlotMapCounts;
+}
 export interface PlotMapPayload {
   layoutId: string;
   version: number;
   seq: number;
   project: PlotMapProject;
+  /** = sheets[0].image (kept for old readers and the share preview). */
   image: PlotMapImage;
+  /** Present only when requested with `?sheets=1`; a legacy layout answers one virtual sheet. */
+  sheets?: PlotMapSheet[];
   plots: PlotMapPlot[];
   counts: PlotMapCounts;
   viewer?: ViewerInfo;
@@ -155,12 +167,44 @@ export interface LayoutListItem {
   createdAt: string;
   version: number;
   stats: LayoutStats;
+  sheetCount?: number;
 }
 
 export interface Blocker {
-  code: 'NO_PLOTS' | 'NO_NUMBER' | 'DUP_NUMBER';
+  code: 'NO_PLOTS' | 'NO_NUMBER' | 'DUP_NUMBER' | 'SHEET_FAILED';
   plotIds: string[];
   count: number;
+  /** SHEET_FAILED only: idx of every failed sheet. */
+  sheets?: number[];
+}
+
+export type SheetState = 'queued' | 'generating' | 'done' | 'failed';
+
+/** E6 `layout.sheets[]`: the owner's per-sheet progress and review data. */
+export interface LayoutSheet {
+  idx: number;
+  name: string;
+  state: SheetState;
+  image: PlotMapImage;
+  stats: LayoutStats;
+  warnings: { code: string; message: string }[];
+  failure: { code: string; message: string } | null;
+  attempts: number;
+}
+
+/** One entry of the E4 body. */
+export interface GenerateSheetInput {
+  imageKey: string;
+  pdfPage?: number;
+}
+
+export interface GenerateResponse {
+  layoutId: string;
+  runId: string;
+  runIds?: string[];
+  state: 'generating';
+  sheets?: { idx: number; name: string; state: SheetState }[];
+  warnings: { code: string; message: string }[];
 }
 
 export type PlotFlag =
@@ -183,6 +227,8 @@ export interface LayoutDetail {
   createdAt: string;
   elapsedSec?: number;
   stats: LayoutStats;
+  /** Absent from an old backend; the editor then treats the layout as one sheet. */
+  sheets?: LayoutSheet[];
   generation: {
     startedAt: string | null;
     finishedAt: string | null;

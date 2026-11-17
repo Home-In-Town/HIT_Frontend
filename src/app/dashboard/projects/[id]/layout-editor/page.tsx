@@ -1,9 +1,10 @@
 ﻿'use client';
 // Layout Editor, rewritten. Before: a ~1500-line editor with Boundary / Roads /
 // Plots / AI tabs, manual drawing, a grid tool, overlay drag/rotate/scale and
-// two-point georeferencing on a satellite map. Now: import an image or PDF,
-// press "Layout generate karo", check and fix (plot number, remove a false
-// box), publish. Nothing here places or draws anything.
+// two-point georeferencing on a satellite map. Now: import images and/or PDF
+// pages (each one is a sheet), press "Layout generate karo", check and fix
+// (plot number, remove a false box, per sheet), publish. Nothing here places
+// or draws anything.
 //
 // The page renders exactly one of four states, decided by E5 (addendum 13.2):
 //  1. E5 404 PLOTMAP_NOT_AVAILABLE: only "enabled nahi hai". No import panel and
@@ -30,7 +31,7 @@ type View =
   | { state: 'unavailable' }
   | { state: 'forbidden' }
   | { state: 'error'; message: string }
-  | { state: 'ready'; layouts: LayoutListItem[] };
+  | { state: 'ready'; layouts: LayoutListItem[]; maxSheets?: number };
 
 function Shell({ projectId, children }: { projectId: string; children: React.ReactNode }) {
   return (
@@ -59,7 +60,8 @@ export default function LayoutEditorPage() {
   const load = useCallback(async () => {
     try {
       const r = await plotmapApi.listLayouts(id);
-      setView({ state: 'ready', layouts: r.layouts });
+      // `limits` comes with the multi-sheet backend; an older one omits it and the panel falls back to 10.
+      setView({ state: 'ready', layouts: r.layouts, maxSheets: r.limits?.maxSheets });
     } catch (e) {
       const code = apiCode(e);
       if (e instanceof ApiError && e.status === 401) { router.replace('/login'); return; }
@@ -127,6 +129,7 @@ export default function LayoutEditorPage() {
           hasLive={!!live}
           onPublished={() => { setLastRun(null); void load(); }}
           onDiscarded={() => { void load(); }}
+          onRegenerating={() => { void load(); }}
         />
       </Shell>
     );
@@ -135,7 +138,7 @@ export default function LayoutEditorPage() {
   const retry = lastRun ? async () => {
     setRetryError(null);
     try {
-      await plotmapApi.generate(id, lastRun.imageKey, lastRun.pdfPage ?? undefined);
+      await plotmapApi.generate(id, lastRun.sheets);
       void load();
     } catch (e) {
       setRetryError(plotmapErrorText(apiCode(e), e instanceof Error ? e.message : undefined));
@@ -164,6 +167,7 @@ export default function LayoutEditorPage() {
         <PlotmapImportPanel
           projectId={id}
           hasLive={!!live}
+          maxSheets={view.maxSheets}
           onStarted={(run) => { setLastRun(run); setForceImport(false); void load(); }}
           onConflict={() => { void load(); }}
         />

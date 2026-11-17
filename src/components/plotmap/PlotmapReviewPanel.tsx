@@ -3,40 +3,57 @@
 // or remove a box that is not a plot. No drag, no draw, no resize: if the AI got
 // a shape wrong, the owner regenerates. Publish is blocked until every plot has
 // one unique number; the server computes the blockers and this panel shows them.
+//
+// A layout can have several sheets (one per image / PDF page). Previous
+// behaviour: one image, so one viewer showed every plot. Now a tab strip
+// switches the sheet, the plot list and the boxes follow the open sheet, search
+// spans all sheets, and a plot number that appears on two sheets is explained in
+// Hinglish so the owner can rename one of them. A single-sheet draft shows no
+// tabs and behaves exactly as before.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { apiBody, apiCode, plotmapApi } from '@/lib/plotmapApi';
-import { draftStats, flagText, naturalCompare, orderForReview, plotmapErrorText, publishBlockers } from '@/lib/plotMap.mjs';
+import {
+  crossSheetDuplicates, draftStats, duplicateMessage, failedSheetsText, flagText, generationFailureText, naturalCompare,
+  orderForReview, plotmapErrorText, plotsForSheet, publishBlockers, sheetsOf,
+} from '@/lib/plotMap.mjs';
 import type { Blocker, DraftPlot, LayoutDetail, PublishResponse } from '@/types/plotmap';
 import PlotMapViewer, { formatArea } from './PlotMapViewer';
+import SheetTabs from './SheetTabs';
+import type { SheetTab } from './SheetTabs';
 
 const BLOCKER_TEXT: Record<Blocker['code'], (n: number) => string> = {
   NO_PLOTS: () => 'Ek bhi plot nahi bacha. Naya image dekar layout dobara banao.',
   NO_NUMBER: (n) => `${n} plot ka number nahi hai`,
   DUP_NUMBER: (n) => `${n} plot ka number kisi aur plot jaisa hai`,
+  SHEET_FAILED: (n) => failedSheetsText(n),
 };
 
 type Unmatched = { number: string; status: string; plotId: string }[];
 
 export default function PlotmapReviewPanel({
-  projectId, layoutId, hasLive, onPublished, onDiscarded,
+  projectId, layoutId, hasLive, onPublished, onDiscarded, onRegenerating,
 }: {
   projectId: string;
   layoutId: string;
   hasLive: boolean;
   onPublished: (r: PublishResponse) => void;
   onDiscarded: () => void;
+  /** A failed sheet was retried: the layout is generating again, so the page should show progress. */
+  onRegenerating?: () => void;
 }) {
   const [layout, setLayout] = useState<LayoutDetail | null>(null);
   const [plots, setPlots] = useState<DraftPlot[]>([]);
   const [blockers, setBlockers] = useState<Blocker[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [numberInput, setNumberInput] = useState('');
-  const [confirm, setConfirm] = useState<'delete' | 'publish' | 'discard' | null>(null);
+  const [confirm, setConfirm] = useState<'delete' | 'publish' | 'discard' | 'removeSheet' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unmatched, setUnmatched] = useState<Unmatched | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [wantedSheet, setWantedSheet] = useState(0);
+  const [nameInput, setNameInput] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -55,14 +72,32 @@ export default function PlotmapReviewPanel({
     return () => clearTimeout(t);
   }, [load]);
 
+  // An old backend (or a legacy layout) has no `sheets`: one virtual sheet, no tabs.
+  const sheets = useMemo(() => (layout?.sheets && layout.sheets.length > 0
+    ? [...layout.sheets].sort((a, b) => a.idx - b.idx)
+    : sheetsOf({ image: layout?.image }).map((s) => ({ ...s, state: 'done' as const, stats: { plots: 0, cp: 0, roads: 0, flagged: 0 }, warnings: [], failure: null, attempts: 1 }))), [layout]);
+  const multi = sheets.length > 1;
+  const activeSheet = sheets.find((s) => s.idx === wantedSheet) ?? sheets[0];
+  const sheetFailed = activeSheet?.state === 'failed';
+
   const selected = useMemo(() => plots.find((p) => p.id === selectedId) ?? null, [plots, selectedId]);
-  const ordered = useMemo(() => orderForReview(plots) as DraftPlot[], [plots]);
-  const others = useMemo(() => plots.filter((p) => p.kind !== 'plot').sort((a, b) => naturalCompare(a.key, b.key)), [plots]);
+  const sheetPlots = useMemo(() => (multi ? plotsForSheet(plots, activeSheet.idx) : plots) as DraftPlot[], [multi, plots, activeSheet?.idx]);
+  const ordered = useMemo(() => orderForReview(sheetPlots) as DraftPlot[], [sheetPlots]);
+  const others = useMemo(() => sheetPlots.filter((p) => p.kind !== 'plot').sort((a, b) => naturalCompare(a.key, b.key)), [sheetPlots]);
   const flaggedIds = useMemo(() => new Set(plots.filter((p) => (p.flags ?? []).length > 0).map((p) => p.id)), [plots]);
   const stats = useMemo(() => draftStats(plots), [plots]);
+  const dupTexts = useMemo(() => crossSheetDuplicates(plots, sheets), [plots, sheets]);
   // The server's blockers are authoritative. When it reports none but the local copy still shows a
   // problem, the local check keeps Publish disabled; the server re-checks on publish anyway.
-  const activeBlockers = useMemo(() => (blockers.length ? blockers : (publishBlockers(plots) as Blocker[])), [blockers, plots]);
+  const activeBlockers = useMemo(() => (blockers.length ? blockers : (publishBlockers(plots, layout?.sheets ?? []) as Blocker[])), [blockers, plots, layout]);
+
+  const tabs = useMemo<SheetTab[]>(() => sheets.map((s) => {
+    if (s.state === 'failed') return { idx: s.idx, name: s.name, badge: 'Nahi ban payi', tone: 'bad' as const };
+    const flagged = plots.filter((p) => (p.sheet ?? 0) === s.idx && (p.flags ?? []).length > 0).length;
+    return { idx: s.idx, name: s.name, ...(flagged > 0 ? { badge: `${flagged} check`, tone: 'warn' as const } : {}) };
+  }), [sheets, plots]);
+
+  const showSheet = (idx: number) => { setWantedSheet(idx); setSelectedId(null); setConfirm(null); setNameInput(null); setError(null); };
 
   const pick = (id: string | null) => {
     setSelectedId(id);
@@ -70,6 +105,7 @@ export default function PlotmapReviewPanel({
     setError(null);
     const p = plots.find((x) => x.id === id);
     setNumberInput(p?.number ?? '');
+    if (p) setWantedSheet(p.sheet ?? 0);
   };
 
   /** Applies the answer of one Check & fix edit to the local copy. */
@@ -89,7 +125,7 @@ export default function PlotmapReviewPanel({
     const code = apiCode(e);
     setError(plotmapErrorText(code, e instanceof Error ? e.message : undefined));
     // A stale version or a draft that changed under us: reload the truth.
-    if (code === 'LAYOUT_VERSION' || code === 'NOT_DRAFT' || code === 'PLOT_NOT_FOUND') await load();
+    if (code === 'LAYOUT_VERSION' || code === 'NOT_DRAFT' || code === 'PLOT_NOT_FOUND' || code === 'SHEET_NOT_FOUND') await load();
   };
 
   const saveNumber = async () => {
@@ -98,7 +134,17 @@ export default function PlotmapReviewPanel({
     setError(null);
     try {
       applyEdit(await plotmapApi.editNumber(projectId, layoutId, selected.id, numberInput.trim(), layout.version));
-    } catch (e) { await failed(e); } finally { setBusy(false); }
+    } catch (e) {
+      // The number is already used on another sheet: name both sheets instead of the generic line.
+      const conflictSheet = apiBody<{ conflictSheet?: number }>(e)?.conflictSheet;
+      const mine = selected.sheet ?? 0;
+      if (apiCode(e) === 'DUP_NUMBER' && typeof conflictSheet === 'number' && conflictSheet !== mine) {
+        const nameOf = (i: number) => sheets.find((s) => s.idx === i)?.name ?? `Sheet ${i + 1}`;
+        setError(duplicateMessage(numberInput.trim(), nameOf(conflictSheet), nameOf(mine)));
+      } else {
+        await failed(e);
+      }
+    } finally { setBusy(false); }
   };
 
   const removePlot = async (p: DraftPlot) => {
@@ -110,6 +156,39 @@ export default function PlotmapReviewPanel({
       setConfirm(null);
       setSelectedId(null);
     } catch (e) { await failed(e); } finally { setBusy(false); }
+  };
+
+  const renameSheet = async () => {
+    if (!layout || nameInput === null) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await plotmapApi.renameSheet(projectId, layoutId, activeSheet.idx, nameInput.trim(), layout.version);
+      setLayout((l) => (l ? { ...l, version: r.layout.version, sheets: (l.sheets ?? []).map((s) => (s.idx === r.sheet.idx ? { ...s, name: r.sheet.name } : s)) } : l));
+      setNameInput(null);
+    } catch (e) { await failed(e); } finally { setBusy(false); }
+  };
+
+  const retrySheet = async (idx: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await plotmapApi.retrySheet(projectId, layoutId, idx);
+      // The layout is `generating` again: hand over to the progress panel.
+      if (onRegenerating) onRegenerating(); else await load();
+    } catch (e) { await failed(e); } finally { setBusy(false); }
+  };
+
+  const removeSheet = async (idx: number) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await plotmapApi.removeSheet(projectId, layoutId, idx);
+      setConfirm(null);
+      setSelectedId(null);
+      setWantedSheet(sheets.find((s) => s.idx !== idx)?.idx ?? 0);
+      await load();
+    } catch (e) { await failed(e); setConfirm(null); } finally { setBusy(false); }
   };
 
   const publish = async () => {
@@ -151,6 +230,7 @@ export default function PlotmapReviewPanel({
 
   const warnings = layout.generation.warnings ?? [];
   const canPublish = !busy && activeBlockers.length === 0 && stats.plots > 0;
+  const sheetName = (i: number) => sheets.find((s) => s.idx === i)?.name ?? `Sheet ${i + 1}`;
 
   return (
     <section aria-label="Check and fix" className="flex flex-col gap-4">
@@ -159,6 +239,7 @@ export default function PlotmapReviewPanel({
         <p className="mt-1 text-sm text-gray-800" aria-live="polite">
           {stats.plots} plots mile · {stats.cp} common plot · {stats.roads} road
           {stats.flagged > 0 ? ` · ${stats.flagged} jagah check karna hai` : ''}
+          {multi ? ` · ${sheets.length} sheets` : ''}
         </p>
         {warnings.map((w) => <p key={w.code} className="mt-1 text-sm text-yellow-900">{w.message}</p>)}
         <p className="mt-2 text-sm text-gray-600">
@@ -166,22 +247,85 @@ export default function PlotmapReviewPanel({
         </p>
       </div>
 
+      {dupTexts.length > 0 && (
+        <div role="alert" className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          <ul className="flex flex-col gap-1" aria-label="Do sheet mein ek hi number">
+            {dupTexts.map((d) => (
+              <li key={d.plotId} className="flex flex-wrap items-center gap-2">
+                <span>{d.text}</span>
+                <button type="button" className="min-h-[44px] font-semibold underline" onClick={() => pick(d.plotId)}>Number badlo</button>
+                <button type="button" className="min-h-[44px] font-semibold underline" onClick={() => showSheet(d.otherSheet)}>Dusre sheet par jao</button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <SheetTabs tabs={tabs} activeIdx={activeSheet.idx} onChange={showSheet} label="Layout ki sheets" />
+
+      {multi && (
+        <div className="flex flex-wrap items-end gap-2 rounded-xl border border-gray-200 bg-white p-3">
+          {nameInput === null ? (
+            <>
+              <p className="min-w-0 flex-1 text-sm text-gray-800">Sheet ka naam: <span className="font-semibold">{activeSheet.name}</span> <span className="text-gray-600">(buyers ko tab par yahi naam dikhega)</span></p>
+              <button type="button" disabled={busy} className={`${btn} border border-gray-300 bg-white text-gray-900`} onClick={() => setNameInput(activeSheet.name)}>Naam badlo</button>
+              {confirm !== 'removeSheet' && <button type="button" disabled={busy} className={`${btn} border border-red-300 bg-white text-red-800`} onClick={() => setConfirm('removeSheet')}>Ye sheet hatao</button>}
+            </>
+          ) : (
+            <form className="flex flex-1 items-end gap-2" onSubmit={(e) => { e.preventDefault(); void renameSheet(); }}>
+              <label className="flex-1 text-sm text-gray-800">
+                Sheet ka naam
+                <input value={nameInput} maxLength={40} onChange={(e) => setNameInput(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-gray-300 bg-white px-3 text-gray-900" />
+              </label>
+              <button type="submit" disabled={busy || !nameInput.trim() || nameInput.trim() === activeSheet.name} className={`${btn} bg-orange-600 text-white`}>Save</button>
+              <button type="button" disabled={busy} className={`${btn} border border-gray-300`} onClick={() => setNameInput(null)}>Wapas</button>
+            </form>
+          )}
+          {confirm === 'removeSheet' && (
+            <div role="alertdialog" aria-label="Sheet hatane ka confirm" className="w-full rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-gray-900">
+              <p>&quot;{activeSheet.name}&quot; aur uske saare plots draft se hat jayenge. Wapas nahi aayega (no undo). Hatao?</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button type="button" disabled={busy} onClick={() => setConfirm(null)} className={`${btn} border border-gray-300 bg-white`}>Wapas</button>
+                <button type="button" disabled={busy} onClick={() => void removeSheet(activeSheet.idx)} className={`${btn} bg-red-700 text-white`}>Haan, sheet hatao</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {sheetFailed && (
+        <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+          <p className="font-semibold">{activeSheet.name}: Nahi ban payi</p>
+          <p className="mt-1">{generationFailureText(activeSheet.failure?.code, activeSheet.failure?.message)}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" disabled={busy} className={`${btn} bg-orange-600 text-white`} onClick={() => void retrySheet(activeSheet.idx)}>Dobara try karo</button>
+            {multi && confirm !== 'removeSheet' && <button type="button" disabled={busy} className={`${btn} border border-red-300 bg-white text-red-800`} onClick={() => setConfirm('removeSheet')}>Ye sheet hatao</button>}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <PlotMapViewer
-          image={layout.image}
-          plots={plots}
-          role="public"
-          selectedId={selectedId}
-          onSelect={pick}
-          flaggedIds={flaggedIds}
-          focusPlotId={selectedId}
-          heightClass="h-[60vh] min-h-[320px]"
-        />
+        {sheetFailed ? (
+          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">Is sheet ka layout nahi bana, isliye yahan dikhane ko kuch nahi hai.</div>
+        ) : (
+          <PlotMapViewer
+            image={multi ? activeSheet.image : layout.image}
+            plots={sheetPlots}
+            role="public"
+            selectedId={selectedId}
+            onSelect={pick}
+            flaggedIds={flaggedIds}
+            focusPlotId={selectedId}
+            heightClass="h-[60vh] min-h-[320px]"
+            {...(multi ? { searchAll: plots, currentSheet: activeSheet.idx, sheetNameOf: sheetName, onSearchPick: (hit: { plotId: string }) => pick(hit.plotId) } : {})}
+          />
+        )}
 
         <div className="flex min-w-0 flex-col gap-3">
           {selected && (
             <div className="rounded-xl border border-orange-300 bg-orange-50 p-3" aria-label={`Plot ${selected.number ?? ''} edit`}>
               <h3 className="font-bold text-gray-900">Plot {selected.number ?? '(number nahi)'}</h3>
+              {multi && <p className="text-xs text-gray-600">{sheetName(selected.sheet ?? 0)}</p>}
               {formatArea(selected.area, selected.areaUnit, selected.areaApprox) && <p className="text-sm text-gray-700">{formatArea(selected.area, selected.areaUnit, selected.areaApprox)}</p>}
               {(selected.flags ?? []).length > 0 && <p className="text-sm text-red-800">{selected.flags.map(flagText).join(' · ')}</p>}
               <form className="mt-2 flex items-end gap-2" onSubmit={(e) => { e.preventDefault(); void saveNumber(); }}>
@@ -211,7 +355,7 @@ export default function PlotmapReviewPanel({
           )}
 
           <div className="rounded-xl border border-gray-200 bg-white p-3">
-            <h3 className="font-bold text-gray-900">Plots ({ordered.length})</h3>
+            <h3 className="font-bold text-gray-900">Plots ({ordered.length}){multi ? ` · ${activeSheet.name}` : ''}</h3>
             <p className="text-xs text-gray-600">Jinko check karna hai wo upar hain.</p>
             <ul className="mt-2 max-h-72 divide-y divide-gray-100 overflow-y-auto" aria-label="Plot list">
               {ordered.map((p) => {
@@ -257,6 +401,9 @@ export default function PlotmapReviewPanel({
               <li key={b.code} className="flex flex-wrap items-center gap-2 text-sm text-red-800">
                 <span>{BLOCKER_TEXT[b.code]?.(b.count) ?? b.code}</span>
                 {b.plotIds[0] && <button type="button" className="min-h-[44px] font-semibold underline" onClick={() => pick(b.plotIds[0])}>Pehla dikhao</button>}
+                {b.code === 'SHEET_FAILED' && b.sheets?.[0] !== undefined && (
+                  <button type="button" className="min-h-[44px] font-semibold underline" onClick={() => showSheet(b.sheets![0])}>Sheet dikhao</button>
+                )}
               </li>
             ))}
           </ul>
@@ -272,7 +419,7 @@ export default function PlotmapReviewPanel({
 
         {confirm === 'publish' ? (
           <div role="alertdialog" aria-label="Publish confirm" className="rounded-lg border border-orange-300 bg-orange-50 p-3 text-sm text-gray-900">
-            <p>{hasLive ? 'Naya layout publish karein? Purana layout archive ho jayega, booked plots number se jud jayenge.' : 'Layout publish karein? Iske baad ye sabko dikhega.'}</p>
+            <p>{hasLive ? 'Naya layout publish karein? Purana layout archive ho jayega, booked plots number se jud jayenge.' : 'Layout publish karein? Iske baad ye sabko dikhega.'}{multi ? ` Saari ${sheets.length} sheets ek saath publish hongi.` : ''}</p>
             <div className="mt-2 grid grid-cols-2 gap-2">
               <button type="button" disabled={busy} className={`${btn} border border-gray-300 bg-white`} onClick={() => setConfirm(null)}>Wapas</button>
               <button type="button" disabled={busy} className={`${btn} bg-orange-600 text-white`} onClick={() => void publish()}>Haan, publish karo</button>

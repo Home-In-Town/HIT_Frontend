@@ -24,8 +24,10 @@ export function appOpenHref(slug: string): string {
   return `intent://plot-map?slug=${encodeURIComponent(slug)}#Intent;scheme=hitmobile;package=in.homeintown.mobile;end`;
 }
 export default function PlotSheet({
-  payload, plot, owner, busy, error, onClose, appSlug,
+  payload, plot, owner, busy, error, onClose, appSlug, sheetName,
 }: {
+  /** Multi-sheet layouts only: which sheet this plot is on. */
+  sheetName?: string;
   payload: PlotMapPayload;
   plot: PlotMapPlot;
   owner?: OwnerHandlers;
@@ -73,6 +75,7 @@ export default function PlotSheet({
           {statusLabel(status, ownerSide ? 'owner_side' : 'public')}
         </span>
         {area && <span>{area}</span>}
+        {sheetName && <span>{sheetName}</span>}
       </p>
 
       {ownerSide ? (

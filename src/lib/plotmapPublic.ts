@@ -26,7 +26,7 @@ export async function getPlotMap(
   try {
     const init: RequestInit & { next?: { revalidate: number } } = { signal: ctrl.signal };
     if (o.revalidate !== undefined) init.next = { revalidate: o.revalidate };
-    const res = await fetchImpl(`${base}/public/projects/${encodeURIComponent(slug)}/plotmap`, init);
+    const res = await fetchImpl(`${base}/public/projects/${encodeURIComponent(slug)}/plotmap?sheets=1`, init);
     if (res.status === 404) return { kind: 'notfound' };
     if (!res.ok) return { kind: 'error', status: res.status };
     return { kind: 'ok', payload: (await res.json()) as PlotMapPayload };
