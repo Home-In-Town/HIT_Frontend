@@ -10,6 +10,7 @@ import CaptainCombobox from '@/components/dashboard/CaptainCombobox';
 import AgentCombobox from '@/components/dashboard/AgentCombobox';
 import toast from 'react-hot-toast';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
+import { showPlotMapAction } from '@/lib/plotMap.mjs';
 
 interface ProjectTableProps {
   projects: Project[];
@@ -359,7 +360,7 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
                           >
                             Layout Editor
                           </button>
-                          {project.plotMap?.enabled === true && (
+                          {showPlotMapAction(project) && (
                             <button
                               onClick={() => {
                                 setOpenMenuId(null);

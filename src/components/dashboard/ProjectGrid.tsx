@@ -5,6 +5,7 @@ import { Project } from '@/types/project';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
+import { showPlotMapAction } from '@/lib/plotMap.mjs';
 
 interface ProjectGridProps {
   projects: Project[];
@@ -96,7 +97,7 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
               >
                 Layout
               </button>
-              {project.plotMap?.enabled === true && (
+              {showPlotMapAction(project) && (
                 <button
                   onClick={() => router.push(`/dashboard/projects/${project.id}/plot-map`)}
                   className="px-4 py-2 text-xs font-bold text-[#B45309] bg-white border border-[#B45309] rounded-xl hover:bg-[#FAF7F2] transition-all"

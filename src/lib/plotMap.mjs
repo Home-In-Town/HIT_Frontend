@@ -409,7 +409,30 @@ export function buildPlotMapMeta(payload, slug = '') {
  */
 export function mapPlotMapField(raw) {
   if (!raw || typeof raw !== 'object') return undefined;
-  return { enabled: raw.enabled === true, layoutId: raw.layoutId ? String(raw.layoutId) : null };
+  return {
+    enabled: raw.enabled === true,
+    // Admin opt-out (E20 {enabled:false}). `enabled` alone cannot say it:
+    // false and "never set" looked identical.
+    optedOut: raw.enabled === false,
+    layoutId: raw.layoutId ? String(raw.layoutId) : null,
+  };
+}
+
+/**
+ * Show the dashboard "Plot Map" action? Previous behaviour: only when
+ * plotMap.enabled === true, which the backend never set for new projects, so
+ * the button was hidden. Now mirrors the backend: any plot/land project unless
+ * an admin opted it out. The backend stays the real gate (it answers 404 if
+ * this guess is wrong); this only decides whether the button is drawn.
+ * @param {{ type?: string; propertyType?: string; plotMap?: { enabled?: boolean; optedOut?: boolean } } | null | undefined} project
+ */
+export function showPlotMapAction(project) {
+  if (!project) return false;
+  if (project.plotMap?.optedOut === true) return false;
+  if (project.plotMap?.enabled === true) return true;
+  if (String(project.type ?? '').toLowerCase() === 'plot') return true;
+  const label = String(project.propertyType ?? '').trim().toLowerCase();
+  return /farm\s*land|agricultur|\bplots?\b|\bland\b/.test(label);
 }
 
 // ── Error text (Hinglish) ──────────────────────────────────────────────────

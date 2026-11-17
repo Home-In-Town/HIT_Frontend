@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import {
   normalisePlotNumber, searchPlots, hitTest, bookButtonState, statusLabel, publishBlockers, draftStats,
-  orderForReview, countStatuses, buildPlotMapMeta, mapPlotMapField, decidePoll, applyStatuses, applyChanges,
+  orderForReview, countStatuses, buildPlotMapMeta, mapPlotMapField, showPlotMapAction, decidePoll, applyStatuses, applyChanges,
   fitRect, clampTransform, zoomAround, screenToNorm, centerOn, naturalCompare, plotmapErrorText,
   generationFailureText, flagText, styleForStatus, plotNotificationHref,
 } from './plotMap.mjs';
@@ -265,10 +265,22 @@ test('buildPlotMapMeta: unsafe image URL gives a summary card', () => {
 });
 
 test('mapPlotMapField keeps enabled/layoutId and nothing else', () => {
-  assert.deepEqual(mapPlotMapField({ enabled: true, layoutId: 'abc', publishLockAt: 'x' }), { enabled: true, layoutId: 'abc' });
+  assert.deepEqual(mapPlotMapField({ enabled: true, layoutId: 'abc', publishLockAt: 'x' }), { enabled: true, optedOut: false, layoutId: 'abc' });
   assert.equal(mapPlotMapField(undefined), undefined);
   assert.equal(mapPlotMapField(null), undefined);
-  assert.deepEqual(mapPlotMapField({ enabled: 'yes', layoutId: null }), { enabled: false, layoutId: null });
+  assert.deepEqual(mapPlotMapField({ enabled: 'yes', layoutId: null }), { enabled: false, optedOut: false, layoutId: null });
+  assert.equal(mapPlotMapField({ enabled: false }).optedOut, true);
+});
+
+test('showPlotMapAction: plot projects on by default, opt-out hides, flats hidden', () => {
+  assert.equal(showPlotMapAction({ type: 'plot', propertyType: 'Farm Land' }), true);
+  assert.equal(showPlotMapAction({ type: 'flat', propertyType: 'Farm Land' }), true);
+  assert.equal(showPlotMapAction({ type: 'plot', propertyType: '' }), true);
+  assert.equal(showPlotMapAction({ type: 'flat', propertyType: 'Residential Plot', plotMap: { enabled: true, optedOut: false, layoutId: null } }), true);
+  assert.equal(showPlotMapAction({ type: 'plot', plotMap: { enabled: false, optedOut: true, layoutId: null } }), false);
+  assert.equal(showPlotMapAction({ type: 'flat', propertyType: 'Apartment / Flat' }), false);
+  assert.equal(showPlotMapAction({ type: 'flat', propertyType: 'Farm House' }), false);
+  assert.equal(showPlotMapAction(undefined), false);
 });
 
 // ── copy ──

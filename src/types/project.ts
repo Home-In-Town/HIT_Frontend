@@ -122,7 +122,7 @@ export interface Project {
   layoutEntities?: LayoutEntity[];
   layoutOverlay?: LayoutOverlay | null;
   // Image-based plot map (flag + pointer only; the map itself comes from /plotmap).
-  plotMap?: { enabled: boolean; layoutId: string | null };
+  plotMap?: { enabled: boolean; optedOut?: boolean; layoutId: string | null };
   // From GET /projects/:id (backend task 3.2 / 4.1): role flags and the
   // Layout_Version token. Absent on older backends and on public routes.
   canEdit?: boolean;

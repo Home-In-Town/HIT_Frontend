@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { mapPlotMapField } from './plotMap.mjs';
 
 test('mapPlotMapField keeps enabled + layoutId and drops everything else', () => {
-  assert.deepEqual(mapPlotMapField({ enabled: true, layoutId: '64f0', publishLockAt: 'x' }), { enabled: true, layoutId: '64f0' });
+  assert.deepEqual(mapPlotMapField({ enabled: true, layoutId: '64f0', publishLockAt: 'x' }), { enabled: true, optedOut: false, layoutId: '64f0' });
 });
 
 test('mapPlotMapField: absent field stays absent (undefined, not null)', () => {
@@ -17,8 +17,8 @@ test('mapPlotMapField: absent field stays absent (undefined, not null)', () => {
 });
 
 test('mapPlotMapField: a truthy non-boolean enabled becomes false', () => {
-  assert.deepEqual(mapPlotMapField({ enabled: 'yes', layoutId: null }), { enabled: false, layoutId: null });
-  assert.deepEqual(mapPlotMapField({ enabled: 1, layoutId: 'a' }), { enabled: false, layoutId: 'a' });
+  assert.deepEqual(mapPlotMapField({ enabled: 'yes', layoutId: null }), { enabled: false, optedOut: false, layoutId: null });
+  assert.deepEqual(mapPlotMapField({ enabled: 1, layoutId: 'a' }), { enabled: false, optedOut: false, layoutId: 'a' });
 });
 
 test('mapPlotMapField: a non-string layoutId is stringified', () => {
