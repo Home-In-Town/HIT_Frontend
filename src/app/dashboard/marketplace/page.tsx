@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
+import { isPlotSource, plotSummary } from '@/lib/propertySummary';
 import { formatDerivedPricePerSqFt, derivePricePerSqFt } from '@/utils/pricePerSqFt';
 import { computeAgentPayout, formatPayout } from '@/utils/agentPayout';
 import {
@@ -103,6 +104,20 @@ function getProjectDetails(item: MarketplaceListing | any) {
     project.projectArea ||
     '';
 
+  const plotLine = isPlotSource({
+    type: project.projectType || project.type,
+    propertyType: project.propertyType,
+    category: project.category,
+  }) ? plotSummary({
+    type: project.projectType || project.type,
+    propertyType: project.propertyType,
+    category: project.category,
+    plotDetails: project.plotDetails,
+    configuration: project.configuration,
+    plotSizeRange: project.plotSizeRange,
+    facingOptions: project.facingOptions,
+  }) : '';
+
   // Listed By information
   const listedBy = item.listedBy?.name || item.listedBy?.companyName || project.owner?.name || 'Owner';
   const listedByPhone = (item.listedBy as any)?.phone || (project.owner as any)?.phone || (item as any).listedByPhone || '';
@@ -131,7 +146,9 @@ function getProjectDetails(item: MarketplaceListing | any) {
     amenities: project.amenities || [],
     companyName: item.listedBy?.companyName || project.owner?.companyName || '',
     // Extra details for rich cards
-    bhkOptions: project.configuration?.bhkOptions || project.bhkOptions || [],
+    // A plot project never shows (or filters by) BHK: a stale list from an earlier category is dropped here.
+    bhkOptions: plotLine ? [] : (project.configuration?.bhkOptions || project.bhkOptions || []),
+    plotLine,
     projectStatus: project.projectStatus || '',
     reraApproved: project.reraApproved || false,
     gatedCommunity: project.configuration?.gatedCommunity || project.gatedCommunity || false,
@@ -1078,7 +1095,12 @@ export default function MarketplacePage() {
                                   {details.bhkOptions.slice(0, 2).join(', ')}
                                 </span>
                               )}
-                              {details.area && (
+                              {details.plotLine && (
+                                <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 rounded text-[7px] md:text-[8px] font-bold border border-blue-100">
+                                  {details.plotLine}
+                                </span>
+                              )}
+                              {details.area && !details.plotLine && (
                                 <span className="px-1.5 py-0.5 bg-zinc-50 text-zinc-600 rounded text-[7px] md:text-[8px] font-bold border border-zinc-100">
                                   {details.area}
                                 </span>

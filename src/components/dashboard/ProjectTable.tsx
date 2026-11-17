@@ -10,6 +10,7 @@ import CaptainCombobox from '@/components/dashboard/CaptainCombobox';
 import AgentCombobox from '@/components/dashboard/AgentCombobox';
 import toast from 'react-hot-toast';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
+import { plotSummary } from '@/lib/propertySummary';
 import { showPlotMapAction } from '@/lib/plotMap.mjs';
 
 interface ProjectTableProps {
@@ -219,6 +220,7 @@ export default function ProjectTable({ projects, onDelete, onCopyLink, onAssignC
                   <span className="px-3 py-1 inline-flex text-[10px] font-bold uppercase tracking-wider rounded-full bg-[#FAF7F2] text-[#57534E] border border-[#E7E5E4]">
                     {getPropertyLabel(project)}
                   </span>
+                  {plotSummary(project) && <div className="mt-1 text-[11px] font-medium text-[#57534E]">{plotSummary(project)}</div>}
                 </td>
 
                 <td className="px-6 py-3.5 whitespace-nowrap">

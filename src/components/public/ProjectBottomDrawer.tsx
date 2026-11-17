@@ -10,6 +10,10 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { Phone, MessageCircle, Eye, LucideIcon } from "lucide-react";
 import { Project } from "@/types/project";
+import { isPlotSource, plotSummary } from "@/lib/propertySummary";
+
+/** Plot: plot summary. Others: exactly the old BHK join (previous behaviour), '' when empty. */
+const cardLine = (p: Project) => (isPlotSource(p) ? plotSummary(p) : (p.bhkOptions?.length ? p.bhkOptions.join(", ") : ""));
 
 // =============================
 // Action Button
@@ -131,9 +135,10 @@ function ProjectCardMobile({
             <h3 className="text-m font-semibold leading-tight">
               {project.name}
             </h3>
-            {project.bhkOptions && (
+            {/* Plot projects show plots / size / land area; others keep the BHK line (and no empty line for []). */}
+            {cardLine(project) && (
               <p className="text-xs text-blue-700">
-                {project.bhkOptions.join(", ")}
+                {cardLine(project)}
               </p>
             )}
           </div>
@@ -188,8 +193,8 @@ function ProjectCardDesktop({ project }: { project: Project }) {
 
       <div className="p-3 space-y-1">
         <h3 className="text-base font-semibold">{project.name}</h3>
-        {project.bhkOptions && (
-          <p className="text-xs text-blue-700">{project.bhkOptions.join(", ")}</p>
+        {cardLine(project) && (
+          <p className="text-xs text-blue-700">{cardLine(project)}</p>
         )}
         <div className="flex gap-1 mt-2 text-xs">
           <Link href={`/visit/${project.slug ?? project.id}`} className="flex-1">

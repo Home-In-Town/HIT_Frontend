@@ -5,6 +5,7 @@ import { Project } from '@/types/project';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getPropertyLabel } from '@/lib/getPropertyLabel';
+import { plotSummary } from '@/lib/propertySummary';
 import { showPlotMapAction } from '@/lib/plotMap.mjs';
 
 interface ProjectGridProps {
@@ -74,6 +75,11 @@ export default function ProjectGrid({ projects, onDelete, onCopyLink }: ProjectG
                   <span className="text-xs font-bold text-[#2A2A2A] truncate block">{project.projectStatus === 'ready-to-move' ? 'Ready' : 'In Progress'}</span>
                </div>
              </div>
+
+             {/* Plot projects: plots / size / land area. Other projects draw nothing here (unchanged). */}
+             {plotSummary(project) && (
+               <p className="text-xs font-medium text-[#57534E]">{plotSummary(project)}</p>
+             )}
 
              {project.reraApproved && (
                 <div className="text-[10px] text-[#B45309] font-bold uppercase tracking-[0.2em] flex items-center gap-2 bg-[#B45309]/5 py-2 px-3 rounded-lg border border-[#B45309]/10">

@@ -11,6 +11,7 @@ import {  MapPinAreaIcon } from "@phosphor-icons/react/dist/ssr";
 import AmenitiesSection from "@/components/public/AmenitiesSection";
 import { buildMediaItems } from "@/utils/buildMediaItems";
 import { derivePricePerSqFt } from "@/utils/pricePerSqFt";
+import { isPlotSource, plotRows } from "@/lib/propertySummary";
 import MediaGallery from "@/components/public/MediaGallery";
 import dynamic from "next/dynamic";
 type FloorPlan = {
@@ -137,7 +138,10 @@ export default function DesktopVisit({
     return value;
   };
 
-  const isPlot = project.propertyType === "Residential Plot" || project.propertyType === "Commercial Plot / Land" || project.type === "plot";
+  // Previous behaviour: only two labels (plus projectType) counted as a plot, so NA Plot / Farm Land /
+  // Industrial Plot showed Carpet Area and BHK. Same rule as the form and the server now.
+  const isPlot = isPlotSource(project);
+  const extraPlotRows = plotRows(project);
 
 const flatDetails = [
     { label: "Carpet Area", value: project.carpetAreaRange, icon: Home },   
@@ -146,7 +150,9 @@ const flatDetails = [
 ];
 
 const plotDetails = [
-  { label: "Plot Size", value: project.plotSizeRange, icon: Ruler },
+  // New plot projects carry plotDetails (size, total plots, road width, approvals, ...); old ones only plotSizeRange.
+  ...(extraPlotRows.some(([l]) => l === "Plot Size") ? [] : [{ label: "Plot Size", value: project.plotSizeRange, icon: Ruler }]),
+  ...extraPlotRows.map(([label, value]) => ({ label, value, icon: Ruler })),
   { label: "Facing", value: project.facingOptions?.join(", "), icon: CompassIcon },
   { label: "Gated", value: project.gatedCommunity ? "Yes" : "No", icon: ShieldCheckIcon },
 ];
